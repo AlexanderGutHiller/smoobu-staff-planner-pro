@@ -54,38 +54,57 @@ async def refresh_bookings_job():
     bookings = await client.get_bookings(start.isoformat(), end.isoformat())
     db = SessionLocal()
     try:
-        existing = {b.id for b in db.query(Booking).all()}
-        seen = set()
+        # Cache existing apartments by name to avoid UNIQUE errors
+        apt_cache = {a.name: a for a in db.query(Apartment).all()}
+        existing_ids = {b.id for b in db.query(Booking).all()}
+        seen_ids = set()
+
         for b in bookings:
-            bid = b.get("id")
+            bid = b.get("id") or b.get("bookingId") or b.get("reservationId")
             if bid is None:
                 continue
-            seen.add(bid)
+            seen_ids.add(bid)
+
             apt = (b.get("apartment") or {})
-            bk = db.query(Booking).filter(Booking.id == bid).first() or Booking(id=bid)
-            bk.apartment_id = apt.get("id")
-            bk.apartment_name = apt.get("name","")
-            bk.arrival = (b.get("arrival") or "")[:10]
-            bk.departure = (b.get("departure") or "")[:10]
-            bk.nights = int(b.get("nights") or 0)
-            bk.adults = int(b.get("adults") or 1)
-            bk.children = int(b.get("children") or 0)
-            bk.guest_comments = (b.get("notice") or "")[:2000]
-            db.merge(bk)
-            if bk.apartment_name:
-                ap = db.query(Apartment).filter(Apartment.name == bk.apartment_name).first()
-                if not ap:
-                    ap = Apartment(name=bk.apartment_name, smoobu_id=bk.apartment_id or None, planned_minutes=90)
+            apt_name = apt.get("name") or (b.get("apartmentName") or "").strip()
+            apt_id_smoobu = apt.get("id") or b.get("apartmentId")
+
+            # Ensure apartment exists once per name
+            ap = None
+            if apt_name:
+                ap = apt_cache.get(apt_name)
+                if ap is None:
+                    ap = Apartment(name=apt_name, smoobu_id=apt_id_smoobu or None, planned_minutes=90)
                     db.add(ap)
-        for old in existing - seen:
+                    db.flush()  # assign ID immediately so following rows can reference it
+                    apt_cache[apt_name] = ap
+
+            # Upsert booking
+            bk = db.query(Booking).filter(Booking.id == bid).first()
+            if not bk:
+                bk = Booking(id=bid)
+            bk.apartment_id = ap.id if ap else None
+            bk.apartment_name = apt_name or ""
+            bk.arrival = (b.get("arrival") or b.get("checkIn") or "")[:10]
+            bk.departure = (b.get("departure") or b.get("checkOut") or "")[:10]
+            bk.nights = int(b.get("nights") or 0)
+            bk.adults = int(b.get("adults") or b.get("numberOfGuests") or 1)
+            bk.children = int(b.get("children") or 0)
+            bk.guest_comments = (b.get("notice") or b.get("guestComments") or b.get("comment") or "")[:2000]
+            db.merge(bk)
+
+        # Delete stale bookings
+        for old in existing_ids - seen_ids:
             db.query(Booking).filter(Booking.id == old).delete()
         db.commit()
+
+        # Rebuild future tasks from bookings
         today = dt.date.today().isoformat()
         db.query(Task).filter(Task.date >= today).delete()
         for bk in db.query(Booking).all():
             if not bk.departure:
                 continue
-            ap = db.query(Apartment).filter(Apartment.name == bk.apartment_name).first()
+            ap = apt_cache.get(bk.apartment_name) or db.query(Apartment).filter(Apartment.name == bk.apartment_name).first()
             planned = ap.planned_minutes if ap else 90
             t = Task(date=bk.departure, planned_minutes=planned, apartment_id=ap.id if ap else None,
                      booking_id=bk.id, status="open", extras_json="{}")
