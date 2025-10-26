@@ -14,6 +14,7 @@ class Booking(Base):
     adults: Mapped[int] = mapped_column(Integer, default=1)
     children: Mapped[int] = mapped_column(Integer, default=0)
     guest_comments: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(32), default="")
 
 class Staff(Base):
     __tablename__ = "staff"
@@ -43,12 +44,3 @@ class Task(Base):
     booking_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("bookings.id"))
     assigned_staff_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("staff.id"))
     status: Mapped[str] = mapped_column(String(16), default="open")
-
-class TimeLog(Base):
-    __tablename__ = "timelogs"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    task_id: Mapped[int] = mapped_column(Integer, ForeignKey("tasks.id"))
-    staff_id: Mapped[int] = mapped_column(Integer, ForeignKey("staff.id"))
-    started_at: Mapped[str] = mapped_column(String(19))
-    ended_at: Mapped[str | None] = mapped_column(String(19), nullable=True)
-    actual_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)

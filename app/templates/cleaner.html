@@ -1,24 +1,64 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><title>Meine Einsaetze</title></head>
-<body class="bg-light"><div class="container py-4">
-<h1 class="mb-3">Meine Einsaetze</h1>
-<div class="alert alert-info">Diesen Link nicht weitergeben. Aktueller Monat: {{ used_hours }} Std erfasst.</div>
+
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><title>{{ T.title_cleaner }}</title>
+<style>
+  .sticky-bottom-bar { position: sticky; bottom: 0; background: #fff; padding: .5rem; border-top: 1px solid #eee; }
+  @media (max-width: 768px){ .btn { padding: .6rem 1rem; font-size: 1rem; } }
+  .pill { display:inline-block; padding:.2rem .5rem; border-radius:1rem; border:1px solid #ddd; font-size:.85rem; }
+</style>
+</head>
+<body class="bg-light">
+<div class="container py-3">
+<h1 class="mb-3">{{ T.title_cleaner }}</h1>
+<div class="alert alert-info">{{ T.keep_link }} {{ T.month_hours }} {{ used_hours }} {{ T.hours }}</div>
 <table class="table table-sm table-hover bg-white align-middle">
-<thead><tr><th>Datum</th><th>Start</th><th>Apartment</th><th>Geplant (Min)</th><th>Extras</th><th>Notiz</th><th>Aktion</th></tr></thead>
+<thead><tr>
+  <th>{{ T.date }}</th><th>{{ T.start }}</th><th>{{ T.apartment }}</th><th>{{ T.planned }}</th><th>{{ T.next_guests }}</th><th>{{ T.extras }}</th><th>{{ T.note }}</th><th>{{ T.timer }}</th><th>{{ T.action }}</th>
+</tr></thead>
 <tbody>
 {% for t in tasks %}
-<tr>
+{% set e = (t.extras_json and (t.extras_json|safe|loads)) or {} %}
+{% set next = next_by_apartment.get(t.apartment_id) and next_by_apartment.get(t.apartment_id).get(t.date) %}
+<tr id="taskrow-{{t.id}}">
 <td>{{ t.date }}</td>
 <td>{{ t.start_time or "—" }}</td>
 <td>{{ apts.get(t.apartment_id).name if apts.get(t.apartment_id) else "—" }}</td>
 <td>{{ t.planned_minutes }}</td>
-<td>{{ t.extras_json }}</td>
-<td>{{ t.notes }}</td>
+<td>
+  {% if next %}<span class="pill">{{ next.adults }} {{ T.adults_short }}</span> <span class="pill">{{ next.children }} {{ T.children_short }}</span>{% else %}—{% endif %}
+</td>
+<td>
+  {% set parts = [] %}
+  {% if e.get('crib') %}{% set _ = parts.append(T.crib) %}{% endif %}
+  {% if e.get('highchair') %}{% set _ = parts.append(T.highchair) %}{% endif %}
+  {% if e.get('text') %}{% set _ = parts.append(e.get('text')) %}{% endif %}
+  {{ ', '.join(parts) if parts else '—' }}
+</td>
+<td>{{ t.notes or '—' }}</td>
+<td><span id="timer-{{t.id}}" data-start="{{ open_logs.get(t.id) or '' }}">—</span></td>
 <td class="d-flex gap-2">
-  <form method="post" action="/cleaner/{{ staff.magic_token }}/start"><input type="hidden" name="task_id" value="{{ t.id }}"><button class="btn btn-sm btn-outline-success">Start</button></form>
-  <form method="post" action="/cleaner/{{ staff.magic_token }}/stop"><input type="hidden" name="task_id" value="{{ t.id }}"><button class="btn btn-sm btn-outline-danger">Stop</button></form>
+  <form method="post" action="/cleaner/{{ staff.magic_token }}/start"><input type="hidden" name="task_id" value="{{ t.id }}"><button class="btn btn-sm btn-outline-success">{{ T.start_btn }}</button></form>
+  <form method="post" action="/cleaner/{{ staff.magic_token }}/stop"><input type="hidden" name="task_id" value="{{ t.id }}"><button class="btn btn-sm btn-outline-danger">{{ T.stop_btn }}</button></form>
 </td>
 </tr>
 {% endfor %}
 </tbody></table>
-</div></body></html>
+<div class="sticky-bottom-bar text-muted small">{{ T.timer_hint }}</div>
+</div>
+<script>
+function pad(n){return (n<10?'0':'')+n;}
+function tick(){
+  const nodes = document.querySelectorAll('[id^="timer-"]');
+  const now = new Date();
+  nodes.forEach(el=>{
+    const start = el.getAttribute('data-start');
+    if(!start){ el.textContent='—'; return; }
+    const s = new Date(start.replace(' ','T')+'Z');
+    const diff = Math.max(0, (now - s));
+    const mins = Math.floor(diff/60000), hrs = Math.floor(mins/60), mm = mins%60;
+    el.textContent = pad(hrs)+':'+pad(mm);
+  });
+}
+tick(); setInterval(tick, 15000);
+</script>
+</body></html>

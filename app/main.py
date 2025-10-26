@@ -9,9 +9,10 @@ from apscheduler.triggers.interval import IntervalTrigger
 from .db import init_db, SessionLocal
 from .models import Booking, Staff, Apartment, Task, TimeLog
 from .services_smoobu import SmoobuClient
-from .utils import new_token, today_iso, now_iso
+from .utils import new_token, today_iso, now_iso, pick_lang
 
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
+DEFAULT_TASK_START = (os.getenv("DEFAULT_TASK_START", "") or "11:00").strip()
 
 log = logging.getLogger("smoobu")
 log.setLevel(logging.INFO)
@@ -20,7 +21,6 @@ app = FastAPI(title="Smoobu Staff Planner Pro")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
-# Jinja filter 'loads'
 import json as _json
 templates.env.filters["loads"] = lambda s: _json.loads(s) if s else {}
 
@@ -31,6 +31,16 @@ def get_db():
     finally:
         db.close()
 
+def _is_confirmed(res: dict) -> bool:
+    status = (res.get("status") or res.get("bookingStatus") or "").lower()
+    rtype = (res.get("type") or res.get("reservationType") or "").lower()
+    bad_status = {"cancelled","canceled","inquiry","enquiry","tentative","blocked","block","owner","ownerstay","maintenance"}
+    if status in bad_status or rtype in bad_status:
+        return False
+    if res.get("isBlocked") or res.get("blocked"):
+        return False
+    return True
+
 @app.on_event("startup")
 async def startup_event():
     init_db()
@@ -38,7 +48,6 @@ async def startup_event():
     scheduler = AsyncIOScheduler(timezone=os.getenv("TIMEZONE", "Europe/Berlin"))
     scheduler.add_job(refresh_bookings_job, IntervalTrigger(minutes=interval_min))
     scheduler.start()
-    # Immediate import on boot
     log.info("Initial import on startup")
     await refresh_bookings_job()
 
@@ -51,72 +60,246 @@ async def refresh_bookings_job():
     end = start + dt.timedelta(days=60)
     client = SmoobuClient()
     log.info("Smoobu import: %s -> %s", start, end)
-    bookings = await client.get_bookings(start.isoformat(), end.isoformat())
+    reservations = await client.get_bookings(start.isoformat(), end.isoformat())
+    reservations = [r for r in reservations if _is_confirmed(r)]
     db = SessionLocal()
     try:
-        # Cache existing apartments by name to avoid UNIQUE errors
         apt_cache = {a.name: a for a in db.query(Apartment).all()}
         existing_ids = {b.id for b in db.query(Booking).all()}
         seen_ids = set()
 
-        for b in bookings:
-            bid = b.get("id") or b.get("bookingId") or b.get("reservationId")
+        for r in reservations:
+            bid = r.get("id") or r.get("bookingId") or r.get("reservationId")
             if bid is None:
                 continue
             seen_ids.add(bid)
+            apt = (r.get("apartment") or {})
+            apt_name = (apt.get("name") or r.get("apartmentName") or "").strip()
+            apt_id_smoobu = apt.get("id") or r.get("apartmentId")
 
-            apt = (b.get("apartment") or {})
-            apt_name = apt.get("name") or (b.get("apartmentName") or "").strip()
-            apt_id_smoobu = apt.get("id") or b.get("apartmentId")
-
-            # Ensure apartment exists once per name
             ap = None
             if apt_name:
                 ap = apt_cache.get(apt_name)
                 if ap is None:
                     ap = Apartment(name=apt_name, smoobu_id=apt_id_smoobu or None, planned_minutes=90)
-                    db.add(ap)
-                    db.flush()  # assign ID immediately so following rows can reference it
+                    db.add(ap); db.flush()
                     apt_cache[apt_name] = ap
 
-            # Upsert booking
             bk = db.query(Booking).filter(Booking.id == bid).first()
             if not bk:
                 bk = Booking(id=bid)
             bk.apartment_id = ap.id if ap else None
             bk.apartment_name = apt_name or ""
-            bk.arrival = (b.get("arrival") or b.get("checkIn") or "")[:10]
-            bk.departure = (b.get("departure") or b.get("checkOut") or "")[:10]
-            bk.nights = int(b.get("nights") or 0)
-            bk.adults = int(b.get("adults") or b.get("numberOfGuests") or 1)
-            bk.children = int(b.get("children") or 0)
-            bk.guest_comments = (b.get("notice") or b.get("guestComments") or b.get("comment") or "")[:2000]
+            bk.arrival = (r.get("arrival") or r.get("checkIn") or "")[:10]
+            bk.departure = (r.get("departure") or r.get("checkOut") or "")[:10]
+            bk.nights = int(r.get("nights") or 0)
+            bk.adults = int(r.get("adults") or r.get("numberOfGuests") or 1)
+            bk.children = int(r.get("children") or 0)
+            bk.guest_comments = (r.get("notice") or r.get("guestComments") or r.get("comment") or "")[:2000]
+            bk.status = (r.get("status") or r.get("bookingStatus") or "confirmed")
             db.merge(bk)
 
-        # Delete stale bookings
         for old in existing_ids - seen_ids:
             db.query(Booking).filter(Booking.id == old).delete()
         db.commit()
 
-        # Rebuild future tasks from bookings
-        today = dt.date.today().isoformat()
-        db.query(Task).filter(Task.date >= today).delete()
+        today_iso_s = dt.date.today().isoformat()
+        end_iso_s = end.isoformat()
+        seen_task_booking_ids = set()
         for bk in db.query(Booking).all():
-            if not bk.departure:
+            if not bk.departure or not (today_iso_s <= bk.departure <= end_iso_s):
                 continue
             ap = apt_cache.get(bk.apartment_name) or db.query(Apartment).filter(Apartment.name == bk.apartment_name).first()
             planned = ap.planned_minutes if ap else 90
-            t = Task(date=bk.departure, planned_minutes=planned, apartment_id=ap.id if ap else None,
-                     booking_id=bk.id, status="open", extras_json="{}")
-            db.add(t)
+
+            t = db.query(Task).filter(Task.booking_id == bk.id).first()
+            if t:
+                t.date = bk.departure
+                t.apartment_id = ap.id if ap else None
+                t.planned_minutes = planned
+                if not t.start_time:
+                    t.start_time = DEFAULT_TASK_START
+            else:
+                t = Task(
+                    date=bk.departure,
+                    start_time=DEFAULT_TASK_START,
+                    planned_minutes=planned,
+                    apartment_id=ap.id if ap else None,
+                    booking_id=bk.id,
+                    status="open",
+                    extras_json="{}"
+                )
+                db.add(t)
+            seen_task_booking_ids.add(bk.id)
+
+        for t in db.query(Task).filter(Task.date >= today_iso_s).all():
+            if t.booking_id and t.booking_id not in seen_task_booking_ids:
+                db.delete(t)
+
         db.commit()
-        log.info("Smoobu import finished: %d bookings, %d tasks", len(bookings), db.query(Task).count())
+        log.info("Smoobu import finished: %d bookings, %d tasks", len(reservations), db.query(Task).count())
     finally:
         db.close()
 
 def ensure_admin(token: str):
     if not ADMIN_TOKEN or token != ADMIN_TOKEN:
         raise HTTPException(status_code=403, detail="Invalid admin token")
+
+def i18n(request: Request):
+    lang = pick_lang(request.headers.get("accept-language"))
+    T = {
+        "de": {
+            "title_admin": "Einsätze",
+            "title_cleaner": "Meine Einsätze",
+            "team": "Team",
+            "apartments": "Apartments",
+            "csv_export": "CSV Export",
+            "import_now": "Jetzt importieren",
+            "date": "Datum",
+            "start": "Start",
+            "apartment": "Apartment",
+            "planned": "Geplant (Min)",
+            "extras": "Extras",
+            "note": "Notiz",
+            "staff": "Staff",
+            "status": "Status",
+            "action": "Aktion",
+            "open": "offen",
+            "done": "fertig",
+            "save": "Speichern",
+            "next_guests": "Gäste (nächste)",
+            "adults_short": "Erw.",
+            "children_short": "Ki.",
+            "keep_link": "Diesen Link nicht weitergeben.",
+            "month_hours": "Aktueller Monat:",
+            "hours": "Std erfasst.",
+            "timer": "Timer",
+            "start_btn": "Start",
+            "stop_btn": "Stop",
+            "timer_hint": "Hinweis: Timer läuft weiter, solange die Seite offen ist."
+        },
+        "en": {
+            "title_admin": "Assignments",
+            "title_cleaner": "My Assignments",
+            "team": "Team",
+            "apartments": "Apartments",
+            "csv_export": "CSV Export",
+            "import_now": "Import now",
+            "date": "Date",
+            "start": "Start",
+            "apartment": "Apartment",
+            "planned": "Planned (min)",
+            "extras": "Extras",
+            "note": "Note",
+            "staff": "Staff",
+            "status": "Status",
+            "action": "Action",
+            "open": "open",
+            "done": "done",
+            "save": "Save",
+            "next_guests": "Next guests",
+            "adults_short": "Adults",
+            "children_short": "Kids",
+            "keep_link": "Do not share this link.",
+            "month_hours": "Current month:",
+            "hours": "hrs recorded.",
+            "timer": "Timer",
+            "start_btn": "Start",
+            "stop_btn": "Stop",
+            "timer_hint": "Tip: Timer keeps running while this page stays open."
+        },
+        "bg": {
+            "title_admin": "Задачи",
+            "title_cleaner": "Моите задачи",
+            "team": "Екип",
+            "apartments": "Апартаменти",
+            "csv_export": "CSV експорт",
+            "import_now": "Импортиране",
+            "date": "Дата",
+            "start": "Старт",
+            "apartment": "Апартамент",
+            "planned": "Планирано (мин)",
+            "extras": "Екстри",
+            "note": "Бележка",
+            "staff": "Служители",
+            "status": "Статус",
+            "action": "Действие",
+            "open": "отворена",
+            "done": "готово",
+            "save": "Запази",
+            "next_guests": "Следв. гости",
+            "adults_short": "Възр.",
+            "children_short": "Деца",
+            "keep_link": "Не споделяйте този линк.",
+            "month_hours": "Текущ месец:",
+            "hours": "ч. отчетени.",
+            "timer": "Таймер",
+            "start_btn": "Старт",
+            "stop_btn": "Стоп",
+            "timer_hint": "Съвет: Таймерът продължава, докато страницата е отворена."
+        },
+        "ro": {
+            "title_admin": "Sarcini",
+            "title_cleaner": "Sarcinile mele",
+            "team": "Echipă",
+            "apartments": "Apartamente",
+            "csv_export": "Export CSV",
+            "import_now": "Importă acum",
+            "date": "Data",
+            "start": "Start",
+            "apartment": "Apartament",
+            "planned": "Planificat (min)",
+            "extras": "Extra",
+            "note": "Notă",
+            "staff": "Personal",
+            "status": "Status",
+            "action": "Acțiune",
+            "open": "deschis",
+            "done": "finalizat",
+            "save": "Salvează",
+            "next_guests": "Următorii oaspeți",
+            "adults_short": "Adulți",
+            "children_short": "Copii",
+            "keep_link": "Nu partajați acest link.",
+            "month_hours": "Luna curentă:",
+            "hours": "ore înregistrate.",
+            "timer": "Cronometru",
+            "start_btn": "Start",
+            "stop_btn": "Stop",
+            "timer_hint": "Sugestie: cronometrul continuă cât timp pagina rămâne deschisă."
+        },
+        "ru": {
+            "title_admin": "Задачи",
+            "title_cleaner": "Мои задачи",
+            "team": "Команда",
+            "apartments": "Апартаменты",
+            "csv_export": "Экспорт CSV",
+            "import_now": "Импорт",
+            "date": "Дата",
+            "start": "Начало",
+            "apartment": "Апартаменты",
+            "planned": "План (мин)",
+            "extras": "Дополнительно",
+            "note": "Заметка",
+            "staff": "Персонал",
+            "status": "Статус",
+            "action": "Действие",
+            "open": "открыто",
+            "done": "готово",
+            "save": "Сохранить",
+            "next_guests": "Следующие гости",
+            "adults_short": "Взр.",
+            "children_short": "Дети",
+            "keep_link": "Не делитесь этой ссылкой.",
+            "month_hours": "Текущий месяц:",
+            "hours": "ч. учтено.",
+            "timer": "Таймер",
+            "start_btn": "Старт",
+            "stop_btn": "Стоп",
+            "timer_hint": "Подсказка: таймер продолжает работать, пока страница открыта."
+        }
+    }
+    return T.get(lang, T["en"])
 
 @app.get("/admin/{token}")
 async def admin_home(token: str, request: Request, db=Depends(get_db)):
@@ -125,7 +308,23 @@ async def admin_home(token: str, request: Request, db=Depends(get_db)):
     tasks = db.query(Task).order_by(Task.date, Task.id).all()
     staff = db.query(Staff).filter(Staff.active==True).order_by(Staff.name).all()
     apts  = db.query(Apartment).order_by(Apartment.name).all()
-    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apts": apts, "today": today})
+
+    # next-by-apartment index (arrival on same date as the task date)
+    next_by_apartment = {}
+    for bk in db.query(Booking).all():
+        if bk.arrival:
+            ap_id = bk.apartment_id
+            if ap_id:
+                m = next_by_apartment.setdefault(ap_id, {})
+                # if multiple arrivals same day, keep the one with max adults+children
+                current = m.get(bk.arrival)
+                if not current or (bk.adults + bk.children) > (current.adults + current.children):
+                    m[bk.arrival] = bk
+
+    return templates.TemplateResponse("admin_home.html", {
+        "request": request, "token": token, "tasks": tasks, "staff": staff, "apts": apts, "today": today,
+        "next_by_apartment": next_by_apartment, "T": i18n(request)
+    })
 
 @app.get("/admin/{token}/import")
 async def admin_import_now(token: str):
@@ -139,8 +338,8 @@ async def admin_task_update(token: str,
     date: str = Form(...),
     start_time: str | None = Form(None),
     planned_minutes: int = Form(90),
-    apartment_id: int | None = Form(None),
-    assigned_staff_id: int | None = Form(None),
+    apartment_id: str | None = Form(None),
+    assigned_staff_id: str | None = Form(None),
     notes: str = Form(""),
     crib: int = Form(0),
     highchair: int = Form(0),
@@ -148,13 +347,18 @@ async def admin_task_update(token: str,
     db=Depends(get_db)
 ):
     ensure_admin(token)
+    def _to_int_or_none(v):
+        if v is None: return None
+        v = str(v).strip()
+        return int(v) if v.isdigit() else None
+
     t = db.query(Task).filter(Task.id==task_id).first()
     if t:
         t.date = date
-        t.start_time = start_time or None
+        t.start_time = (start_time or "").strip() or None
         t.planned_minutes = planned_minutes
-        t.apartment_id = apartment_id or None
-        t.assigned_staff_id = assigned_staff_id or None
+        t.apartment_id = _to_int_or_none(apartment_id)
+        t.assigned_staff_id = _to_int_or_none(assigned_staff_id)
         extras = {"crib": bool(crib), "highchair": bool(highchair), "text": extra_text}
         t.extras_json = json.dumps(extras, ensure_ascii=False)
         t.notes = notes
@@ -250,31 +454,86 @@ async def cleaner_home(token: str, request: Request, db=Depends(get_db)):
         if tl.staff_id==s.id and tl.started_at[:10] >= m_start and tl.started_at[:10] < m_end and tl.actual_minutes:
             minutes += tl.actual_minutes
     used_hours = round(minutes/60,2)
-    return templates.TemplateResponse("cleaner.html", {"request": request, "staff": s, "tasks": tasks, "apts": apts, "used_hours": used_hours})
 
-@app.post("/cleaner/{token}/start")
-async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)):
-    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
-    if not s: raise HTTPException(status_code=403)
-    t = db.query(Task).filter(Task.id==task_id, Task.assigned_staff_id==s.id).first()
-    if not t: raise HTTPException(status_code=404)
-    open_log = db.query(TimeLog).filter(TimeLog.task_id==t.id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).first()
-    if not open_log:
-        tl = TimeLog(task_id=t.id, staff_id=s.id, started_at=now_iso(), ended_at=None, actual_minutes=None)
-        db.add(tl); db.commit()
-    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+    open_logs = {}
+    for t in tasks:
+        tl = db.query(TimeLog).filter(TimeLog.task_id==t.id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
+        if tl:
+            open_logs[t.id] = tl.started_at
 
-@app.post("/cleaner/{token}/stop")
-async def cleaner_stop(token: str, task_id: int = Form(...), db=Depends(get_db)):
-    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
-    if not s: raise HTTPException(status_code=403)
-    tl = db.query(TimeLog).filter(TimeLog.task_id==task_id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).first()
-    if not tl: raise HTTPException(status_code=404)
-    from datetime import datetime
-    fmt = "%Y-%m-%d %H:%M:%S"
-    tl.ended_at = now_iso()
-    start = datetime.strptime(tl.started_at, fmt)
-    end = datetime.strptime(tl.ended_at, fmt)
-    tl.actual_minutes = int((end-start).total_seconds()//60)
-    db.commit()
-    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+    # Build next-by-apartment index for staff (arrival on same date as task)
+    next_by_apartment = {}
+    for bk in db.query(Booking).all():
+        if bk.arrival and bk.apartment_id:
+            m = next_by_apartment.setdefault(bk.apartment_id, {})
+            current = m.get(bk.arrival)
+            if not current or (bk.adults + bk.children) > (current.adults + current.children):
+                m[bk.arrival] = bk
+
+    def i18n(request):
+        lang = pick_lang(request.headers.get("accept-language"))
+        from fastapi.datastructures import State
+        T = {
+            "de": {
+                "title_cleaner": "Meine Einsätze",
+                "date": "Datum", "start": "Start", "apartment": "Apartment", "planned": "Geplant (Min)",
+                "next_guests": "Nächste Gäste", "extras": "Extras", "note": "Notiz", "timer": "Timer",
+                "start_btn": "Start", "stop_btn": "Stop",
+                "keep_link": "Diesen Link nicht weitergeben.", "month_hours": "Aktueller Monat:", "hours": "Std erfasst.",
+                "adults_short": "Erw.", "children_short": "Ki.", "crib": "Zustellbett", "highchair": "Kinderstuhl",
+                "timer_hint": "Hinweis: Timer läuft weiter, solange die Seite offen ist.",
+                "title_admin": "Einsätze", "team":"Team","apartments":"Apartments","csv_export":"CSV Export","import_now":"Jetzt importieren",
+                "save":"Speichern","staff":"Staff","status":"Status","open":"offen","done":"fertig","action":"Aktion"
+            },
+            "en": {
+                "title_cleaner": "My Assignments",
+                "date": "Date", "start": "Start", "apartment": "Apartment", "planned": "Planned (min)",
+                "next_guests": "Next guests", "extras": "Extras", "note": "Note", "timer": "Timer",
+                "start_btn": "Start", "stop_btn": "Stop",
+                "keep_link": "Do not share this link.", "month_hours": "Current month:", "hours": "hrs recorded.",
+                "adults_short": "Adults", "children_short": "Kids", "crib": "Extra bed", "highchair": "High chair",
+                "timer_hint": "Tip: Timer keeps running while this page stays open.",
+                "title_admin": "Assignments","team":"Team","apartments":"Apartments","csv_export":"CSV Export","import_now":"Import now",
+                "save":"Save","staff":"Staff","status":"Status","open":"open","done":"done","action":"Action"
+            },
+            "bg": {
+                "title_cleaner": "Моите задачи",
+                "date":"Дата","start":"Старт","apartment":"Апартамент","planned":"Планирано (мин)",
+                "next_guests":"Следв. гости","extras":"Екстри","note":"Бележка","timer":"Таймер",
+                "start_btn":"Старт","stop_btn":"Стоп",
+                "keep_link":"Не споделяйте този линк.","month_hours":"Текущ месец:","hours":"ч. отчетени.",
+                "adults_short":"Възр.","children_short":"Деца","crib":"Допълнително легло","highchair":"Детско столче",
+                "timer_hint":"Съвет: Таймерът продължава, докато страницата е отворена.",
+                "title_admin": "Задачи","team":"Екип","apartments":"Апартаменти","csv_export":"CSV експорт","import_now":"Импортиране",
+                "save":"Запази","staff":"Служители","status":"Статус","open":"отворена","done":"готово","action":"Действие"
+            },
+            "ro": {
+                "title_cleaner":"Sarcinile mele",
+                "date":"Data","start":"Start","apartment":"Apartament","planned":"Planificat (min)",
+                "next_guests":"Următorii oaspeți","extras":"Extra","note":"Notă","timer":"Cronometru",
+                "start_btn":"Start","stop_btn":"Stop",
+                "keep_link":"Nu partajați acest link.","month_hours":"Luna curentă:","hours":"ore înregistrate.",
+                "adults_short":"Adulți","children_short":"Copii","crib":"Pat suplimentar","highchair":"Scaun înalt",
+                "timer_hint":"Sugestie: cronometrul continuă cât timp pagina rămâne deschisă.",
+                "title_admin":"Sarcini","team":"Echipă","apartments":"Apartamente","csv_export":"Export CSV","import_now":"Importă acum",
+                "save":"Salvează","staff":"Personal","status":"Status","open":"deschis","done":"finalizat","action":"Acțiune"
+            },
+            "ru": {
+                "title_cleaner":"Мои задачи",
+                "date":"Дата","start":"Начало","apartment":"Апартаменты","planned":"План (мин)",
+                "next_guests":"Следующие гости","extras":"Дополнительно","note":"Заметка","timer":"Таймер",
+                "start_btn":"Старт","stop_btn":"Стоп",
+                "keep_link":"Не делитесь этой ссылкой.","month_hours":"Текущий месяц:","hours":"ч. учтено.",
+                "adults_short":"Взр.","children_short":"Дети","crib":"Доп. кровать","highchair":"Детский стул",
+                "timer_hint":"Подсказка: таймер работает, пока страница открыта.",
+                "title_admin":"Задачи","team":"Команда","apartments":"Апартаменты","csv_export":"Экспорт CSV","import_now":"Импорт",
+                "save":"Сохранить","staff":"Персонал","status":"Статус","open":"открыто","done":"готово","action":"Действие"
+            }
+        }
+        return T.get(lang, T["en"])
+    T = i18n(request)
+
+    return templates.TemplateResponse("cleaner.html", {
+        "request": request, "staff": s, "tasks": tasks, "apts": apts, "used_hours": used_hours,
+        "open_logs": open_logs, "next_by_apartment": next_by_apartment, "T": T
+    })

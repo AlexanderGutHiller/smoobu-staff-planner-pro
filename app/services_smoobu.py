@@ -11,10 +11,10 @@ class SmoobuClient:
         self.base_url = base_url or BASE_URL
         self._headers = {"Api-Key": self.api_key, "Accept": "application/json", "Cache-Control": "no-cache"} if self.api_key else {}
 
-    async def get_bookings(self, start: str, end: str) -> List[Dict[str, Any]]:
+    async def get_bookings(self, start: str, end: str):
         if not self._headers:
             return []
-        out: List[Dict[str, Any]] = []
+        out = []
         page = 1
         async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
             while True:
@@ -23,7 +23,7 @@ class SmoobuClient:
                 r = await client.get(url, headers=self._headers, params=params)
                 r.raise_for_status()
                 data = r.json()
-                items = data.get("bookings", []) or data.get("reservations", [])
+                items = data.get("reservations") or data.get("bookings") or []
                 out.extend(items)
                 total = int(data.get("total_items", 0))
                 size = int(data.get("page_size", len(items) or 200))

@@ -9,3 +9,9 @@ def today_iso():
 
 def now_iso():
     return dt.datetime.utcnow().replace(microsecond=0).isoformat(sep=' ')
+
+def pick_lang(accept_language: str | None) -> str:
+    al = (accept_language or "").lower()
+    for code in ["de","bg","ro","ru","en"]:
+        if code in al: return code
+    return "en"
