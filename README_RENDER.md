@@ -1,5 +1,7 @@
 
-# Smoobu Staff Planner — Render-only Package (v2)
+# Smoobu Staff Planner — Render-only Package (v3)
+
+**Fix:** Use official Smoobu API base + endpoint (`/reservations?from=&to=`).
 
 Deploy on Render (Python runtime):
 - Build Command: `pip install -r requirements.txt`
@@ -8,7 +10,7 @@ Deploy on Render (Python runtime):
 
 Environment Variables:
 - `SMOOBU_API_KEY` (required)
-- `SMOOBU_BASE_URL` = `https://api.smoobu.com/api/v1`
+- `SMOOBU_BASE_URL` = `https://login.smoobu.com/api`  ← **NEW**
 - `REFRESH_INTERVAL_MINUTES` = `60` (change for testing)
 - `TIMEZONE` = `Europe/Berlin`
 - `ADMIN_TOKEN` (choose a long token)

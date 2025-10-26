@@ -70,7 +70,7 @@ async def refresh_bookings_job():
             bk.nights = int(b.get("nights") or 0)
             bk.adults = int(b.get("adults") or 1)
             bk.children = int(b.get("children") or 0)
-            bk.guest_comments = (b.get("guestComments") or b.get("comment") or "")[:2000]
+            bk.guest_comments = (b.get("notice") or "")[:2000]
             db.merge(bk)
             if bk.apartment_name:
                 ap = db.query(Apartment).filter(Apartment.name == bk.apartment_name).first()
