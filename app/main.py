@@ -146,158 +146,14 @@ def ensure_admin(token: str):
         raise HTTPException(status_code=403, detail="Invalid admin token")
 
 def i18n(request: Request):
+    from .utils import pick_lang
     lang = pick_lang(request.headers.get("accept-language"))
     T = {
-        "de": {
-            "title_admin": "Einsätze",
-            "title_cleaner": "Meine Einsätze",
-            "team": "Team",
-            "apartments": "Apartments",
-            "csv_export": "CSV Export",
-            "import_now": "Jetzt importieren",
-            "date": "Datum",
-            "start": "Start",
-            "apartment": "Apartment",
-            "planned": "Geplant (Min)",
-            "extras": "Extras",
-            "note": "Notiz",
-            "staff": "Staff",
-            "status": "Status",
-            "action": "Aktion",
-            "open": "offen",
-            "done": "fertig",
-            "save": "Speichern",
-            "next_guests": "Gäste (nächste)",
-            "adults_short": "Erw.",
-            "children_short": "Ki.",
-            "keep_link": "Diesen Link nicht weitergeben.",
-            "month_hours": "Aktueller Monat:",
-            "hours": "Std erfasst.",
-            "timer": "Timer",
-            "start_btn": "Start",
-            "stop_btn": "Stop",
-            "timer_hint": "Hinweis: Timer läuft weiter, solange die Seite offen ist."
-        },
-        "en": {
-            "title_admin": "Assignments",
-            "title_cleaner": "My Assignments",
-            "team": "Team",
-            "apartments": "Apartments",
-            "csv_export": "CSV Export",
-            "import_now": "Import now",
-            "date": "Date",
-            "start": "Start",
-            "apartment": "Apartment",
-            "planned": "Planned (min)",
-            "extras": "Extras",
-            "note": "Note",
-            "staff": "Staff",
-            "status": "Status",
-            "action": "Action",
-            "open": "open",
-            "done": "done",
-            "save": "Save",
-            "next_guests": "Next guests",
-            "adults_short": "Adults",
-            "children_short": "Kids",
-            "keep_link": "Do not share this link.",
-            "month_hours": "Current month:",
-            "hours": "hrs recorded.",
-            "timer": "Timer",
-            "start_btn": "Start",
-            "stop_btn": "Stop",
-            "timer_hint": "Tip: Timer keeps running while this page stays open."
-        },
-        "bg": {
-            "title_admin": "Задачи",
-            "title_cleaner": "Моите задачи",
-            "team": "Екип",
-            "apartments": "Апартаменти",
-            "csv_export": "CSV експорт",
-            "import_now": "Импортиране",
-            "date": "Дата",
-            "start": "Старт",
-            "apartment": "Апартамент",
-            "planned": "Планирано (мин)",
-            "extras": "Екстри",
-            "note": "Бележка",
-            "staff": "Служители",
-            "status": "Статус",
-            "action": "Действие",
-            "open": "отворена",
-            "done": "готово",
-            "save": "Запази",
-            "next_guests": "Следв. гости",
-            "adults_short": "Възр.",
-            "children_short": "Деца",
-            "keep_link": "Не споделяйте този линк.",
-            "month_hours": "Текущ месец:",
-            "hours": "ч. отчетени.",
-            "timer": "Таймер",
-            "start_btn": "Старт",
-            "stop_btn": "Стоп",
-            "timer_hint": "Съвет: Таймерът продължава, докато страницата е отворена."
-        },
-        "ro": {
-            "title_admin": "Sarcini",
-            "title_cleaner": "Sarcinile mele",
-            "team": "Echipă",
-            "apartments": "Apartamente",
-            "csv_export": "Export CSV",
-            "import_now": "Importă acum",
-            "date": "Data",
-            "start": "Start",
-            "apartment": "Apartament",
-            "planned": "Planificat (min)",
-            "extras": "Extra",
-            "note": "Notă",
-            "staff": "Personal",
-            "status": "Status",
-            "action": "Acțiune",
-            "open": "deschis",
-            "done": "finalizat",
-            "save": "Salvează",
-            "next_guests": "Următorii oaspeți",
-            "adults_short": "Adulți",
-            "children_short": "Copii",
-            "keep_link": "Nu partajați acest link.",
-            "month_hours": "Luna curentă:",
-            "hours": "ore înregistrate.",
-            "timer": "Cronometru",
-            "start_btn": "Start",
-            "stop_btn": "Stop",
-            "timer_hint": "Sugestie: cronometrul continuă cât timp pagina rămâne deschisă."
-        },
-        "ru": {
-            "title_admin": "Задачи",
-            "title_cleaner": "Мои задачи",
-            "team": "Команда",
-            "apartments": "Апартаменты",
-            "csv_export": "Экспорт CSV",
-            "import_now": "Импорт",
-            "date": "Дата",
-            "start": "Начало",
-            "apartment": "Апартаменты",
-            "planned": "План (мин)",
-            "extras": "Дополнительно",
-            "note": "Заметка",
-            "staff": "Персонал",
-            "status": "Статус",
-            "action": "Действие",
-            "open": "открыто",
-            "done": "готово",
-            "save": "Сохранить",
-            "next_guests": "Следующие гости",
-            "adults_short": "Взр.",
-            "children_short": "Дети",
-            "keep_link": "Не делитесь этой ссылкой.",
-            "month_hours": "Текущий месяц:",
-            "hours": "ч. учтено.",
-            "timer": "Таймер",
-            "start_btn": "Старт",
-            "stop_btn": "Стоп",
-            "timer_hint": "Подсказка: таймер продолжает работать, пока страница открыта."
-        }
+        "de": {"title_admin":"Einsätze","title_cleaner":"Meine Einsätze","team":"Team","apartments":"Apartments","csv_export":"CSV Export","import_now":"Jetzt importieren","date":"Datum","start":"Start","apartment":"Apartment","planned":"Geplant (Min)","extras":"Extras","note":"Notiz","staff":"Staff","status":"Status","action":"Aktion","open":"offen","done":"fertig","save":"Speichern","next_guests":"Gäste (nächste)","adults_short":"Erw.","children_short":"Ki.","keep_link":"Diesen Link nicht weitergeben.","month_hours":"Aktueller Monat:","hours":"Std erfasst.","timer":"Timer","start_btn":"Start","stop_btn":"Stop","timer_hint":"Hinweis: Timer läuft weiter, solange die Seite offen ist.","crib":"Zustellbett","highchair":"Kinderstuhl"},
+        "en": {"title_admin":"Assignments","title_cleaner":"My Assignments","team":"Team","apartments":"Apartments","csv_export":"CSV Export","import_now":"Import now","date":"Date","start":"Start","apartment":"Apartment","planned":"Planned (min)","extras":"Extras","note":"Note","staff":"Staff","status":"Status","action":"Action","open":"open","done":"done","save":"Save","next_guests":"Next guests","adults_short":"Adults","children_short":"Kids","keep_link":"Do not share this link.","month_hours":"Current month:","hours":"hrs recorded.","timer":"Timer","start_btn":"Start","stop_btn":"Stop","timer_hint":"Tip: Timer keeps running while this page stays open.","crib":"Extra bed","highchair":"High chair"},
+        "bg": {"title_admin":"Задачи","title_cleaner":"Моите задачи","team":"Екип","apartments":"Апартаменти","csv_export":"CSV експорт","import_now":"Импортиране","date":"Дата","start":"Старт","apartment":"Апартамент","planned":"Планирано (мин)","extras":"Екстри","note":"Бележка","staff":"Служители","status":"Статус","action":"Действие","open":"отворена","done":"готово","save":"Запази","next_guests":"Следв. гости","adults_short":"Възр.","children_short":"Деца","keep_link":"Не споделяйте този линк.","month_hours":"Текущ месец:","hours":"ч. отчетени.","timer":"Таймер","start_btn":"Старт","stop_btn":"Стоп","timer_hint":"Съвет: Таймерът продължава, докато страницата е отворена.","crib":"Допълнително легло","highchair":"Детско столче"},
+        "ro": {"title_admin":"Sarcini","title_cleaner":"Sarcinile mele","team":"Echipă","apartments":"Apartamente","csv_export":"Export CSV","import_now":"Importă acum","date":"Data","start":"Start","apartment":"Apartament","planned":"Planificat (min)","extras":"Extra","note":"Notă","staff":"Personal","status":"Status","action":"Acțiune","open":"deschis","done":"finalizat","save":"Salvează","next_guests":"Următorii oaspeți","adults_short":"Adulți","children_short":"Copii","keep_link":"Nu partajați acest link.","month_hours":"Luna curentă:","hours":"ore înregistrate.","timer":"Cronometru","start_btn":"Start","stop_btn":"Stop","timer_hint":"Sugestie: cronometrul continuă cât timp pagina rămâne deschisă.","crib":"Pat suplimentar","highchair":"Scaun înalt"},
+        "ru": {"title_admin":"Задачи","title_cleaner":"Мои задачи","team":"Команда","apartments":"Апартаменты","csv_export":"Экспорт CSV","import_now":"Импорт","date":"Дата","start":"Начало","apartment":"Апартаменты","planned":"План (мин)","extras":"Дополнительно","note":"Заметка","staff":"Персонал","status":"Статус","action":"Действие","open":"открыто","done":"готово","save":"Сохранить","next_guests":"Следующие гости","adults_short":"Взр.","children_short":"Дети","keep_link":"Не делитесь этой ссылкой.","month_hours":"Текущий месяц:","hours":"ч. учтено.","timer":"Таймер","start_btn":"Старт","stop_btn":"Стоп","timer_hint":"Подсказка: таймер работает, пока страница открыта.","crib":"Доп. кровать","highchair":"Детский стул"}
     }
     return T.get(lang, T["en"])
 
@@ -309,17 +165,13 @@ async def admin_home(token: str, request: Request, db=Depends(get_db)):
     staff = db.query(Staff).filter(Staff.active==True).order_by(Staff.name).all()
     apts  = db.query(Apartment).order_by(Apartment.name).all()
 
-    # next-by-apartment index (arrival on same date as the task date)
     next_by_apartment = {}
     for bk in db.query(Booking).all():
-        if bk.arrival:
-            ap_id = bk.apartment_id
-            if ap_id:
-                m = next_by_apartment.setdefault(ap_id, {})
-                # if multiple arrivals same day, keep the one with max adults+children
-                current = m.get(bk.arrival)
-                if not current or (bk.adults + bk.children) > (current.adults + current.children):
-                    m[bk.arrival] = bk
+        if bk.arrival and bk.apartment_id:
+            m = next_by_apartment.setdefault(bk.apartment_id, {})
+            current = m.get(bk.arrival)
+            if not current or (bk.adults + bk.children) > (current.adults + current.children):
+                m[bk.arrival] = bk
 
     return templates.TemplateResponse("admin_home.html", {
         "request": request, "token": token, "tasks": tasks, "staff": staff, "apts": apts, "today": today,
@@ -439,6 +291,7 @@ async def admin_export(token: str, month: str, db=Depends(get_db)):
 
 @app.get("/cleaner/{token}")
 async def cleaner_home(token: str, request: Request, db=Depends(get_db)):
+    from .utils import pick_lang
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403, detail="Invalid token")
     tasks = db.query(Task).filter(Task.assigned_staff_id==s.id).order_by(Task.date, Task.id).all()
@@ -461,7 +314,6 @@ async def cleaner_home(token: str, request: Request, db=Depends(get_db)):
         if tl:
             open_logs[t.id] = tl.started_at
 
-    # Build next-by-apartment index for staff (arrival on same date as task)
     next_by_apartment = {}
     for bk in db.query(Booking).all():
         if bk.arrival and bk.apartment_id:
@@ -472,68 +324,14 @@ async def cleaner_home(token: str, request: Request, db=Depends(get_db)):
 
     def i18n(request):
         lang = pick_lang(request.headers.get("accept-language"))
-        from fastapi.datastructures import State
         T = {
-            "de": {
-                "title_cleaner": "Meine Einsätze",
-                "date": "Datum", "start": "Start", "apartment": "Apartment", "planned": "Geplant (Min)",
-                "next_guests": "Nächste Gäste", "extras": "Extras", "note": "Notiz", "timer": "Timer",
-                "start_btn": "Start", "stop_btn": "Stop",
-                "keep_link": "Diesen Link nicht weitergeben.", "month_hours": "Aktueller Monat:", "hours": "Std erfasst.",
-                "adults_short": "Erw.", "children_short": "Ki.", "crib": "Zustellbett", "highchair": "Kinderstuhl",
-                "timer_hint": "Hinweis: Timer läuft weiter, solange die Seite offen ist.",
-                "title_admin": "Einsätze", "team":"Team","apartments":"Apartments","csv_export":"CSV Export","import_now":"Jetzt importieren",
-                "save":"Speichern","staff":"Staff","status":"Status","open":"offen","done":"fertig","action":"Aktion"
-            },
-            "en": {
-                "title_cleaner": "My Assignments",
-                "date": "Date", "start": "Start", "apartment": "Apartment", "planned": "Planned (min)",
-                "next_guests": "Next guests", "extras": "Extras", "note": "Note", "timer": "Timer",
-                "start_btn": "Start", "stop_btn": "Stop",
-                "keep_link": "Do not share this link.", "month_hours": "Current month:", "hours": "hrs recorded.",
-                "adults_short": "Adults", "children_short": "Kids", "crib": "Extra bed", "highchair": "High chair",
-                "timer_hint": "Tip: Timer keeps running while this page stays open.",
-                "title_admin": "Assignments","team":"Team","apartments":"Apartments","csv_export":"CSV Export","import_now":"Import now",
-                "save":"Save","staff":"Staff","status":"Status","open":"open","done":"done","action":"Action"
-            },
-            "bg": {
-                "title_cleaner": "Моите задачи",
-                "date":"Дата","start":"Старт","apartment":"Апартамент","planned":"Планирано (мин)",
-                "next_guests":"Следв. гости","extras":"Екстри","note":"Бележка","timer":"Таймер",
-                "start_btn":"Старт","stop_btn":"Стоп",
-                "keep_link":"Не споделяйте този линк.","month_hours":"Текущ месец:","hours":"ч. отчетени.",
-                "adults_short":"Възр.","children_short":"Деца","crib":"Допълнително легло","highchair":"Детско столче",
-                "timer_hint":"Съвет: Таймерът продължава, докато страницата е отворена.",
-                "title_admin": "Задачи","team":"Екип","apartments":"Апартаменти","csv_export":"CSV експорт","import_now":"Импортиране",
-                "save":"Запази","staff":"Служители","status":"Статус","open":"отворена","done":"готово","action":"Действие"
-            },
-            "ro": {
-                "title_cleaner":"Sarcinile mele",
-                "date":"Data","start":"Start","apartment":"Apartament","planned":"Planificat (min)",
-                "next_guests":"Următorii oaspeți","extras":"Extra","note":"Notă","timer":"Cronometru",
-                "start_btn":"Start","stop_btn":"Stop",
-                "keep_link":"Nu partajați acest link.","month_hours":"Luna curentă:","hours":"ore înregistrate.",
-                "adults_short":"Adulți","children_short":"Copii","crib":"Pat suplimentar","highchair":"Scaun înalt",
-                "timer_hint":"Sugestie: cronometrul continuă cât timp pagina rămâne deschisă.",
-                "title_admin":"Sarcini","team":"Echipă","apartments":"Apartamente","csv_export":"Export CSV","import_now":"Importă acum",
-                "save":"Salvează","staff":"Personal","status":"Status","open":"deschis","done":"finalizat","action":"Acțiune"
-            },
-            "ru": {
-                "title_cleaner":"Мои задачи",
-                "date":"Дата","start":"Начало","apartment":"Апартаменты","planned":"План (мин)",
-                "next_guests":"Следующие гости","extras":"Дополнительно","note":"Заметка","timer":"Таймер",
-                "start_btn":"Старт","stop_btn":"Стоп",
-                "keep_link":"Не делитесь этой ссылкой.","month_hours":"Текущий месяц:","hours":"ч. учтено.",
-                "adults_short":"Взр.","children_short":"Дети","crib":"Доп. кровать","highchair":"Детский стул",
-                "timer_hint":"Подсказка: таймер работает, пока страница открыта.",
-                "title_admin":"Задачи","team":"Команда","apartments":"Апартаменты","csv_export":"Экспорт CSV","import_now":"Импорт",
-                "save":"Сохранить","staff":"Персонал","status":"Статус","open":"открыто","done":"готово","action":"Действие"
-            }
+            "de": {"title_cleaner":"Meine Einsätze","date":"Datum","start":"Start","apartment":"Apartment","planned":"Geplant (Min)","next_guests":"Nächste Gäste","extras":"Extras","note":"Notiz","timer":"Timer","start_btn":"Start","stop_btn":"Stop","keep_link":"Diesen Link nicht weitergeben.","month_hours":"Aktueller Monat:","hours":"Std erfasst.","adults_short":"Erw.","children_short":"Ki.","crib":"Zustellbett","highchair":"Kinderstuhl","timer_hint":"Hinweis: Timer läuft weiter, solange die Seite offen ist."},
+            "en": {"title_cleaner":"My Assignments","date":"Date","start":"Start","apartment":"Apartment","planned":"Planned (min)","next_guests":"Next guests","extras":"Extras","note":"Note","timer":"Timer","start_btn":"Start","stop_btn":"Stop","keep_link":"Do not share this link.","month_hours":"Current month:","hours":"hrs recorded.","adults_short":"Adults","children_short":"Kids","crib":"Extra bed","highchair":"High chair","timer_hint":"Tip: Timer keeps running while this page stays open."},
+            "bg": {"title_cleaner":"Моите задачи","date":"Дата","start":"Старт","apartment":"Апартамент","planned":"Планирано (мин)","next_guests":"Следв. гости","extras":"Екстри","note":"Бележка","timer":"Таймер","start_btn":"Старт","stop_btn":"Стоп","keep_link":"Не споделяйте този линк.","month_hours":"Текущ месец:","hours":"ч. отчетени.","adults_short":"Възр.","children_short":"Деца","crib":"Допълнително легло","highchair":"Детско столче","timer_hint":"Съвет: Таймерът продължава, докато страницата е отворена."},
+            "ro": {"title_cleaner":"Sarcinile mele","date":"Data","start":"Start","apartment":"Apartament","planned":"Planificat (min)","next_guests":"Următorii oaspeți","extras":"Extra","note":"Notă","timer":"Cronometru","start_btn":"Start","stop_btn":"Stop","keep_link":"Nu partajați acest link.","month_hours":"Luna curentă:","hours":"ore înregistrate.","adults_short":"Adulți","children_short":"Copii","crib":"Pat suplimentar","highchair":"Scaun înalt","timer_hint":"Sugestie: cronometrul continuă cât timp pagina rămâne deschisă."},
+            "ru": {"title_cleaner":"Мои задачи","date":"Дата","start":"Начало","apartment":"Апартаменты","planned":"План (мин)","next_guests":"Следующие гости","extras":"Дополнительно","note":"Заметка","timer":"Таймер","start_btn":"Старт","stop_btn":"Стоп","keep_link":"Не делитесь этой ссылкой.","month_hours":"Текущий месяц:","hours":"ч. учтено.","adults_short":"Взр.","children_short":"Дети","crib":"Доп. кровать","highchair":"Детский стул","timer_hint":"Подсказка: таймер работает, пока страница открыта."}
         }
         return T.get(lang, T["en"])
     T = i18n(request)
 
-    return templates.TemplateResponse("cleaner.html", {
-        "request": request, "staff": s, "tasks": tasks, "apts": apts, "used_hours": used_hours,
-        "open_logs": open_logs, "next_by_apartment": next_by_apartment, "T": T
-    })
+    return templates.TemplateResponse("cleaner.html", {"request": request, "staff": s, "tasks": tasks, "apts": apts, "used_hours": used_hours, "open_logs": open_logs, "next_by_apartment": next_by_apartment, "T": T})
