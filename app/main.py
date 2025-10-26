@@ -1,7 +1,7 @@
 
 import os, json, datetime as dt, csv, io
 from fastapi import FastAPI, Request, Depends, Form, HTTPException
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -16,6 +16,10 @@ ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 app = FastAPI(title="Smoobu Staff Planner Pro")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
+
+# Register a simple 'loads' filter for Jinja2
+import json as _json
+templates.env.filters["loads"] = _json.loads
 
 def get_db():
     db = SessionLocal()
@@ -32,6 +36,10 @@ async def startup_event():
     scheduler.add_job(refresh_bookings_job, IntervalTrigger(minutes=interval_min))
     scheduler.start()
 
+@app.get("/")
+async def root():
+    return PlainTextResponse("OK - use /admin/<ADMIN_TOKEN>")
+
 async def refresh_bookings_job():
     start = dt.date.today()
     end = start + dt.timedelta(days=60)
@@ -43,6 +51,8 @@ async def refresh_bookings_job():
         seen = set()
         for b in bookings:
             bid = b.get("id")
+            if bid is None:
+                continue
             seen.add(bid)
             apt = (b.get("apartment") or {})
             bk = db.query(Booking).filter(Booking.id == bid).first() or Booking(id=bid)
