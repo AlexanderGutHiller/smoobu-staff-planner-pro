@@ -1,5 +1,5 @@
 
-import os, json, datetime as dt, csv, io
+import os, json, datetime as dt, csv, io, logging
 from fastapi import FastAPI, Request, Depends, Form, HTTPException
 from fastapi.responses import RedirectResponse, StreamingResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -13,13 +13,16 @@ from .utils import new_token, today_iso, now_iso
 
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 
+log = logging.getLogger("smoobu")
+log.setLevel(logging.INFO)
+
 app = FastAPI(title="Smoobu Staff Planner Pro")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
-# Register a simple 'loads' filter for Jinja2
+# Jinja filter 'loads'
 import json as _json
-templates.env.filters["loads"] = _json.loads
+templates.env.filters["loads"] = lambda s: _json.loads(s) if s else {}
 
 def get_db():
     db = SessionLocal()
@@ -35,6 +38,9 @@ async def startup_event():
     scheduler = AsyncIOScheduler(timezone=os.getenv("TIMEZONE", "Europe/Berlin"))
     scheduler.add_job(refresh_bookings_job, IntervalTrigger(minutes=interval_min))
     scheduler.start()
+    # Immediate import on boot
+    log.info("Initial import on startup")
+    await refresh_bookings_job()
 
 @app.get("/")
 async def root():
@@ -44,6 +50,7 @@ async def refresh_bookings_job():
     start = dt.date.today()
     end = start + dt.timedelta(days=60)
     client = SmoobuClient()
+    log.info("Smoobu import: %s -> %s", start, end)
     bookings = await client.get_bookings(start.isoformat(), end.isoformat())
     db = SessionLocal()
     try:
@@ -84,6 +91,7 @@ async def refresh_bookings_job():
                      booking_id=bk.id, status="open", extras_json="{}")
             db.add(t)
         db.commit()
+        log.info("Smoobu import finished: %d bookings, %d tasks", len(bookings), db.query(Task).count())
     finally:
         db.close()
 
@@ -99,6 +107,12 @@ async def admin_home(token: str, request: Request, db=Depends(get_db)):
     staff = db.query(Staff).filter(Staff.active==True).order_by(Staff.name).all()
     apts  = db.query(Apartment).order_by(Apartment.name).all()
     return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apts": apts, "today": today})
+
+@app.get("/admin/{token}/import")
+async def admin_import_now(token: str):
+    ensure_admin(token)
+    await refresh_bookings_job()
+    return RedirectResponse(url=f"/admin/{token}", status_code=303)
 
 @app.post("/admin/{token}/task/update")
 async def admin_task_update(token: str,
