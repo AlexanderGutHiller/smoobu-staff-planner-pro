@@ -1,3 +1,3 @@
-# Smoobu Staff Planner Pro
+# Smoobu Staff Planner
 
-Projektstruktur für ein FastAPI-basiertes Reinigungspersonal-Tool.
+Ein FastAPI-Projekt für die Personalplanung mit Smoobu.
