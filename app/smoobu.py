@@ -1,0 +1,1 @@
+# smoobu api integration
