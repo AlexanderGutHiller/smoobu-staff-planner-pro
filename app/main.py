@@ -1,8 +1,12 @@
+
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
 
 app = FastAPI()
 
-@app.get("/", response_class=HTMLResponse)
-async def read_root():
-    return "<h1>Smoobu Staff Planner läuft!</h1>"
+@app.get("/")
+def read_root():
+    return {"message": "Service läuft"}
+
+@app.get("/admin/{admin_id}")
+def get_admin_dashboard(admin_id: int):
+    return {"admin_id": admin_id, "message": "Admin-Dashboard ist noch leer"}
