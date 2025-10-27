@@ -1,17 +1,23 @@
+# Smoobu Staff Planner (v5)
 
-# Smoobu Staff Planner — Render-only Package (v4)
+FastAPI-App für Reinigungs-/Einsatzplanung mit Smoobu-Sync (Delta/Upsert) und "Next Arrival"-Infos.
 
-- Fix: UNIQUE constraint for apartments by using a local cache + session.flush().
-- Still uses Smoobu API base `https://login.smoobu.com/api` and `/reservations` endpoint.
+## Start (lokal)
 
-Deploy on Render:
-- Build: `pip install -r requirements.txt`
-- Start: `uvicorn app.main:app --host 0.0.0.0 --port 10000`
-- PORT: `10000`
+```bash
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 10000 --reload
+```
 
-ENV:
-- `SMOOBU_API_KEY`
-- `SMOOBU_BASE_URL` = `https://login.smoobu.com/api`
-- `REFRESH_INTERVAL_MINUTES` = `60`
-- `TIMEZONE` = `Europe/Berlin`
-- `ADMIN_TOKEN`
+## Environment
+
+- `SMOOBU_API_KEY` (erforderlich)
+- `SMOOBU_BASE_URL` (default: https://login.smoobu.com/api)
+- `REFRESH_INTERVAL_MINUTES` (default: 60)
+- `TIMEZONE` (default: Europe/Berlin)
+- `ADMIN_TOKEN` (für Admin-UI)
+
+## Hinweise
+- SQLite DB: `./data.db`
+- Admin UI: `/admin/<ADMIN_TOKEN>`
+- Cleaner Portal: `/cleaner/<MAGIC_TOKEN>`
