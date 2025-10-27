@@ -1,20 +1,17 @@
 
-# Smoobu Staff Planner — Render-only Package (v3)
+# Smoobu Staff Planner — Render-only Package (v4)
 
-**Fix:** Use official Smoobu API base + endpoint (`/reservations?from=&to=`).
+- Fix: UNIQUE constraint for apartments by using a local cache + session.flush().
+- Still uses Smoobu API base `https://login.smoobu.com/api` and `/reservations` endpoint.
 
-Deploy on Render (Python runtime):
-- Build Command: `pip install -r requirements.txt`
-- Start Command: `uvicorn app.main:app --host 0.0.0.0 --port 10000`
+Deploy on Render:
+- Build: `pip install -r requirements.txt`
+- Start: `uvicorn app.main:app --host 0.0.0.0 --port 10000`
 - PORT: `10000`
 
-Environment Variables:
-- `SMOOBU_API_KEY` (required)
-- `SMOOBU_BASE_URL` = `https://login.smoobu.com/api`  ← **NEW**
-- `REFRESH_INTERVAL_MINUTES` = `60` (change for testing)
+ENV:
+- `SMOOBU_API_KEY`
+- `SMOOBU_BASE_URL` = `https://login.smoobu.com/api`
+- `REFRESH_INTERVAL_MINUTES` = `60`
 - `TIMEZONE` = `Europe/Berlin`
-- `ADMIN_TOKEN` (choose a long token)
-
-Admin:
-- `/admin/<ADMIN_TOKEN>`
-- Manual import: `/admin/<ADMIN_TOKEN>/import`
+- `ADMIN_TOKEN`
