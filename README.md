@@ -1,10 +1,8 @@
-# Smoobu Staff Planner PRO
+# Smoobu Staff Planner v9
 
-Start:
-
-```
-pip install -r requirements.txt
-cp .env.example .env
-uvicorn app.main:app --reload
-```
-Admin: http://localhost:8000/admin/<ADMIN_TOKEN>
+This version adds:
+- Display of next check-in with guests/kids.
+- Manual task creation by admin.
+- Color-coded status indicators (green, yellow, red).
+- Timer UI for cleaners.
+- Bugfixes and layout improvements.
