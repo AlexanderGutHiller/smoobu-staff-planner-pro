@@ -42,8 +42,10 @@ async def fetch_bookings_from_smoobu(start_date: date, end_date: date):
         response.raise_for_status()
         
         # Überprüfe ob wir JSON bekommen
-        if 'application/json' not in response.headers.get('Content-Type', ''):
-            logger.error(f"Smoobu: Received non-JSON response. Content-Type: {response.headers.get('Content-Type')}")
+        content_type = response.headers.get('Content-Type', '')
+        if 'application/json' not in content_type:
+            logger.error(f"Smoobu: Received non-JSON response. Content-Type: {content_type}")
+            logger.error(f"Smoobu: This likely means the API endpoint is wrong or authentication failed")
             return []
         
         data = response.json()
