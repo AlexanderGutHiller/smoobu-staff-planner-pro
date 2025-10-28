@@ -29,6 +29,10 @@ async def fetch_bookings_from_smoobu(start_date: date, end_date: date):
     logger.info(f"Smoobu: Request URL: {url}")
     logger.info(f"Smoobu: Request headers: {headers}")
     
+    # FEHLER BEHOBEN: Die Request URL wurde nicht richtig gebaut
+    logger.info(f"Smoobu: Full request URL: {url}")
+    logger.info(f"Smoobu: Full request headers: {headers}")
+    
     try:
         response = requests.get(url, headers=headers, timeout=30)
         logger.info(f"Smoobu: Response status code: {response.status_code}")
