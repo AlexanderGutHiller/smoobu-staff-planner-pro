@@ -1,2 +1,1 @@
-# Smoobu Staff Planner v6
-Vollständige Implementierung laut Spezifikation.
+# v6-final (Python 3.11)
