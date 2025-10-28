@@ -26,6 +26,8 @@ async def fetch_bookings_from_smoobu(start_date: date, end_date: date):
 
     logger.info(f"Smoobu: Fetching bookings from {start_date} to {end_date}")
     logger.info(f"Smoobu: API Key present: {bool(SMOOBU_API_KEY)}")
+    logger.info(f"Smoobu: Request URL: {url}")
+    logger.info(f"Smoobu: Request headers: {headers}")
     
     try:
         response = requests.get(url, headers=headers, timeout=30)
@@ -34,6 +36,12 @@ async def fetch_bookings_from_smoobu(start_date: date, end_date: date):
         logger.info(f"Smoobu: Response content (first 200 chars): {response.text[:200]}")
         
         response.raise_for_status()
+        
+        # Überprüfe ob wir JSON bekommen
+        if 'application/json' not in response.headers.get('Content-Type', ''):
+            logger.error(f"Smoobu: Received non-JSON response. Content-Type: {response.headers.get('Content-Type')}")
+            return []
+        
         data = response.json()
 
         # API liefert in ["reservations"] die Liste
