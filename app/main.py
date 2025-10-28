@@ -50,37 +50,77 @@ def get_translations(lang: str) -> Dict[str, str]:
         "de": {
             "tasks": "Einsätze", "team": "Team", "apartments": "Apartments", "import_now": "Import jetzt",
             "cleanup": "Bereinigen", "date": "Datum", "apartment": "Apartment", "planned": "Geplant",
-            "status": "Status", "actual": "Tatsächlich", "next_arrival": "Nächste Anreise", "locked": "Lock",
+            "status": "Status", "actual": "Tatsächlich", "next_arrival": "Nächste Anreise",
             "save": "Speichern", "today": "Heute", "week": "Diese Woche", "month": "Dieser Monat",
-            "next7": "Nächste 7 Tage", "all": "Alle", "lock": "Gesperrt", "unlock": "Offen"
+            "next7": "Nächste 7 Tage", "all": "Alle", "erledigt": "Erledigt", "läuft": "Läuft", "offen": "Offen",
+            "min": "min", "noch": "noch ca.", "über_zeit": "Über Zeit", "start": "Start", "pause": "Pause",
+            "fertig": "Fertig", "wieder_öffnen": "Wieder öffnen", "notiz": "Notiz", "meine_einsätze": "Meine Einsätze",
+            "monatslimit": "Achtung: Du hast dein Monatslimit von", "std_überschritten": "Std überschritten",
+            "aktuell": "Std erfasst.", "monat_erfasst": "Aktueller Monat:",
+            "keine_einsätze": "Keine Einsätze vorhanden", "nächste_anreise": "Nächste Anreise",
+            "erw": "Erw.", "kinder": "Kinder", "verbleibend": "verbleibend:",
+            "erledigte_ausblenden": "Erledigte ausblenden", "erledigte_anzeigen": "Erledigte anzeigen",
+            "datum": "Datum", "ma": "MA", "lock": "Lock"
         },
         "en": {
             "tasks": "Tasks", "team": "Team", "apartments": "Apartments", "import_now": "Import now",
             "cleanup": "Clean up", "date": "Date", "apartment": "Apartment", "planned": "Planned",
-            "status": "Status", "actual": "Actual", "next_arrival": "Next Arrival", "locked": "Lock",
+            "status": "Status", "actual": "Actual", "next_arrival": "Next Arrival",
             "save": "Save", "today": "Today", "week": "This Week", "month": "This Month",
-            "next7": "Next 7 Days", "all": "All", "lock": "Locked", "unlock": "Open"
+            "next7": "Next 7 Days", "all": "All", "erledigt": "Done", "läuft": "Running", "offen": "Open",
+            "min": "min", "noch": "ca.", "über_zeit": "Over time", "start": "Start", "pause": "Pause",
+            "fertig": "Done", "wieder_öffnen": "Reopen", "notiz": "Note", "meine_einsätze": "My Tasks",
+            "monatslimit": "Warning: You have exceeded your monthly limit of", "std_überschritten": "hours",
+            "aktuell": "hours logged.", "monat_erfasst": "Current month:",
+            "keine_einsätze": "No tasks available", "nächste_anreise": "Next Arrival",
+            "erw": "Adults", "kinder": "Children", "verbleibend": "remaining:",
+            "erledigte_ausblenden": "Hide completed", "erledigte_anzeigen": "Show completed",
+            "datum": "Date", "ma": "Staff", "lock": "Lock"
         },
         "ro": {
             "tasks": "Sarcini", "team": "Echipa", "apartments": "Apartamente", "import_now": "Importă acum",
             "cleanup": "Curățare", "date": "Dată", "apartment": "Apartament", "planned": "Planificat",
-            "status": "Status", "actual": "Real", "next_arrival": "Următoarea sosire", "locked": "Blocat",
+            "status": "Status", "actual": "Real", "next_arrival": "Următoarea sosire",
             "save": "Salvează", "today": "Azi", "week": "Săptămâna aceasta", "month": "Luna aceasta",
-            "next7": "Următoarele 7 zile", "all": "Toate", "lock": "Blocat", "unlock": "Deschis"
+            "next7": "Următoarele 7 zile", "all": "Toate", "erledigt": "Finalizat", "läuft": "În curs", "offen": "Deschis",
+            "min": "min", "noch": "ca.", "über_zeit": "Peste timp", "start": "Start", "pause": "Pauză",
+            "fertig": "Finalizat", "wieder_öffnen": "Redeschide", "notiz": "Notă", "meine_einsätze": "Sarcinile mele",
+            "monatslimit": "Atenție: Ai depășit limita lunară de", "std_überschritten": "ore",
+            "aktuell": "ore înregistrate.", "monat_erfasst": "Luna curentă:",
+            "keine_einsätze": "Nu există sarcini", "nächste_anreise": "Următoarea sosire",
+            "erw": "Adulți", "kinder": "Copii", "verbleibend": "rămâne:",
+            "erledigte_ausblenden": "Ascunde finalizate", "erledigte_anzeigen": "Afișează finalizate",
+            "datum": "Dată", "ma": "Echipa", "lock": "Blocare"
         },
         "ru": {
             "tasks": "Задачи", "team": "Команда", "apartments": "Апартаменты", "import_now": "Импорт сейчас",
             "cleanup": "Очистка", "date": "Дата", "apartment": "Апартамент", "planned": "Запланировано",
-            "status": "Статус", "actual": "Фактически", "next_arrival": "Следующий приезд", "locked": "Заблокировано",
+            "status": "Статус", "actual": "Фактически", "next_arrival": "Следующий приезд",
             "save": "Сохранить", "today": "Сегодня", "week": "На этой неделе", "month": "В этом месяце",
-            "next7": "Следующие 7 дней", "all": "Все", "lock": "Заблокировано", "unlock": "Открыто"
+            "next7": "Следующие 7 дней", "all": "Все", "erledigt": "Выполнено", "läuft": "Выполняется", "offen": "Открыто",
+            "min": "мин", "noch": "около", "über_zeit": "Превышено", "start": "Старт", "pause": "Пауза",
+            "fertig": "Готово", "wieder_öffnen": "Открыть снова", "notiz": "Заметка", "meine_einsätze": "Мои задачи",
+            "monatslimit": "Внимание: Вы превысили месячный лимит", "std_überschritten": "часов",
+            "aktuell": "часов записано.", "monat_erfasst": "Текущий месяц:",
+            "keine_einsätze": "Нет задач", "nächste_anreise": "Следующий приезд",
+            "erw": "Взрослые", "kinder": "Дети", "verbleibend": "осталось:",
+            "erledigte_ausblenden": "Скрыть выполненные", "erledigte_anzeigen": "Показать выполненные",
+            "datum": "Дата", "ma": "Команда", "lock": "Заблокировано"
         },
         "bg": {
             "tasks": "Задачи", "team": "Екип", "apartments": "Апартаменти", "import_now": "Импортирай сега",
             "cleanup": "Почистване", "date": "Дата", "apartment": "Апартамент", "planned": "Планирано",
-            "status": "Статус", "actual": "Действително", "next_arrival": "Следващо пристигане", "locked": "Заключено",
+            "status": "Статус", "actual": "Действително", "next_arrival": "Следващо пристигане",
             "save": "Запази", "today": "Днес", "week": "Тази седмица", "month": "Този месец",
-            "next7": "Следващите 7 дни", "all": "Всички", "lock": "Заключено", "unlock": "Отворено"
+            "next7": "Следващите 7 дни", "all": "Всички", "erledigt": "Завършено", "läuft": "В ход", "offen": "Отворено",
+            "min": "мин", "noch": "остават", "über_zeit": "Над времето", "start": "Старт", "pause": "Пауза",
+            "fertig": "Готово", "wieder_öffnen": "Отвори отново", "notiz": "Бележка", "meine_einsätze": "Моите задачи",
+            "monatslimit": "Внимание: Надхвърлихте месечния си лимит от", "std_überschritten": "часа",
+            "aktuell": "часа записани.", "monat_erfasst": "Текущ месец:",
+            "keine_einsätze": "Няма задачи", "nächste_anreise": "Следващо пристигане",
+            "erw": "Възрастни", "kinder": "Деца", "verbleibend": "остават:",
+            "erledigte_ausblenden": "Скрий завършени", "erledigte_anzeigen": "Покажи завършени",
+            "datum": "Дата", "ma": "Екип", "lock": "Заключено"
         }
     }
     return translations.get(lang, translations["de"])
@@ -359,7 +399,7 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     base_url = BASE_URL.rstrip("/")
     if not base_url:
         base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
-    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "base_url": base_url, "lang": lang, "t": trans})
+    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "base_url": base_url, "lang": lang, "trans": trans})
 
 @app.get("/admin/{token}/staff")
 async def admin_staff(request: Request, token: str, db=Depends(get_db)):
@@ -371,7 +411,7 @@ async def admin_staff(request: Request, token: str, db=Depends(get_db)):
     base_url = BASE_URL.rstrip("/")
     if not base_url:
         base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
-    return templates.TemplateResponse("admin_staff.html", {"request": request, "token": token, "staff": staff, "base_url": base_url, "lang": lang, "t": trans})
+    return templates.TemplateResponse("admin_staff.html", {"request": request, "token": token, "staff": staff, "base_url": base_url, "lang": lang, "trans": trans})
 
 @app.post("/admin/{token}/staff/add")
 async def admin_staff_add(token: str, name: str = Form(...), hourly_rate: float = Form(0.0), max_hours_per_month: int = Form(160), db=Depends(get_db)):
@@ -408,7 +448,7 @@ async def admin_apartments(request: Request, token: str, db=Depends(get_db)):
     lang = detect_language(request)
     trans = get_translations(lang)
     apts = db.query(Apartment).order_by(Apartment.name).all()
-    return templates.TemplateResponse("admin_apartments.html", {"request": request, "token": token, "apartments": apts, "lang": lang, "t": trans})
+    return templates.TemplateResponse("admin_apartments.html", {"request": request, "token": token, "apartments": apts, "lang": lang, "trans": trans})
 
 @app.post("/admin/{token}/apartments/update")
 async def admin_apartments_update(token: str, apartment_id: int = Form(...), planned_minutes: int = Form(...), db=Depends(get_db)):
@@ -582,7 +622,7 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
     warn_limit = used_hours > float(s.max_hours_per_month or 0)
     lang = detect_language(request)
     trans = get_translations(lang)
-    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "run_map": run_map, "warn_limit": warn_limit, "lang": lang, "t": trans})
+    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "run_map": run_map, "warn_limit": warn_limit, "lang": lang, "trans": trans})
 
 @app.post("/cleaner/{token}/start")
 async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)):

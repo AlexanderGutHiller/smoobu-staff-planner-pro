@@ -63,7 +63,7 @@ body { padding-bottom: 20px; }
 </head>
 <body class="bg-light"><div class="container py-3 px-2">
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="mb-0" style="font-size: 1.5rem;">Meine Einsätze</h1>
+  <h1 class="mb-0" style="font-size: 1.5rem;">{{ trans.meine_einsätze }}</h1>
   <select class="form-select form-select-sm" style="width: auto; max-width: 140px;" onchange="setLanguage(this.value)">
     <option value="de" {% if lang == 'de' %}selected{% endif %}>🇩🇪 DE</option>
     <option value="en" {% if lang == 'en' %}selected{% endif %}>🇬🇧 EN</option>
@@ -82,16 +82,16 @@ function setLanguage(lang) {
 }
 </script>
 {% if warn_limit %}
-  <div class="alert alert-warning alert-dismissible fade show"><i class="bi bi-exclamation-triangle-fill"></i> Du hast dein Monatslimit von {{ staff.max_hours_per_month }} Std überschritten (aktuell {{ used_hours }} Std).</div>
+  <div class="alert alert-warning alert-dismissible fade show"><i class="bi bi-exclamation-triangle-fill"></i> {{ trans.monatslimit }} {{ staff.max_hours_per_month }} {{ trans.std_überschritten }} ({{ trans.aktuell }} {{ used_hours }} {{ trans.std_überschritten }})</div>
 {% else %}
-  <div class="alert alert-info alert-dismissible fade show"><i class="bi bi-info-circle"></i> Aktueller Monat: {{ used_hours }} Std erfasst.</div>
+  <div class="alert alert-info alert-dismissible fade show"><i class="bi bi-info-circle"></i> {{ trans.monat_erfasst }} {{ used_hours }} {{ trans.std_überschritten }}</div>
 {% endif %}
 
 <div class="mb-3">
   {% if show_done %}
-    <a class="btn btn-outline-secondary btn-touch-sm" href="/cleaner/{{ staff.magic_token }}"><i class="bi bi-eye-slash"></i> Erledigte ausblenden</a>
+    <a class="btn btn-outline-secondary btn-touch-sm" href="/cleaner/{{ staff.magic_token }}"><i class="bi bi-eye-slash"></i> {{ trans.erledigte_ausblenden }}</a>
   {% else %}
-    <a class="btn btn-outline-secondary btn-touch-sm" href="/cleaner/{{ staff.magic_token }}?show_done=1"><i class="bi bi-eye"></i> Erledigte anzeigen</a>
+    <a class="btn btn-outline-secondary btn-touch-sm" href="/cleaner/{{ staff.magic_token }}?show_done=1"><i class="bi bi-eye"></i> {{ trans.erledigte_anzeigen }}</a>
   {% endif %}
 </div>
 
@@ -111,21 +111,13 @@ function setLanguage(lang) {
         {% if t.booking_id and book_map.get(t.booking_id) %}
           <div class="mb-2"><i class="bi bi-person-fill"></i> <strong class="text-primary">{{ book_map.get(t.booking_id, '') }}</strong></div>
         {% endif %}
-        {% if t.booking_id and booking_details_map.get(t.booking_id) %}
-          <div class="mb-2 text-muted">
-            <i class="bi bi-people"></i> {{ booking_details_map[t.booking_id].adults }} Erw.
-            {% if booking_details_map[t.booking_id].children > 0 %}
-              + {{ booking_details_map[t.booking_id].children }} Kinder
-            {% endif %}
-          </div>
-        {% endif %}
         
         {% if t.next_arrival %}
           <div class="guest-info">
-            <div class="fw-bold mb-1"><i class="bi bi-calendar3"></i> Nächste Anreise: {{ t.next_arrival | date_wd_de('short') }}</div>
-            <div><i class="bi bi-people-fill"></i> <strong>{{ t.next_arrival_adults or 0 }}</strong> Erw.
+            <div class="fw-bold mb-1"><i class="bi bi-calendar3"></i> {{ trans.nächste_anreise }}: {{ t.next_arrival | date_wd_de('short') }}</div>
+            <div><i class="bi bi-people-fill"></i> <strong>{{ t.next_arrival_adults or 0 }}</strong> {{ trans.erw }}
             {% if t.next_arrival_children and t.next_arrival_children > 0 %}
-              + <strong>{{ t.next_arrival_children }}</strong> Kinder
+              + <strong>{{ t.next_arrival_children }}</strong> {{ trans.kinder }}
             {% endif %}</div>
             {% if t.next_arrival_guest_name %}
               <div class="mt-1"><i class="bi bi-person-fill"></i> <strong>{{ t.next_arrival_guest_name }}</strong></div>
@@ -146,17 +138,17 @@ function setLanguage(lang) {
     
     <div class="row align-items-center mb-3">
       <div class="col-6 text-center">
-        <div class="text-muted small">Geplant</div>
-        <div class="fw-bold" style="font-size: 1.3rem;">{{ t.planned_minutes }} min</div>
+        <div class="text-muted small">{{ trans.planned }}</div>
+        <div class="fw-bold" style="font-size: 1.3rem;">{{ t.planned_minutes }} {{ trans.min }}</div>
       </div>
       <div class="col-6 text-center">
-        <div class="text-muted small">Status</div>
+        <div class="text-muted small">{{ trans.status }}</div>
         {% if t.status=='running' %}
-          <span class="badge bg-success status-badge"><i class="bi bi-play-circle-fill"></i> Läuft</span>
+          <span class="badge bg-success status-badge"><i class="bi bi-play-circle-fill"></i> {{ trans.läuft }}</span>
         {% elif t.status=='done' %}
-          <span class="badge bg-secondary status-badge"><i class="bi bi-check-circle"></i> Erledigt</span>
+          <span class="badge bg-secondary status-badge"><i class="bi bi-check-circle"></i> {{ trans.erledigt }}</span>
         {% else %}
-          <span class="badge bg-secondary status-badge"><i class="bi bi-hourglass-split"></i> Offen</span>
+          <span class="badge bg-secondary status-badge"><i class="bi bi-hourglass-split"></i> {{ trans.offen }}</span>
         {% endif %}
       </div>
     </div>
@@ -166,10 +158,7 @@ function setLanguage(lang) {
         <div class="timer-display timer-running">
           <div id="timer-{{ t.id }}" data-started="{{ started or '' }}" data-planned="{{ t.planned_minutes }}">⏱️ 0:00</div>
         </div>
-        <div class="small text-muted" id="remaining-{{ t.id }}">verbleibend: --</div>
-      </div>
-      <div class="progress mb-3" id="prog-{{ t.id }}" style="height:30px;">
-        <div class="progress-bar" role="progressbar" style="width: 0%; line-height:30px; font-size: 1rem;" id="pb-{{ t.id }}">0%</div>
+        <div class="small text-muted" id="remaining-{{ t.id }}" data-lang-over="{{ trans.über_zeit }}" data-lang-min="{{ trans.min }}" data-lang-remaining="{{ trans.noch }}">{{ trans.verbleibend }} --</div>
       </div>
     {% endif %}
     
@@ -177,31 +166,31 @@ function setLanguage(lang) {
       {% if t.status=='open' %}
       <form method="post" action="/cleaner/{{ staff.magic_token }}/start">
         <input type="hidden" name="task_id" value="{{ t.id }}"/>
-        <button class="btn btn-success btn-touch"><i class="bi bi-play-fill"></i> Start</button>
+        <button class="btn btn-success btn-touch"><i class="bi bi-play-fill"></i> {{ trans.start }}</button>
       </form>
       {% elif t.status=='running' %}
       <div class="row g-2">
         <div class="col-6">
           <form method="post" action="/cleaner/{{ staff.magic_token }}/stop">
             <input type="hidden" name="task_id" value="{{ t.id }}"/>
-            <button class="btn btn-warning btn-touch w-100"><i class="bi bi-pause-fill"></i> Pause</button>
+            <button class="btn btn-warning btn-touch w-100"><i class="bi bi-pause-fill"></i> {{ trans.pause }}</button>
           </form>
         </div>
         <div class="col-6">
           <form method="post" action="/cleaner/{{ staff.magic_token }}/done">
             <input type="hidden" name="task_id" value="{{ t.id }}"/>
-            <button class="btn btn-primary btn-touch w-100"><i class="bi bi-check-circle"></i> Fertig</button>
+            <button class="btn btn-primary btn-touch w-100"><i class="bi bi-check-circle"></i> {{ trans.fertig }}</button>
           </form>
         </div>
       </div>
       {% elif t.status=='done' %}
       <form method="post" action="/cleaner/{{ staff.magic_token }}/reopen">
         <input type="hidden" name="task_id" value="{{ t.id }}"/>
-        <button class="btn btn-outline-danger btn-touch-sm"><i class="bi bi-arrow-counterclockwise"></i> Wieder öffnen</button>
+        <button class="btn btn-outline-danger btn-touch-sm"><i class="bi bi-arrow-counterclockwise"></i> {{ trans.wieder_öffnen }}</button>
       </form>
       {% endif %}
       <button class="btn btn-outline-primary btn-touch-sm" data-bs-toggle="modal" data-bs-target="#noteModal" data-task="{{ t.id }}" data-current="{{ t.notes|e }}">
-        <i class="bi bi-pencil-square"></i> Notiz
+        <i class="bi bi-pencil-square"></i> {{ trans.notiz }}
       </button>
     </div>
   </div>
@@ -323,31 +312,13 @@ function updateTimers(){
     // Verbleibende Zeit
     const remainingEl = document.getElementById('remaining-'+id);
     if(remainingEl){
+      const langOver = remainingEl.getAttribute('data-lang-over') || 'Über Zeit';
+      const langRemaining = remainingEl.getAttribute('data-lang-remaining') || 'noch ca.';
+      const langMin = remainingEl.getAttribute('data-lang-min') || 'min';
       remainingEl.textContent = elapsedMinutes >= planned ? 
-        `⚠️ Über Zeit (+${elapsedMinutes - planned} min)` : 
-        `noch ca. ${remaining} min`;
+        `⚠️ ${langOver} (+${elapsedMinutes - planned} ${langMin})` : 
+        `${langRemaining} ${remaining} ${langMin}`;
       remainingEl.style.color = elapsedMinutes >= planned ? '#dc3545' : '';
-    }
-    
-    // Progress Bar
-    const pb = document.getElementById('pb-'+id);
-    if(pb){
-      const pct = Math.min(100, Math.round(elapsedMinutes / Math.max(1, planned) * 100));
-      pb.style.width = pct + '%';
-      pb.textContent = pct + '%';
-      
-      const prog = document.getElementById('prog-'+id);
-      if(prog){
-        if(elapsedMinutes >= planned){
-          prog.classList.add('over');
-          pb.classList.add('bg-danger');
-          pb.classList.remove('bg-success');
-        } else {
-          prog.classList.remove('over');
-          pb.classList.add('bg-success');
-          pb.classList.remove('bg-danger');
-        }
-      }
     }
   });
 }

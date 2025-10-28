@@ -46,7 +46,6 @@ class Task(Base):
     status: Mapped[str] = mapped_column(String(16), default="open")  # open|running|done
 
     auto_generated: Mapped[bool] = mapped_column(Boolean, default=True)
-    locked: Mapped[bool] = mapped_column(Boolean, default=False)
     booking_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     next_arrival: Mapped[str | None] = mapped_column(String(10), nullable=True)

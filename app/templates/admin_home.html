@@ -133,15 +133,14 @@ function setLanguage(lang) {
     {% else %}-{% endif %}
   </td>
   <td data-col="staff">
-    <form method="post" action="/admin/{{ token }}/task/assign" class="d-flex gap-2">
+    <form method="post" action="/admin/{{ token }}/task/assign" class="assign-form" id="assign-form-{{ t.id }}">
       <input type="hidden" name="task_id" value="{{ t.id }}"/>
-      <select name="staff_id_raw" class="form-select form-select-sm">
+      <select name="staff_id_raw" class="form-select form-select-sm" onchange="document.getElementById('assign-form-{{ t.id }}').submit()">
         <option value="">–</option>
         {% for s in staff %}
           <option value="{{ s.id }}" {% if t.assigned_staff_id==s.id %}selected{% endif %}>{{ s.name }}</option>
         {% endfor %}
       </select>
-      <button class="btn btn-sm btn-outline-primary"><i class="bi bi-floppy"></i></button>
     </form>
   </td>
   <td>
