@@ -6,11 +6,13 @@ from datetime import date
 logger = logging.getLogger("smoobu")
 
 SMOOBU_API_KEY = os.getenv("SMOOBU_API_KEY")
-SMOOBU_API_BASE = "https://api.smoobu.com"
+SMOOBU_API_BASE = "https://api.smoobu.com/api"
 
+# Laut Smoobu Dokumentation: Header heißt "Api-Key"
 headers = {
-    "X-Api-Key": SMOOBU_API_KEY,
-    "Content-Type": "application/json"
+    "Api-Key": SMOOBU_API_KEY,
+    "Content-Type": "application/json",
+    "Accept": "application/json"
 }
 
 
@@ -22,16 +24,13 @@ async def fetch_bookings_from_smoobu(start_date: date, end_date: date):
     Ruft Buchungen im angegebenen Zeitraum aus der Smoobu API ab.
     Gibt eine Liste von dicts mit Buchungsdaten zurück.
     """
-    url = f"{SMOOBU_API_BASE}/v1/reservations?from={start_date}&to={end_date}"
+    # Korrekte URL laut Smoobu API Dokumentation
+    url = f"{SMOOBU_API_BASE}/reservations?from={start_date}&to={end_date}"
 
     logger.info(f"Smoobu: Fetching bookings from {start_date} to {end_date}")
     logger.info(f"Smoobu: API Key present: {bool(SMOOBU_API_KEY)}")
     logger.info(f"Smoobu: Request URL: {url}")
     logger.info(f"Smoobu: Request headers: {headers}")
-    
-    # FEHLER BEHOBEN: Die Request URL wurde nicht richtig gebaut
-    logger.info(f"Smoobu: Full request URL: {url}")
-    logger.info(f"Smoobu: Full request headers: {headers}")
     
     try:
         response = requests.get(url, headers=headers, timeout=30)
