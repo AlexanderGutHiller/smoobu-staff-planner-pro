@@ -52,8 +52,13 @@ def upsert_tasks_from_bookings(bookings: list[Booking]):
             log.info("Skip booking %s (%s) – invalid departure format: %s", b.id, b.apartment_name, b.departure)
             continue
         
+        # Prüfe auf leeres arrival (Langzeitbuchungen ohne Check-Out)
+        if not b.arrival or not b.arrival.strip():
+            log.info("Skip booking %s (%s) – no arrival (long-term booking)", b.id, b.apartment_name)
+            continue
+        
         # Prüfe departure <= arrival (ungültige Buchung)
-        if b.arrival and b.departure <= b.arrival:
+        if b.departure <= b.arrival:
             log.info("Skip booking %s (%s) – invalid departure <= arrival", b.id, b.apartment_name)
             continue
         
@@ -142,13 +147,32 @@ def upsert_tasks_from_bookings(bookings: list[Booking]):
                         removed_count += 1
                         continue
         
-        # Entferne Tasks deren Buchung nicht mehr in der aktuellen Liste ist
+        # Entferne Tasks deren Buchung nicht mehr in der aktuellen Liste ist (auch gesperrte!)
         current_ids = set(booking_ids)
         for t in s.execute(select(Task)).scalars().all():
-            if t.auto_generated and (not t.locked) and (t.booking_id and t.booking_id not in current_ids):
-                log.info("Removing stale task %d - booking %d no longer exists", t.id, t.booking_id)
+            if t.auto_generated and t.booking_id and t.booking_id not in current_ids:
+                log.info("Removing stale task %d - booking %d no longer exists (locked: %s)", t.id, t.booking_id, t.locked)
                 s.delete(t)
                 removed_count += 1
+                continue
+            
+            # Prüfe auch ob der Task zu einer Buchung gehört, die nicht mehr gültig ist
+            if t.booking_id:
+                b = s.execute(select(Booking).where(Booking.id == t.booking_id)).scalar_one_or_none()
+                if b:
+                    # Wenn Buchung kein departure mehr hat, lösche Task (auch gesperrte!)
+                    if not b.departure or not b.departure.strip():
+                        log.info("Removing task %d - booking %d has no departure (locked: %s)", t.id, t.booking_id, t.locked)
+                        s.delete(t)
+                        removed_count += 1
+                        continue
+                    
+                    # Wenn Buchung kein arrival mehr hat, lösche Task (auch gesperrte!)
+                    if not b.arrival or not b.arrival.strip():
+                        log.info("Removing task %d - booking %d has no arrival (locked: %s)", t.id, t.booking_id, t.locked)
+                        s.delete(t)
+                        removed_count += 1
+                        continue
         
         if removed_count > 0:
             log.info("Cleanup completed: %d invalid/stale tasks removed", removed_count)

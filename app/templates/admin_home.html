@@ -12,10 +12,11 @@
 <body class="bg-light"><div class="container py-4">
 <h1 class="mb-3">Einsätze</h1>
 
-<div class="d-flex gap-2 mb-3">
+<div class="d-flex gap-2 mb-3 flex-wrap">
   <a class="btn btn-outline-secondary" href="/admin/{{ token }}/staff"><i class="bi bi-people"></i> Team</a>
   <a class="btn btn-outline-secondary" href="/admin/{{ token }}/apartments"><i class="bi bi-building"></i> Apartments</a>
   <a class="btn btn-primary" href="/admin/{{ token }}/import"><i class="bi bi-arrow-repeat"></i> Import jetzt</a>
+  <a class="btn btn-outline-warning" href="/admin/{{ token }}/cleanup"><i class="bi bi-trash"></i> Bereinigen</a>
 </div>
 
 <table id="task-table" class="table table-sm table-hover bg-white align-middle">
@@ -39,6 +40,8 @@
       </select>
     </th>
     <th>Geplant</th>
+    <th>Status</th>
+    <th>Tatsächlich</th>
     <th>Next Arrival</th>
     <th>MA<br>
       <select id="f-staff" class="form-select form-select-sm filter-input">
@@ -48,13 +51,7 @@
         {% endfor %}
       </select>
     </th>
-    <th>Lock<br>
-      <select id="f-lock" class="form-select form-select-sm filter-input">
-        <option value="">Alle</option>
-        <option value="locked">Gesperrt</option>
-        <option value="unlocked">Offen</option>
-      </select>
-    </th>
+    <th>Lock</th>
     <th>#</th>
   </tr>
 </thead>
@@ -64,10 +61,36 @@
   <td data-col="date">{{ t.date | date_wd_de('short') }}</td>
   <td data-col="apt">
     <div class="fw-bold">{{ apt_map.get(t.apartment_id, t.apartment_id) }}</div>
-    <small class="text-muted">{{ book_map.get(t.booking_id, '') }}</small>
+    {% if book_map.get(t.booking_id) %}
+      <div class="small text-primary"><i class="bi bi-person"></i> <strong>{{ book_map.get(t.booking_id, '') }}</strong></div>
+    {% endif %}
     {% if t.notes %}<div class="mt-1"><small class="text-muted"><i class="bi bi-sticky"></i> {{ t.notes }}</small></div>{% endif %}
   </td>
   <td data-col="planned">{{ t.planned_minutes }} min</td>
+  <td>
+    {% if t.status == 'done' %}
+      <span class="badge bg-success"><i class="bi bi-check-circle"></i> Erledigt</span>
+    {% elif t.status == 'running' %}
+      <span class="badge bg-primary"><i class="bi bi-play-circle"></i> Läuft</span>
+    {% else %}
+      <span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> Offen</span>
+    {% endif %}
+  </td>
+  <td>
+    {% set tl = timelog_map.get(t.id, {}) %}
+    {% if tl.actual_minutes %}
+      <span class="fw-bold {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">
+        {{ tl.actual_minutes }} min
+      </span>
+      {% if tl.actual_minutes > t.planned_minutes %}
+        <small class="text-danger d-block">+{{ tl.actual_minutes - t.planned_minutes }} min</small>
+      {% endif %}
+    {% elif tl.started_at and not tl.ended_at %}
+      <span class="badge bg-warning text-dark"><i class="bi bi-clock"></i> Läuft...</span>
+    {% else %}
+      <span class="text-muted">-</span>
+    {% endif %}
+  </td>
   <td data-col="next">
     {% if t.next_arrival %}
       <div class="fw-bold">{{ t.next_arrival | date_wd_de('short') }}</div>
@@ -94,7 +117,7 @@
           <option value="{{ s.id }}" {% if t.assigned_staff_id==s.id %}selected{% endif %}>{{ s.name }}</option>
         {% endfor %}
       </select>
-      <button class="btn btn-sm btn-outline-primary"><i class="bi bi-save"></i></button>
+      <button class="btn btn-sm btn-outline-primary"><i class="bi bi-floppy"></i></button>
     </form>
   </td>
   <td>

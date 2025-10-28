@@ -40,6 +40,9 @@ tr.row-done{opacity:.6;}
   <td><strong>{{ t.date | date_wd_de('short') }}</strong></td>
   <td>
     <div class="fw-bold mb-1">{{ apt_map.get(t.apartment_id, t.apartment_id) }}</div>
+    {% if book_map.get(t.booking_id) %}
+      <div class="small text-primary mb-1"><i class="bi bi-person-fill"></i> <strong>{{ book_map.get(t.booking_id, '') }}</strong></div>
+    {% endif %}
     {% if t.next_arrival %}
       <div class="guest-info">
         <div><i class="bi bi-people-fill"></i> <strong>{{ t.next_arrival_adults or 0 }}</strong> Erw.
@@ -54,8 +57,6 @@ tr.row-done{opacity:.6;}
           <br><small class="text-muted"><i class="bi bi-chat-text"></i> {{ t.next_arrival_comments[:80] }}</small>
         {% endif %}
       </div>
-    {% elif book_map.get(t.booking_id) %}
-      <div class="small text-muted"><i class="bi bi-person"></i> {{ book_map.get(t.booking_id, '') }}</div>
     {% endif %}
     {% if t.notes %}
       <div class="small-note mt-1"><i class="bi bi-sticky"></i> {{ t.notes[:80] }}</div>
@@ -128,7 +129,7 @@ tr.row-done{opacity:.6;}
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
-        <button type="button" class="btn btn-primary" id="saveNoteBtn"><i class="bi bi-save"></i> Speichern</button>
+        <button type="button" class="btn btn-primary" id="saveNoteBtn"><i class="bi bi-floppy"></i> Speichern</button>
       </div>
     </div>
   </div>

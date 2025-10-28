@@ -169,10 +169,22 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     apts = db.query(Apartment).filter(Apartment.active==True).all()
     apt_map = {a.id: a.name for a in apts}
     book_map = {b.id: b.guest_name for b in db.query(Booking).all()}
+    
+    # Timelog-Daten für jedes Task
+    timelog_map = {}
+    for t in tasks:
+        tl = db.query(TimeLog).filter(TimeLog.task_id==t.id).order_by(TimeLog.id.desc()).first()
+        if tl:
+            timelog_map[t.id] = {
+                'actual_minutes': tl.actual_minutes,
+                'started_at': tl.started_at,
+                'ended_at': tl.ended_at
+            }
+    
     base_url = BASE_URL.rstrip("/")
     if not base_url:
         base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
-    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "base_url": base_url})
+    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "timelog_map": timelog_map, "base_url": base_url})
 
 @app.get("/admin/{token}/staff")
 async def admin_staff(request: Request, token: str, db=Depends(get_db)):
@@ -238,9 +250,11 @@ async def admin_apartments_apply(token: str, apartment_id: int = Form(...), db=D
     today_iso = dt.date.today().isoformat()
     
     # Update all tasks for this apartment that are today or in the future
+    # Only update unlocked tasks
     tasks = db.query(Task).filter(
         Task.apartment_id == apartment_id,
-        Task.date >= today_iso
+        Task.date >= today_iso,
+        Task.locked == False
     ).all()
     
     updated = 0
@@ -253,10 +267,36 @@ async def admin_apartments_apply(token: str, apartment_id: int = Form(...), db=D
     return RedirectResponse(url=f"/admin/{token}/apartments", status_code=303)
 
 @app.get("/admin/{token}/import")
-async def admin_import(token: str):
+async def admin_import(token: str, db=Depends(get_db)):
     if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
     await refresh_bookings_job()
     return PlainTextResponse("Import done.")
+
+@app.get("/admin/{token}/cleanup")
+async def admin_cleanup(token: str, db=Depends(get_db)):
+    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    
+    removed_count = 0
+    # Finde alle Tasks ohne gültige Buchung (auch gesperrte!)
+    for t in db.query(Task).filter(Task.auto_generated == True).all():
+        if t.booking_id:
+            b = db.get(Booking, t.booking_id)
+            # Wenn Buchung nicht existiert oder ungültig ist, lösche Task
+            if not b:
+                db.delete(t)
+                removed_count += 1
+                log.info("Removing invalid task %d - booking %d does not exist (locked: %s)", t.id, t.booking_id, t.locked)
+            elif not b.departure or not b.departure.strip():
+                db.delete(t)
+                removed_count += 1
+                log.info("Removing invalid task %d - booking %d has no departure (locked: %s)", t.id, t.booking_id, t.locked)
+            elif not b.arrival or not b.arrival.strip():
+                db.delete(t)
+                removed_count += 1
+                log.info("Removing invalid task %d - booking %d has no arrival (locked: %s)", t.id, t.booking_id, t.locked)
+    
+    db.commit()
+    return PlainTextResponse(f"Cleanup done. Removed {removed_count} invalid tasks (including locked ones).")
 
 @app.get("/admin/{token}/export")
 async def admin_export(token: str, month: str, db=Depends(get_db)):
@@ -325,15 +365,26 @@ async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
-    open_tl = db.query(TimeLog).filter(TimeLog.staff_id==s.id, TimeLog.ended_at==None).first()
-    if open_tl:
+    if not t: raise HTTPException(status_code=404, detail="Task nicht gefunden")
+    
+    # Beende alle offenen TimeLogs dieses Staff
+    open_tls = db.query(TimeLog).filter(TimeLog.staff_id==s.id, TimeLog.ended_at==None).all()
+    for open_tl in open_tls:
         from datetime import datetime
         open_tl.ended_at = now_iso()
         fmt = "%Y-%m-%d %H:%M:%S"
-        open_tl.actual_minutes = int((datetime.strptime(open_tl.ended_at, fmt)-datetime.strptime(open_tl.started_at, fmt)).total_seconds()//60)
-    tl = TimeLog(task_id=task_id, staff_id=s.id, started_at=now_iso(), ended_at=None, actual_minutes=None)
+        try:
+            start = datetime.strptime(open_tl.started_at, fmt)
+            end = datetime.strptime(open_tl.ended_at, fmt)
+            open_tl.actual_minutes = int((end-start).total_seconds()//60)
+        except Exception:
+            pass
+    
+    # Erstelle neues TimeLog für diesen Task
+    new_tl = TimeLog(task_id=task_id, staff_id=s.id, started_at=now_iso(), ended_at=None, actual_minutes=None)
     t.status = "running"
-    db.add(tl); db.commit()
+    db.add(new_tl)
+    db.commit()
     return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
 
 @app.post("/cleaner/{token}/stop")
@@ -341,14 +392,20 @@ async def cleaner_stop(token: str, task_id: int = Form(...), db=Depends(get_db))
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
-    tl = db.query(TimeLog).filter(TimeLog.task_id==task_id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).first()
-    if not tl: raise HTTPException(status_code=404)
-    from datetime import datetime
-    fmt = "%Y-%m-%d %H:%M:%S"
-    tl.ended_at = now_iso()
-    start = datetime.strptime(tl.started_at, fmt)
-    end = datetime.strptime(tl.ended_at, fmt)
-    tl.actual_minutes = int((end-start).total_seconds()//60)
+    if not t: raise HTTPException(status_code=404, detail="Task nicht gefunden")
+    
+    tl = db.query(TimeLog).filter(TimeLog.task_id==task_id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
+    if tl:
+        from datetime import datetime
+        fmt = "%Y-%m-%d %H:%M:%S"
+        tl.ended_at = now_iso()
+        try:
+            start = datetime.strptime(tl.started_at, fmt)
+            end = datetime.strptime(tl.ended_at, fmt)
+            tl.actual_minutes = int((end-start).total_seconds()//60)
+        except Exception:
+            pass
+    
     t.status = "open"
     db.commit()
     return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
@@ -358,6 +415,21 @@ async def cleaner_done(token: str, task_id: int = Form(...), db=Depends(get_db))
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
+    if not t: raise HTTPException(status_code=404, detail="Task nicht gefunden")
+    
+    # Beende TimeLog wenn noch offen
+    tl = db.query(TimeLog).filter(TimeLog.task_id==task_id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
+    if tl:
+        from datetime import datetime
+        fmt = "%Y-%m-%d %H:%M:%S"
+        tl.ended_at = now_iso()
+        try:
+            start = datetime.strptime(tl.started_at, fmt)
+            end = datetime.strptime(tl.ended_at, fmt)
+            tl.actual_minutes = int((end-start).total_seconds()//60)
+        except Exception:
+            pass
+    
     t.status = "done"
     db.commit()
     return RedirectResponse(url=f"/cleaner/{token}", status_code=303)

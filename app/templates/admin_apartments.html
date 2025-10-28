@@ -19,7 +19,7 @@
       <form id="form-{{ a.id }}" class="d-flex gap-2" method="post" action="/admin/{{ token }}/apartments/update" style="max-width: 250px;">
         <input type="hidden" name="apartment_id" value="{{ a.id }}"/>
         <input id="planned-min-{{ a.id }}" class="form-control form-control-sm" type="number" name="planned_minutes" value="{{ a.planned_minutes }}" min="15" step="15"/>
-        <button class="btn btn-sm btn-outline-primary" type="submit" title="Nur Standard speichern"><i class="bi bi-save"></i></button>
+        <button class="btn btn-sm btn-outline-primary" type="submit" title="Nur Standard speichern"><i class="bi bi-floppy"></i></button>
       </form>
       <form id="form-apply-{{ a.id }}" method="post" action="/admin/{{ token }}/apartments/apply">
         <input type="hidden" name="apartment_id" value="{{ a.id }}"/>
