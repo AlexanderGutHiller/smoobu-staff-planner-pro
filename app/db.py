@@ -1,32 +1,37 @@
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from .models import Base, Meta
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
-# --- SQLite Datenbank ---
-SQLALCHEMY_DATABASE_URL = "sqlite:///./data.db"
+engine = create_engine('sqlite:///./data.db', echo=False, future=True)
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+class Base(DeclarativeBase):
+    pass
 
-# --- Initialisierung ---
+SessionLocal = sessionmaker(bind=engine, autoflush=False, future=True)
+
 def init_db():
+    from . import models  # noqa
     Base.metadata.create_all(bind=engine)
-    with SessionLocal() as db:
-        # Stelle sicher, dass Meta-Tabelle existiert
-        if not db.query(Meta).first():
-            db.add(Meta(key="last_sync", value=None))
-            db.commit()
+    _apply_sqlite_migrations()
 
-# --- Hilfsfunktionen für Meta-Tabelle ---
-def meta_get(db, key: str):
-    rec = db.get(Meta, key)
-    return rec.value if rec else None
-
-def meta_set(db, key: str, value: str):
-    rec = db.get(Meta, key)
-    if rec:
-        rec.value = value
-    else:
-        rec = Meta(key=key, value=value)
-        db.add(rec)
-    db.commit()
+def _apply_sqlite_migrations():
+    with engine.begin() as conn:
+        def add_col(sql):
+            try:
+                conn.exec_driver_sql(sql)
+            except Exception as e:
+                msg = str(e).lower()
+                if "duplicate column name" in msg or "already exists" in msg or "duplicate" in msg:
+                    return
+                if "no such table" in msg:
+                    return
+                raise
+        add_col("ALTER TABLE tasks ADD COLUMN auto_generated BOOLEAN DEFAULT 1")
+        add_col("ALTER TABLE tasks ADD COLUMN locked BOOLEAN DEFAULT 0")
+        add_col("ALTER TABLE tasks ADD COLUMN booking_hash VARCHAR(64)")
+        add_col("ALTER TABLE tasks ADD COLUMN next_arrival VARCHAR(10)")
+        add_col("ALTER TABLE tasks ADD COLUMN next_arrival_adults INTEGER")
+        add_col("ALTER TABLE tasks ADD COLUMN next_arrival_children INTEGER")
+        add_col("ALTER TABLE tasks ADD COLUMN next_arrival_comments TEXT")
+        add_col("ALTER TABLE bookings ADD COLUMN guest_name VARCHAR(255)")
+        add_col("ALTER TABLE staff ADD COLUMN max_hours_per_month INTEGER DEFAULT 160")
