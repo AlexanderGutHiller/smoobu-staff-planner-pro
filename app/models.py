@@ -1,64 +1,65 @@
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float
+from sqlalchemy.orm import declarative_base, relationship
+import datetime as dt
 
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import String, Integer, Float, Boolean, ForeignKey, Text
-from .db import Base
+Base = declarative_base()
 
-class Booking(Base):
-    __tablename__ = "bookings"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
-    apartment_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    apartment_name: Mapped[str] = mapped_column(String(255), default="")
-    arrival: Mapped[str] = mapped_column(String(10), default="")     # yyyy-mm-dd
-    departure: Mapped[str] = mapped_column(String(10), default="")   # yyyy-mm-dd
-    nights: Mapped[int] = mapped_column(Integer, default=0)
-    adults: Mapped[int] = mapped_column(Integer, default=1)
-    children: Mapped[int] = mapped_column(Integer, default=0)
-    guest_comments: Mapped[str] = mapped_column(Text, default="")
-    guest_name: Mapped[str] = mapped_column(String(255), default="")
+# --- Neue Meta-Tabelle für Systemwerte (z. B. letzter Sync) ---
+class Meta(Base):
+    __tablename__ = "meta"
+    key = Column(String, primary_key=True)
+    value = Column(String, nullable=True)
 
+# --- Stammdaten ---
 class Apartment(Base):
     __tablename__ = "apartments"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
-    name: Mapped[str] = mapped_column(String(255), default="")
-    planned_minutes: Mapped[int] = mapped_column(Integer, default=90)
-    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    default_duration = Column(Integer, default=90)  # geplante Minuten pro Reinigung
 
 class Staff(Base):
     __tablename__ = "staff"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(255))
-    hourly_rate: Mapped[float] = mapped_column(Float, default=0.0)
-    max_hours_per_month: Mapped[int] = mapped_column(Integer, default=160)
-    magic_token: Mapped[str] = mapped_column(String(32), unique=True)
-    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    token = Column(String, nullable=False, unique=True)
+    hourly_rate = Column(Float, default=15.0)
+    max_hours_per_month = Column(Float, default=160.0)
+    is_active = Column(Boolean, default=True)
 
+# --- Buchungen von Smoobu ---
+class Booking(Base):
+    __tablename__ = "bookings"
+    id = Column(Integer, primary_key=True)
+    apartment_id = Column(Integer, ForeignKey("apartments.id"))
+    apartment_name = Column(String)
+    arrival = Column(String)
+    departure = Column(String)
+    adults = Column(Integer)
+    children = Column(Integer)
+    guest_name = Column(String)
+
+# --- Reinigungs-Tasks ---
 class Task(Base):
     __tablename__ = "tasks"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    date: Mapped[str] = mapped_column(String(10))  # yyyy-mm-dd
-    start_time: Mapped[str] = mapped_column(String(5), default="")   # optional HH:MM
-    planned_minutes: Mapped[int] = mapped_column(Integer, default=90)
-    notes: Mapped[str] = mapped_column(Text, default="")
-    extras_json: Mapped[str] = mapped_column(Text, default="{}")
-    apartment_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("apartments.id"))
-    booking_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("bookings.id"))
-    assigned_staff_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("staff.id"))
-    status: Mapped[str] = mapped_column(String(16), default="open")  # open|running|done
+    id = Column(Integer, primary_key=True)
+    booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=True)
+    apartment_id = Column(Integer, ForeignKey("apartments.id"))
+    apartment_name = Column(String)
+    planned_minutes = Column(Integer, default=90)
+    arrival = Column(String)
+    departure = Column(String)
+    guest_name = Column(String)
+    assigned_staff_id = Column(Integer, ForeignKey("staff.id"), nullable=True)
+    locked = Column(Boolean, default=False)
+    done = Column(Boolean, default=False)
+    auto_generated = Column(Boolean, default=True)
 
-    auto_generated: Mapped[bool] = mapped_column(Boolean, default=True)
-    locked: Mapped[bool] = mapped_column(Boolean, default=False)
-    booking_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
-
-    next_arrival: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    next_arrival_adults: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    next_arrival_children: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    next_arrival_comments: Mapped[str | None] = mapped_column(Text, nullable=True)
-
+# --- Zeitprotokolle ---
 class TimeLog(Base):
     __tablename__ = "timelogs"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    task_id: Mapped[int] = mapped_column(Integer, ForeignKey("tasks.id"))
-    staff_id: Mapped[int] = mapped_column(Integer, ForeignKey("staff.id"))
-    started_at: Mapped[str] = mapped_column(String(19))  # yyyy-mm-dd HH:MM:SS
-    ended_at: Mapped[str | None] = mapped_column(String(19), nullable=True)
-    actual_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    id = Column(Integer, primary_key=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"))
+    staff_id = Column(Integer, ForeignKey("staff.id"))
+    apartment_name = Column(String)
+    date = Column(String, default=lambda: dt.date.today().isoformat())
+    minutes = Column(Integer, default=0)
