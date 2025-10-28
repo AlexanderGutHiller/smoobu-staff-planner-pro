@@ -77,12 +77,12 @@ async def refresh_bookings_job():
         for b in bookings:
             booking = Booking.from_smoobu(b)
             db.add(booking)
-
         db.commit()
 
         # --- Tasks neu aufbauen ---
-        build_tasks_from_bookings(db)
-        db.commit()
+        # Die Funktion erwartet Buchungen im Smoobu-Format (Dict), nicht als Booking-Objekte
+        # Daher verwenden wir die originalen "bookings" vom API-Aufruf
+        build_tasks_from_bookings(db, bookings)
 
         logger.info(f"Fetched {len(bookings)} bookings")
         return True

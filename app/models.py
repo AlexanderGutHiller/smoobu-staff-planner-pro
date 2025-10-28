@@ -37,6 +37,21 @@ class Booking(Base):
     adults = Column(Integer)
     children = Column(Integer)
     guest_name = Column(String)
+    
+    @classmethod
+    def from_smoobu(cls, data: dict):
+        """Erstellt ein Booking-Objekt aus Smoobu API-Daten."""
+        apt_info = data.get("apartment", {})
+        return cls(
+            id=data.get("id"),
+            apartment_id=apt_info.get("id"),
+            apartment_name=apt_info.get("name", ""),
+            arrival=data.get("arrivalDate", ""),
+            departure=data.get("departureDate", ""),
+            adults=data.get("adults", 0),
+            children=data.get("children", 0),
+            guest_name=data.get("guestName", "")
+        )
 
 # --- Reinigungs-Tasks ---
 class Task(Base):
