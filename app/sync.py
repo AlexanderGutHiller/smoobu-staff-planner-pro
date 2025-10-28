@@ -31,6 +31,7 @@ def _index_next_arrivals(bookings: list[Booking]):
 def get_planned_minutes_for(apartment_id: int | None, default=90) -> int:
     with SessionLocal() as s:
         if apartment_id:
+            from sqlalchemy import select
             apt = s.execute(select(Apartment).where(Apartment.id == apartment_id)).scalar_one_or_none()
             if apt and getattr(apt, "planned_minutes", None):
                 return int(apt.planned_minutes)
@@ -39,17 +40,25 @@ def get_planned_minutes_for(apartment_id: int | None, default=90) -> int:
 def upsert_tasks_from_bookings(bookings: list[Booking]):
     if not bookings:
         return
-    booking_ids = [b.id for b in bookings]
-    next_map = _index_next_arrivals(bookings)
+    clean = []
+    for b in bookings:
+        if not b.departure or not b.departure.strip():
+            log.info("Skip booking %s (%s) – no departure", b.id, b.apartment_name)
+            continue
+        if b.arrival and b.departure <= b.arrival:
+            log.info("Skip booking %s (%s) – invalid departure <= arrival", b.id, b.apartment_name)
+            continue
+        clean.append(b)
+
+    booking_ids = [b.id for b in clean]
+    next_map = _index_next_arrivals(clean)
 
     with SessionLocal() as s:
+        from sqlalchemy import select
         existing = s.execute(select(Task).where(Task.booking_id.in_(booking_ids))).scalars().all()
         existing_by_booking = {t.booking_id: t for t in existing if t.booking_id is not None}
 
-        for b in bookings:
-            if not b.departure or not b.departure.strip():
-                log.info("Überspringe Buchung %s (%s) – keine Abreise", b.id, b.apartment_name)
-                continue
+        for b in clean:
             h = compute_booking_hash(b)
             n_arrival, n_adults, n_children, n_comments = next_map.get(b.id, (None, None, None, None))
             t = existing_by_booking.get(b.id)

@@ -1,8 +1,8 @@
 
 import os, json, datetime as dt, csv, io, logging
-from typing import List, Optional
+from typing import List, Optional, Dict
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, Query
-from fastapi.responses import RedirectResponse, StreamingResponse, PlainTextResponse, HTMLResponse
+from fastapi.responses import RedirectResponse, StreamingResponse, PlainTextResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -22,7 +22,7 @@ BASE_URL = os.getenv("BASE_URL", "")
 log = logging.getLogger("smoobu")
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="Smoobu Staff Planner Pro (v6.1)")
+app = FastAPI(title="Smoobu Staff Planner Pro (v6.3)")
 
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -76,6 +76,18 @@ def _daterange(days=60):
     end = start + dt.timedelta(days=days)
     return start.isoformat(), end.isoformat()
 
+def _best_guest_name(it: dict) -> str:
+    guest = it.get("guest") or {}
+    full = guest.get("fullName") or ""
+    if full:
+        return full
+    fn = guest.get("firstName", "") or it.get("firstName", "")
+    ln = guest.get("lastName", "") or it.get("lastName", "")
+    name = (fn + " " + ln).strip()
+    if name:
+        return name
+    return it.get("name") or it.get("contactName") or ""
+
 async def refresh_bookings_job():
     client = SmoobuClient()
     start, end = _daterange(60)
@@ -90,9 +102,7 @@ async def refresh_bookings_job():
             apt = it.get("apartment") or {}
             apt_id = int(apt.get("id")) if apt.get("id") is not None else None
             apt_name = apt.get("name") or ""
-
-            guest = it.get("guest") or {}
-            guest_name = (f"{guest.get('firstName', '')} {guest.get('lastName', '')}".strip() or it.get("name", ""))
+            guest_name = _best_guest_name(it)
 
             if apt_id is not None and apt_id not in seen_apartment_ids:
                 a = db.get(Apartment, apt_id)
@@ -118,7 +128,6 @@ async def refresh_bookings_job():
             b.guest_name = guest_name or ""
             seen_booking_ids.append(b_id)
 
-        # remove vanished bookings
         existing_ids = [row[0] for row in db.query(Booking.id).all()]
         for bid in existing_ids:
             if bid not in seen_booking_ids:
@@ -129,7 +138,6 @@ async def refresh_bookings_job():
         bookings = db.query(Booking).all()
         upsert_tasks_from_bookings(bookings)
 
-        # Cleanup: Tasks ohne Datum entfernen
         removed = 0
         for t in db.query(Task).all():
             if not t.date or not t.date.strip():
@@ -140,12 +148,13 @@ async def refresh_bookings_job():
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    return "<html><body style='font-family:system-ui;padding:16px'><h1>Smoobu Staff Planner Pro</h1><p>Service läuft. Admin-UI: <code>/admin/&lt;ADMIN_TOKEN&gt;</code></p><p>Health: <a href='/health'>/health</a></p></body></html>"
+    return "<html><head><link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css' rel='stylesheet'></head><body class='p-4' style='font-family:system-ui;'><h1>Smoobu Staff Planner Pro</h1><p>Service läuft. Admin-UI: <code>/admin/&lt;ADMIN_TOKEN&gt;</code></p><p>Health: <a href='/health'>/health</a></p></body></html>"
 
 @app.get("/health")
 async def health():
     return {"ok": True, "time": now_iso()}
 
+# -------------------- Admin UI --------------------
 @app.get("/admin/{token}")
 async def admin_home(request: Request, token: str, date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None), staff_id: Optional[int] = Query(None), apartment_id: Optional[int] = Query(None), db=Depends(get_db)):
     if token != ADMIN_TOKEN:
@@ -161,7 +170,7 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     apt_map = {a.id: a.name for a in apts}
     book_map = {b.id: b.guest_name for b in db.query(Booking).all()}
     base_url = BASE_URL.rstrip("/")
-    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "filters": {"date_from": date_from or "", "date_to": date_to or "", "staff_id": staff_id or "", "apartment_id": apartment_id or ""}, "base_url": base_url})
+    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "base_url": base_url})
 
 @app.get("/admin/{token}/staff")
 async def admin_staff(request: Request, token: str, db=Depends(get_db)):
@@ -201,7 +210,8 @@ async def admin_task_lock(token: str, task_id: int = Form(...), lock: int = Form
 
 @app.get("/admin/{token}/apartments")
 async def admin_apartments(request: Request, token: str, db=Depends(get_db)):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    if token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403)
     apts = db.query(Apartment).order_by(Apartment.name).all()
     return templates.TemplateResponse("admin_apartments.html", {"request": request, "token": token, "apartments": apts})
 
@@ -253,11 +263,15 @@ async def admin_export(token: str, month: str, db=Depends(get_db)):
     for r in rows: w.writerow(r)
     return StreamingResponse(iter([output.getvalue().encode('utf-8')]), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=report-{month}.csv"})
 
+# -------------------- Cleaner --------------------
 @app.get("/cleaner/{token}")
-async def cleaner_home(request: Request, token: str, db=Depends(get_db)):
+async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depends(get_db)):
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403)
-    tasks = db.query(Task).filter(Task.assigned_staff_id==s.id).order_by(Task.date, Task.id).all()
+    q = db.query(Task).filter(Task.assigned_staff_id==s.id)
+    if not show_done:
+        q = q.filter(Task.status != "done")
+    tasks = q.order_by(Task.date, Task.id).all()
     apts = db.query(Apartment).all()
     apt_map = {a.id: a.name for a in apts}
     book_map = {b.id: b.guest_name for b in db.query(Booking).all()}
@@ -267,20 +281,27 @@ async def cleaner_home(request: Request, token: str, db=Depends(get_db)):
     for tl in logs:
         if tl.started_at[:7]==month and tl.actual_minutes: minutes += int(tl.actual_minutes)
     used_hours = round(minutes/60.0, 2)
-    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "book_map": book_map, "staff": s})
+    run_map: Dict[int, str] = {}
+    for t in tasks:
+        tl = db.query(TimeLog).filter(TimeLog.task_id==t.id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
+        if tl:
+            run_map[t.id] = tl.started_at
+    warn_limit = used_hours > float(s.max_hours_per_month or 0)
+    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "book_map": book_map, "staff": s, "show_done": show_done, "run_map": run_map, "warn_limit": warn_limit})
 
 @app.post("/cleaner/{token}/start")
 async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)):
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403)
+    t = db.get(Task, task_id)
     open_tl = db.query(TimeLog).filter(TimeLog.staff_id==s.id, TimeLog.ended_at==None).first()
     if open_tl:
-        open_tl.ended_at = now_iso()
         from datetime import datetime
+        open_tl.ended_at = now_iso()
         fmt = "%Y-%m-%d %H:%M:%S"
         open_tl.actual_minutes = int((datetime.strptime(open_tl.ended_at, fmt)-datetime.strptime(open_tl.started_at, fmt)).total_seconds()//60)
-        db.commit()
     tl = TimeLog(task_id=task_id, staff_id=s.id, started_at=now_iso(), ended_at=None, actual_minutes=None)
+    t.status = "running"
     db.add(tl); db.commit()
     return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
 
@@ -288,6 +309,7 @@ async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)
 async def cleaner_stop(token: str, task_id: int = Form(...), db=Depends(get_db)):
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403)
+    t = db.get(Task, task_id)
     tl = db.query(TimeLog).filter(TimeLog.task_id==task_id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).first()
     if not tl: raise HTTPException(status_code=404)
     from datetime import datetime
@@ -296,5 +318,36 @@ async def cleaner_stop(token: str, task_id: int = Form(...), db=Depends(get_db))
     start = datetime.strptime(tl.started_at, fmt)
     end = datetime.strptime(tl.ended_at, fmt)
     tl.actual_minutes = int((end-start).total_seconds()//60)
+    t.status = "open"
     db.commit()
     return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+
+@app.post("/cleaner/{token}/done")
+async def cleaner_done(token: str, task_id: int = Form(...), db=Depends(get_db)):
+    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
+    if not s: raise HTTPException(status_code=403)
+    t = db.get(Task, task_id)
+    t.status = "done"
+    db.commit()
+    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+
+@app.post("/cleaner/{token}/reopen")
+async def cleaner_reopen(token: str, task_id: int = Form(...), db=Depends(get_db)):
+    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
+    if not s: raise HTTPException(status_code=403)
+    t = db.get(Task, task_id)
+    tl = db.query(TimeLog).filter(TimeLog.task_id==task_id, TimeLog.staff_id==s.id).order_by(TimeLog.id.desc()).first()
+    if tl:
+        db.delete(tl)
+    t.status = "open"
+    db.commit()
+    return RedirectResponse(url=f"/cleaner/{token}?show_done=1", status_code=303)
+
+@app.post("/cleaner/{token}/note")
+async def cleaner_note(token: str, task_id: int = Form(...), note: str = Form(""), db=Depends(get_db)):
+    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
+    if not s: raise HTTPException(status_code=403)
+    t = db.get(Task, task_id)
+    t.notes = (note or "").strip()
+    db.commit()
+    return JSONResponse({"ok": True, "task_id": t.id, "note": t.notes})

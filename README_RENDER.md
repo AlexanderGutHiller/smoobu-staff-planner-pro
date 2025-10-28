@@ -1,1 +1,1 @@
-# v6.1 (Python 3.11)
+# v6.3 – Live-Timer, Progressbar, AJAX-Notizen
