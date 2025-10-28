@@ -147,32 +147,45 @@ def upsert_tasks_from_bookings(bookings: list[Booking]):
                         removed_count += 1
                         continue
         
-        # Entferne Tasks deren Buchung nicht mehr in der aktuellen Liste ist (auch gesperrte!)
+        # Entferne ALLE ungültigen Tasks - auch gesperrte!
         current_ids = set(booking_ids)
         for t in s.execute(select(Task)).scalars().all():
-            if t.auto_generated and t.booking_id and t.booking_id not in current_ids:
-                log.info("Removing stale task %d - booking %d no longer exists (locked: %s)", t.id, t.booking_id, t.locked)
+            should_delete = False
+            reason = ""
+            
+            # Nur auto-generierte Tasks prüfen
+            if t.auto_generated:
+                if t.booking_id:
+                    # Prüfe ob Buchung in aktueller Liste ist
+                    if t.booking_id not in current_ids:
+                        should_delete = True
+                        reason = f"booking {t.booking_id} no longer exists in Smoobu"
+                    else:
+                        # Buchung existiert in Liste, prüfe Buchungsdatenbank
+                        b = s.execute(select(Booking).where(Booking.id == t.booking_id)).scalar_one_or_none()
+                        if not b:
+                            should_delete = True
+                            reason = f"booking {t.booking_id} not found in database"
+                        elif not b.departure or not b.departure.strip():
+                            should_delete = True
+                            reason = f"booking {t.booking_id} has no departure"
+                        elif not b.arrival or not b.arrival.strip():
+                            should_delete = True
+                            reason = f"booking {t.booking_id} has no arrival"
+                        elif len(b.departure) != 10 or b.departure.count('-') != 2:
+                            should_delete = True
+                            reason = f"booking {t.booking_id} has invalid departure format"
+                        elif b.departure <= b.arrival:
+                            should_delete = True
+                            reason = f"booking {t.booking_id} departure <= arrival"
+                elif not t.booking_id and t.date >= "2020-01-01":
+                    # Task ohne Buchung (manuell erstellt) - überspringen
+                    continue
+            
+            if should_delete:
                 s.delete(t)
                 removed_count += 1
-                continue
-            
-            # Prüfe auch ob der Task zu einer Buchung gehört, die nicht mehr gültig ist
-            if t.booking_id:
-                b = s.execute(select(Booking).where(Booking.id == t.booking_id)).scalar_one_or_none()
-                if b:
-                    # Wenn Buchung kein departure mehr hat, lösche Task (auch gesperrte!)
-                    if not b.departure or not b.departure.strip():
-                        log.info("Removing task %d - booking %d has no departure (locked: %s)", t.id, t.booking_id, t.locked)
-                        s.delete(t)
-                        removed_count += 1
-                        continue
-                    
-                    # Wenn Buchung kein arrival mehr hat, lösche Task (auch gesperrte!)
-                    if not b.arrival or not b.arrival.strip():
-                        log.info("Removing task %d - booking %d has no arrival (locked: %s)", t.id, t.booking_id, t.locked)
-                        s.delete(t)
-                        removed_count += 1
-                        continue
+                log.info("Removing task %d - %s (locked: %s, date: %s, apt: %s)", t.id, reason, t.locked, t.date, t.apartment_id)
         
         if removed_count > 0:
             log.info("Cleanup completed: %d invalid/stale tasks removed", removed_count)

@@ -272,28 +272,67 @@ async def admin_import(token: str, db=Depends(get_db)):
     await refresh_bookings_job()
     return PlainTextResponse("Import done.")
 
+@app.get("/admin/{token}/cleanup_tasks")
+async def admin_cleanup_tasks(token: str, date: str, db=Depends(get_db)):
+    """Manuelles Löschen von Tasks an einem bestimmten Datum"""
+    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    
+    removed_count = 0
+    tasks = db.query(Task).filter(Task.date == date, Task.auto_generated == True).all()
+    
+    for t in tasks:
+        db.delete(t)
+        removed_count += 1
+        log.info("Removed task %d for date %s (apartment: %s)", t.id, date, t.apartment_id)
+    
+    db.commit()
+    return PlainTextResponse(f"Removed {removed_count} tasks for date {date}.")
+
 @app.get("/admin/{token}/cleanup")
 async def admin_cleanup(token: str, db=Depends(get_db)):
     if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
     
     removed_count = 0
-    # Finde alle Tasks ohne gültige Buchung (auch gesperrte!)
-    for t in db.query(Task).filter(Task.auto_generated == True).all():
-        if t.booking_id:
+    all_bookings = {b.id for b in db.query(Booking).all()}
+    
+    # Finde ALLE ungültigen Tasks
+    for t in db.query(Task).all():
+        should_delete = False
+        reason = ""
+        
+        # Nur auto-generierte Tasks prüfen
+        if t.auto_generated and t.booking_id:
             b = db.get(Booking, t.booking_id)
-            # Wenn Buchung nicht existiert oder ungültig ist, lösche Task
-            if not b:
-                db.delete(t)
-                removed_count += 1
-                log.info("Removing invalid task %d - booking %d does not exist (locked: %s)", t.id, t.booking_id, t.locked)
+            
+            # Wenn Buchung nicht mehr existiert
+            if not b or t.booking_id not in all_bookings:
+                should_delete = True
+                reason = f"booking {t.booking_id} does not exist"
+            # Wenn Buchung kein departure hat
             elif not b.departure or not b.departure.strip():
-                db.delete(t)
-                removed_count += 1
-                log.info("Removing invalid task %d - booking %d has no departure (locked: %s)", t.id, t.booking_id, t.locked)
+                should_delete = True
+                reason = f"booking {t.booking_id} has no departure"
+            # Wenn Buchung kein arrival hat
             elif not b.arrival or not b.arrival.strip():
-                db.delete(t)
-                removed_count += 1
-                log.info("Removing invalid task %d - booking %d has no arrival (locked: %s)", t.id, t.booking_id, t.locked)
+                should_delete = True
+                reason = f"booking {t.booking_id} has no arrival"
+            # Wenn departure format ungültig
+            elif len(b.departure) != 10 or b.departure.count('-') != 2:
+                should_delete = True
+                reason = f"booking {t.booking_id} has invalid departure format"
+            # Wenn arrival format ungültig
+            elif len(b.arrival) != 10 or b.arrival.count('-') != 2:
+                should_delete = True
+                reason = f"booking {t.booking_id} has invalid arrival format"
+            # Wenn departure <= arrival
+            elif b.departure <= b.arrival:
+                should_delete = True
+                reason = f"booking {t.booking_id} departure <= arrival"
+        
+        if should_delete:
+            db.delete(t)
+            removed_count += 1
+            log.info("Removing invalid task %d - %s (locked: %s, date: %s, apt: %s)", t.id, reason, t.locked, t.date, t.apartment_id)
     
     db.commit()
     return PlainTextResponse(f"Cleanup done. Removed {removed_count} invalid tasks (including locked ones).")
