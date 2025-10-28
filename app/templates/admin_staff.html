@@ -1,44 +1,34 @@
-
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-<title>Admin - Team</title></head>
-<body class="bg-light"><div class="container py-4">
-<h1 class="mb-3">Team</h1>
-<a class="btn btn-outline-secondary mb-3" href="/admin/{{ token }}"><i class="bi bi-arrow-left"></i> Zurück</a>
-
-<form method="post" action="/admin/{{ token }}/staff/add" class="row gy-2 gx-2 mb-3">
-  <div class="col-auto"><input class="form-control" name="name" placeholder="Name" required></div>
-  <div class="col-auto"><input class="form-control" name="hourly_rate" type="number" step="0.01" value="0" placeholder="€/Std"></div>
-  <div class="col-auto"><input class="form-control" name="max_hours_per_month" type="number" step="1" value="160" placeholder="Std/Monat"></div>
-  <div class="col-auto"><button class="btn btn-primary"><i class="bi bi-plus-lg"></i> Anlegen</button></div>
-</form>
-
-<table class="table table-sm table-hover bg-white align-middle">
-<thead><tr><th>Name</th><th>Stundensatz</th><th>Max/Monat</th><th>Status</th><th>Magic-Link</th><th>Aktion</th></tr></thead>
-<tbody>
-{% for s in staff %}
-<tr>
-  <td>{{ s.name }}</td>
-  <td>{{ '%.2f'|format(s.hourly_rate) }} €</td>
-  <td>{{ s.max_hours_per_month }}</td>
-  <td>{{ 'Aktiv' if s.active else 'Inaktiv' }}</td>
-  <td>
-    {% set link = (base_url ~ '/cleaner/' ~ s.magic_token) if base_url else ('/cleaner/' ~ s.magic_token) %}
-    <div class="input-group input-group-sm">
-      <input class="form-control" value="{{ link }}" readonly id="link-{{ s.id }}">
-      <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('link-{{ s.id }}').value)"><i class="bi bi-clipboard"></i></button>
-    </div>
-  </td>
-  <td>
-    <form method="post" action="/admin/{{ token }}/staff/toggle">
-      <input type="hidden" name="staff_id" value="{{ s.id }}"/>
-      <button class="btn btn-sm {{ 'btn-outline-danger' if s.active else 'btn-success' }}">
-        {% if s.active %}<i class="bi bi-person-slash"></i> Deaktivieren{% else %}<i class="bi bi-person-check"></i> Aktivieren{% endif %}
-      </button>
-    </form>
-  </td>
-</tr>
-{% endfor %}
-</tbody></table>
-</div></body></html>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin – Mitarbeiter</title>
+  <style>
+    body { font-family: sans-serif; margin: 1.5rem; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { border: 1px solid #ccc; padding: .5rem; text-align: left; }
+    th { background: #eee; }
+    code { background: #f4f4f4; padding: .2rem .4rem; border-radius: .3rem; }
+    .small { color: #666; font-size: .85em; }
+  </style>
+</head>
+<body>
+  <h2>Mitarbeiter</h2>
+  <p><a href="/admin/{{request.path_params.token}}">← zurück</a></p>
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Stundensatz</th><th>Monatslimit</th><th>Magic-Link</th></tr>
+    </thead>
+    <tbody>
+      {% for s in staff %}
+      <tr>
+        <td>{{ s.name }}</td>
+        <td>{{ "%.2f"|format(s.hourly_rate) }} €</td>
+        <td>{{ s.max_hours_per_month }} h</td>
+        <td><code>{{ base_url }}/cleaner/{{ s.token }}</code></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
