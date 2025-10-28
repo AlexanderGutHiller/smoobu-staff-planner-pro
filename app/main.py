@@ -2,7 +2,7 @@
 import os, json, datetime as dt, csv, io, logging
 from typing import List, Optional, Dict
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, Query
-from fastapi.responses import RedirectResponse, StreamingResponse, PlainTextResponse, HTMLResponse, JSONResponse
+from fastapi.responses import RedirectResponse, StreamingResponse, PlainTextResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -15,7 +15,18 @@ from .utils import new_token, today_iso, now_iso
 from .sync import upsert_tasks_from_bookings
 
 def detect_language(request: Request) -> str:
-    """Erkenne Browser-Sprache aus Accept-Language Header"""
+    """Erkenne Browser-Sprache aus Cookie, Query-Parameter oder Accept-Language Header"""
+    # Zuerst Cookie überprüfen
+    lang_cookie = request.cookies.get("lang", "")
+    if lang_cookie in ["de", "en", "fr", "it", "es", "ro", "ru", "bg"]:
+        return lang_cookie
+    
+    # Dann Query-Parameter überprüfen
+    lang_query = request.query_params.get("lang", "")
+    if lang_query in ["de", "en", "fr", "it", "es", "ro", "ru", "bg"]:
+        return lang_query
+    
+    # Dann Accept-Language Header
     accept_lang = request.headers.get("accept-language", "de").lower()
     if "en" in accept_lang:
         return "en"
@@ -25,6 +36,12 @@ def detect_language(request: Request) -> str:
         return "it"
     elif "es" in accept_lang:
         return "es"
+    elif "ro" in accept_lang:
+        return "ro"
+    elif "ru" in accept_lang:
+        return "ru"
+    elif "bg" in accept_lang:
+        return "bg"
     return "de"  # Default: Deutsch
 
 def get_translations(lang: str) -> Dict[str, str]:
@@ -43,6 +60,27 @@ def get_translations(lang: str) -> Dict[str, str]:
             "status": "Status", "actual": "Actual", "next_arrival": "Next Arrival", "locked": "Lock",
             "save": "Save", "today": "Today", "week": "This Week", "month": "This Month",
             "next7": "Next 7 Days", "all": "All", "lock": "Locked", "unlock": "Open"
+        },
+        "ro": {
+            "tasks": "Sarcini", "team": "Echipa", "apartments": "Apartamente", "import_now": "Importă acum",
+            "cleanup": "Curățare", "date": "Dată", "apartment": "Apartament", "planned": "Planificat",
+            "status": "Status", "actual": "Real", "next_arrival": "Următoarea sosire", "locked": "Blocat",
+            "save": "Salvează", "today": "Azi", "week": "Săptămâna aceasta", "month": "Luna aceasta",
+            "next7": "Următoarele 7 zile", "all": "Toate", "lock": "Blocat", "unlock": "Deschis"
+        },
+        "ru": {
+            "tasks": "Задачи", "team": "Команда", "apartments": "Апартаменты", "import_now": "Импорт сейчас",
+            "cleanup": "Очистка", "date": "Дата", "apartment": "Апартамент", "planned": "Запланировано",
+            "status": "Статус", "actual": "Фактически", "next_arrival": "Следующий приезд", "locked": "Заблокировано",
+            "save": "Сохранить", "today": "Сегодня", "week": "На этой неделе", "month": "В этом месяце",
+            "next7": "Следующие 7 дней", "all": "Все", "lock": "Заблокировано", "unlock": "Открыто"
+        },
+        "bg": {
+            "tasks": "Задачи", "team": "Екип", "apartments": "Апартаменти", "import_now": "Импортирай сега",
+            "cleanup": "Почистване", "date": "Дата", "apartment": "Апартамент", "planned": "Планирано",
+            "status": "Статус", "actual": "Действително", "next_arrival": "Следващо пристигане", "locked": "Заключено",
+            "save": "Запази", "today": "Днес", "week": "Тази седмица", "month": "Този месец",
+            "next7": "Следващите 7 дни", "all": "Всички", "lock": "Заключено", "unlock": "Отворено"
         }
     }
     return translations.get(lang, translations["de"])
@@ -159,6 +197,61 @@ async def refresh_bookings_job():
                 log.warning("🎯 Status fields: type='%s', status='%s', cancelled=%s, blocked=%s, internal=%s, draft=%s, pending=%s, on_hold=%s", 
                            it.get("type"), status, cancelled, is_blocked, is_internal, is_draft, is_pending, is_on_hold)
 
+            # Check booking type FIRST - before we update or create the booking
+            booking_type = it.get("type", "").lower()
+            
+            # Check for cancelled, blocked, internal, draft, pending, on-hold bookings OR cancellation type - SKIP and DELETE these!
+            should_skip = False
+            reason = ""
+            
+            if booking_type == "cancellation":
+                should_skip = True
+                reason = "cancellation type"
+            elif cancelled:
+                should_skip = True
+                reason = "cancelled"
+            elif is_blocked:
+                should_skip = True
+                reason = "blocked"
+            elif is_internal:
+                should_skip = True
+                reason = "internal"
+            elif is_draft:
+                should_skip = True
+                reason = "draft"
+            elif is_pending:
+                should_skip = True
+                reason = "pending"
+            elif is_on_hold:
+                should_skip = True
+                reason = "on-hold"
+            
+            # Check for invalid bookings - also skip and delete
+            if not departure or not departure.strip():
+                log.info("⛔ SKIP INVALID booking %d (%s) - NO DEPARTURE, arrival='%s'", b_id, apt_name, arrival)
+                should_skip = True
+                reason = "invalid (no departure)"
+            elif not arrival or not arrival.strip():
+                log.info("⛔ SKIP INVALID booking %d (%s) - NO ARRIVAL, departure='%s'", b_id, apt_name, departure)
+                should_skip = True
+                reason = "invalid (no arrival)"
+            elif departure <= arrival:
+                log.info("⛔ SKIP INVALID booking %d (%s) - departure <= arrival ('%s' <= '%s')", b_id, apt_name, departure, arrival)
+                should_skip = True
+                reason = "invalid (departure <= arrival)"
+            
+            if should_skip:
+                log.info("⛔ SKIP %s booking %d (%s) - arrival: %s, departure: %s", reason, b_id, apt_name, arrival, departure)
+                # Delete existing booking if it exists
+                b_existing = db.get(Booking, b_id)
+                if b_existing:
+                    db.delete(b_existing)
+                    log.info("🗑️ Deleted existing booking %d from database", b_id)
+                continue
+            
+            # Only log valid bookings
+            log.info("✓ Valid booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
+            
             if apt_id is not None and apt_id not in seen_apartment_ids:
                 a = db.get(Apartment, apt_id)
                 if not a:
@@ -181,42 +274,6 @@ async def refresh_bookings_job():
             b.children = int(it.get("children") or 0)
             b.guest_comments = (it.get("guestComments") or it.get("comments") or "")[:2000]
             b.guest_name = guest_name or ""
-            
-            # Check booking type
-            booking_type = it.get("type", "").lower()
-            
-            # Check for cancelled, blocked, internal, draft, pending, on-hold bookings OR cancellation type - SKIP these!
-            if booking_type == "cancellation":
-                log.info("⛔ SKIP cancellation type booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
-                continue
-            elif cancelled:
-                log.info("⛔ SKIP cancelled booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
-                continue
-            elif is_blocked:
-                log.info("⛔ SKIP blocked booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
-                continue
-            elif is_internal:
-                log.info("⛔ SKIP internal booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
-                continue
-            elif is_draft:
-                log.info("⛔ SKIP draft booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
-                continue
-            elif is_pending:
-                log.info("⛔ SKIP pending booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
-                continue
-            elif is_on_hold:
-                log.info("⛔ SKIP on-hold booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
-                continue
-            
-            # Prüfe ob Buchung valid ist bevor wir sie speichern
-            if not departure or not departure.strip():
-                log.warning("⚠️ INVALID booking from Smoobu: %d (%s) - NO DEPARTURE, arrival='%s'", b_id, apt_name, arrival)
-            elif not arrival or not arrival.strip():
-                log.warning("⚠️ INVALID booking from Smoobu: %d (%s) - NO ARRIVAL, departure='%s'", b_id, apt_name, departure)
-            elif departure <= arrival:
-                log.warning("⚠️ INVALID booking from Smoobu: %d (%s) - departure <= arrival ('%s' <= '%s')", b_id, apt_name, departure, arrival)
-            else:
-                log.info("✓ Valid booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
             
             seen_booking_ids.append(b_id)
 
@@ -248,6 +305,24 @@ async def root():
 async def health():
     return {"ok": True, "time": now_iso()}
 
+@app.get("/set-language")
+async def set_language(lang: str, redirect: str = "/"):
+    """Setze die Sprache als Cookie und leite weiter"""
+    if lang not in ["de", "en", "fr", "it", "es", "ro", "ru", "bg"]:
+        lang = "de"
+    
+    # Erstelle Response mit Redirect
+    response = RedirectResponse(url=redirect)
+    response.set_cookie(
+        key="lang",
+        value=lang,
+        max_age=365*24*60*60,  # 1 Jahr
+        httponly=False,
+        secure=False,
+        samesite="lax"
+    )
+    return response
+
 # -------------------- Admin UI --------------------
 @app.get("/admin/{token}")
 async def admin_home(request: Request, token: str, date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None), staff_id: Optional[int] = Query(None), apartment_id: Optional[int] = Query(None), db=Depends(get_db)):
@@ -268,7 +343,7 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     apt_map = {a.id: a.name for a in apts}
     bookings = db.query(Booking).all()
     book_map = {b.id: b.guest_name for b in bookings}
-    booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0} for b in bookings}
+    booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0, 'guest_name': b.guest_name or ''} for b in bookings}
     
     # Timelog-Daten für jedes Task
     timelog_map = {}
@@ -492,7 +567,7 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
     apt_map = {a.id: a.name for a in apts}
     bookings = db.query(Booking).all()
     book_map = {b.id: b.guest_name for b in bookings}
-    booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0} for b in bookings}
+    booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0, 'guest_name': b.guest_name or ''} for b in bookings}
     month = dt.date.today().strftime("%Y-%m")
     minutes = 0
     logs = db.query(TimeLog).filter(TimeLog.staff_id==s.id, TimeLog.actual_minutes!=None).all()

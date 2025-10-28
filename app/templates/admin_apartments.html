@@ -5,7 +5,25 @@
 <title>Admin - Apartments</title></head>
 <body class="bg-light"><div class="container py-4">
 <h1 class="mb-3">Apartments</h1>
-<a class="btn btn-outline-secondary mb-3" href="/admin/{{ token }}"><i class="bi bi-arrow-left"></i> Zurück</a>
+<div class="d-flex gap-2 mb-3 align-items-center">
+  <a class="btn btn-outline-secondary" href="/admin/{{ token }}"><i class="bi bi-arrow-left"></i> Zurück</a>
+  <select class="form-select form-select-sm" style="width: auto;" onchange="setLanguage(this.value)">
+    <option value="de" {% if lang == 'de' %}selected{% endif %}>🇩🇪 Deutsch</option>
+    <option value="en" {% if lang == 'en' %}selected{% endif %}>🇬🇧 English</option>
+    <option value="fr" {% if lang == 'fr' %}selected{% endif %}>🇫🇷 Français</option>
+    <option value="it" {% if lang == 'it' %}selected{% endif %}>🇮🇹 Italiano</option>
+    <option value="es" {% if lang == 'es' %}selected{% endif %}>🇪🇸 Español</option>
+    <option value="ro" {% if lang == 'ro' %}selected{% endif %}>🇷🇴 Română</option>
+    <option value="ru" {% if lang == 'ru' %}selected{% endif %}>🇷🇺 Русский</option>
+    <option value="bg" {% if lang == 'bg' %}selected{% endif %}>🇧🇬 Български</option>
+  </select>
+</div>
+<script>
+function setLanguage(lang) {
+  const currentPath = window.location.pathname + window.location.search;
+  window.location.href = `/set-language?lang=${lang}&redirect=${encodeURIComponent(currentPath)}`;
+}
+</script>
 
 <table class="table table-sm table-hover bg-white align-middle">
 <thead><tr><th>ID</th><th>Name</th><th>Reinigungszeit (Minuten)</th><th>Aktionen</th></tr></thead>

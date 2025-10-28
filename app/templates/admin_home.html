@@ -12,12 +12,28 @@
 <body class="bg-light"><div class="container py-4">
 <h1 class="mb-3">Einsätze</h1>
 
-<div class="d-flex gap-2 mb-3 flex-wrap">
+<div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
   <a class="btn btn-outline-secondary" href="/admin/{{ token }}/staff"><i class="bi bi-people"></i> Team</a>
   <a class="btn btn-outline-secondary" href="/admin/{{ token }}/apartments"><i class="bi bi-building"></i> Apartments</a>
   <a class="btn btn-primary" href="/admin/{{ token }}/import"><i class="bi bi-arrow-repeat"></i> Import jetzt</a>
   <a class="btn btn-outline-warning" href="/admin/{{ token }}/cleanup"><i class="bi bi-trash"></i> Bereinigen</a>
+  <select class="form-select form-select-sm" style="width: auto;" onchange="setLanguage(this.value)">
+    <option value="de" {% if lang == 'de' %}selected{% endif %}>🇩🇪 Deutsch</option>
+    <option value="en" {% if lang == 'en' %}selected{% endif %}>🇬🇧 English</option>
+    <option value="fr" {% if lang == 'fr' %}selected{% endif %}>🇫🇷 Français</option>
+    <option value="it" {% if lang == 'it' %}selected{% endif %}>🇮🇹 Italiano</option>
+    <option value="es" {% if lang == 'es' %}selected{% endif %}>🇪🇸 Español</option>
+    <option value="ro" {% if lang == 'ro' %}selected{% endif %}>🇷🇴 Română</option>
+    <option value="ru" {% if lang == 'ru' %}selected{% endif %}>🇷🇺 Русский</option>
+    <option value="bg" {% if lang == 'bg' %}selected{% endif %}>🇧🇬 Български</option>
+  </select>
 </div>
+<script>
+function setLanguage(lang) {
+  const currentPath = window.location.pathname + window.location.search;
+  window.location.href = `/set-language?lang=${lang}&redirect=${encodeURIComponent(currentPath)}`;
+}
+</script>
 
 <table id="task-table" class="table table-sm table-hover bg-white align-middle">
 <thead>
@@ -61,10 +77,10 @@
   <td data-col="date">{{ t.date | date_wd_de('short') }}</td>
   <td data-col="apt">
     <div class="fw-bold">{{ apt_map.get(t.apartment_id, t.apartment_id) }}</div>
-    {% if book_map.get(t.booking_id) %}
+    {% if t.booking_id and book_map.get(t.booking_id) %}
       <div class="small text-primary"><i class="bi bi-person"></i> <strong>{{ book_map.get(t.booking_id, '') }}</strong></div>
     {% endif %}
-    {% if booking_details_map.get(t.booking_id) %}
+    {% if t.booking_id and booking_details_map.get(t.booking_id) %}
       <div class="small text-muted">
         <i class="bi bi-people"></i> {{ booking_details_map[t.booking_id].adults }} Erw.
         {% if booking_details_map[t.booking_id].children > 0 %}
