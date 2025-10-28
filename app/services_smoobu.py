@@ -1,9 +1,10 @@
 
-import os, requests
+import os, requests, logging
 from typing import Any
 
 BASE_URL = os.getenv("SMOOBU_BASE_URL", "https://login.smoobu.com/api")
 API_KEY = os.getenv("SMOOBU_API_KEY", "")
+log = logging.getLogger("smoobu")
 
 class SmoobuClient:
     def __init__(self, api_key: str | None = None, base_url: str | None = None):
@@ -11,10 +12,7 @@ class SmoobuClient:
         self.base_url = (base_url or BASE_URL).rstrip("/")
 
     def _headers(self) -> dict[str, str]:
-        return {
-            "Api-Key": self.api_key,
-            "Accept": "application/json",
-        }
+        return {"Api-Key": self.api_key, "Accept": "application/json"}
 
     def get_reservations(self, date_from: str, date_to: str, page_size: int = 200) -> list[dict[str, Any]]:
         out, page = [], 1
@@ -30,4 +28,5 @@ class SmoobuClient:
             if len(out) >= total or not items:
                 break
             page += 1
+        log.info("Smoobu: %d reservations fetched (%s..%s)", len(out), date_from, date_to)
         return out

@@ -14,6 +14,7 @@ class Booking(Base):
     adults: Mapped[int] = mapped_column(Integer, default=1)
     children: Mapped[int] = mapped_column(Integer, default=0)
     guest_comments: Mapped[str] = mapped_column(Text, default="")
+    guest_name: Mapped[str] = mapped_column(String(255), default="")
 
 class Apartment(Base):
     __tablename__ = "apartments"
@@ -27,6 +28,7 @@ class Staff(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255))
     hourly_rate: Mapped[float] = mapped_column(Float, default=0.0)
+    max_hours_per_month: Mapped[int] = mapped_column(Integer, default=160)
     magic_token: Mapped[str] = mapped_column(String(32), unique=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 

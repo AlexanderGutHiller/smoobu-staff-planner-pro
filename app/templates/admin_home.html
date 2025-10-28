@@ -40,7 +40,10 @@
 {% for t in tasks %}
 <tr class="{% if t.assigned_staff_id %}table-success{% else %}table-warning{% endif %}">
   <td>{{ t.date | date_wd_de('short') }}</td>
-  <td>{{ apt_map.get(t.apartment_id, t.apartment_id) }}</td>
+  <td>
+    {{ apt_map.get(t.apartment_id, t.apartment_id) }}<br>
+    <small class="text-muted fst-italic">{{ book_map.get(t.booking_id, '') }}</small>
+  </td>
   <td>{{ t.planned_minutes }} min</td>
   <td>
     {% if t.next_arrival %}

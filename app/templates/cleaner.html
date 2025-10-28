@@ -11,7 +11,10 @@
 <tr>
   <td>{{ t.date | date_wd_de('short') }}</td>
   <td>{{ t.start_time or '-' }}</td>
-  <td>{{ apt_map.get(t.apartment_id, t.apartment_id) }}</td>
+  <td>
+    {{ apt_map.get(t.apartment_id, t.apartment_id) }}<br>
+    <small class="text-muted fst-italic">{{ book_map.get(t.booking_id, '') }}</small>
+  </td>
   <td>{{ t.planned_minutes }}</td>
   <td class="d-flex gap-2">
     <form method="post" action="/cleaner/{{ staff.magic_token }}/start"><input type="hidden" name="task_id" value="{{ t.id }}"/><button class="btn btn-sm btn-success">Start</button></form>

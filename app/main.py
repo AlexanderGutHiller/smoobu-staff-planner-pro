@@ -22,14 +22,13 @@ BASE_URL = os.getenv("BASE_URL", "")
 log = logging.getLogger("smoobu")
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="Smoobu Staff Planner Pro (v6-final)")
+app = FastAPI(title="Smoobu Staff Planner Pro (v6.1)")
 
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="app/templates")
 
-# --------- Jinja date filters (German) ----------
 def _parse_iso_date(s: str):
     try:
         return dt.datetime.strptime(s, "%Y-%m-%d").date()
@@ -51,7 +50,6 @@ def date_wd_de(s: str, style: str = "short") -> str:
 
 templates.env.filters["date_de"] = date_de
 templates.env.filters["date_wd_de"] = date_wd_de
-# -----------------------------------------------
 
 def get_db():
     db = SessionLocal()
@@ -92,6 +90,10 @@ async def refresh_bookings_job():
             apt = it.get("apartment") or {}
             apt_id = int(apt.get("id")) if apt.get("id") is not None else None
             apt_name = apt.get("name") or ""
+
+            guest = it.get("guest") or {}
+            guest_name = (f"{guest.get('firstName', '')} {guest.get('lastName', '')}".strip() or it.get("name", ""))
+
             if apt_id is not None and apt_id not in seen_apartment_ids:
                 a = db.get(Apartment, apt_id)
                 if not a:
@@ -100,6 +102,7 @@ async def refresh_bookings_job():
                 else:
                     a.name = apt_name or a.name
                 seen_apartment_ids.append(apt_id)
+
             b = db.get(Booking, b_id)
             if not b:
                 b = Booking(id=b_id)
@@ -112,39 +115,39 @@ async def refresh_bookings_job():
             b.adults = int(it.get("adults") or 1)
             b.children = int(it.get("children") or 0)
             b.guest_comments = (it.get("guestComments") or it.get("comments") or "")[:2000]
+            b.guest_name = guest_name or ""
             seen_booking_ids.append(b_id)
+
+        # remove vanished bookings
         existing_ids = [row[0] for row in db.query(Booking.id).all()]
         for bid in existing_ids:
             if bid not in seen_booking_ids:
                 db.delete(db.get(Booking, bid))
+
         db.commit()
+
         bookings = db.query(Booking).all()
         upsert_tasks_from_bookings(bookings)
 
+        # Cleanup: Tasks ohne Datum entfernen
+        removed = 0
+        for t in db.query(Task).all():
+            if not t.date or not t.date.strip():
+                db.delete(t); removed += 1
+        if removed:
+            log.info("Cleanup: %d Tasks ohne Datum entfernt.", removed)
+        db.commit()
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    return """<html><body style="font-family:system-ui;padding:16px">
-    <h1>Smoobu Staff Planner Pro</h1>
-    <p>Service läuft. Admin-UI: <code>/admin/&lt;ADMIN_TOKEN&gt;</code></p>
-    <p>Health: <a href="/health">/health</a></p>
-    </body></html>"""
+    return "<html><body style='font-family:system-ui;padding:16px'><h1>Smoobu Staff Planner Pro</h1><p>Service läuft. Admin-UI: <code>/admin/&lt;ADMIN_TOKEN&gt;</code></p><p>Health: <a href='/health'>/health</a></p></body></html>"
 
 @app.get("/health")
 async def health():
     return {"ok": True, "time": now_iso()}
 
-# -------------------- Admin UI --------------------
-
 @app.get("/admin/{token}")
-async def admin_home(
-    request: Request,
-    token: str,
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
-    staff_id: Optional[int] = Query(None),
-    apartment_id: Optional[int] = Query(None),
-    db=Depends(get_db),
-):
+async def admin_home(request: Request, token: str, date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None), staff_id: Optional[int] = Query(None), apartment_id: Optional[int] = Query(None), db=Depends(get_db)):
     if token != ADMIN_TOKEN:
         raise HTTPException(status_code=403)
     q = db.query(Task)
@@ -156,13 +159,9 @@ async def admin_home(
     staff = db.query(Staff).filter(Staff.active==True).all()
     apts = db.query(Apartment).filter(Apartment.active==True).all()
     apt_map = {a.id: a.name for a in apts}
+    book_map = {b.id: b.guest_name for b in db.query(Booking).all()}
     base_url = BASE_URL.rstrip("/")
-    return templates.TemplateResponse(
-        "admin_home.html",
-        {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map,
-         "filters": {"date_from": date_from or "", "date_to": date_to or "", "staff_id": staff_id or "", "apartment_id": apartment_id or ""},
-         "base_url": base_url}
-    )
+    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "filters": {"date_from": date_from or "", "date_to": date_to or "", "staff_id": staff_id or "", "apartment_id": apartment_id or ""}, "base_url": base_url})
 
 @app.get("/admin/{token}/staff")
 async def admin_staff(request: Request, token: str, db=Depends(get_db)):
@@ -173,9 +172,9 @@ async def admin_staff(request: Request, token: str, db=Depends(get_db)):
     return templates.TemplateResponse("admin_staff.html", {"request": request, "token": token, "staff": staff, "base_url": base_url})
 
 @app.post("/admin/{token}/staff/add")
-async def admin_staff_add(token: str, name: str = Form(...), hourly_rate: float = Form(0.0), db=Depends(get_db)):
+async def admin_staff_add(token: str, name: str = Form(...), hourly_rate: float = Form(0.0), max_hours_per_month: int = Form(160), db=Depends(get_db)):
     if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
-    s = Staff(name=name, hourly_rate=hourly_rate, magic_token=new_token(16), active=True)
+    s = Staff(name=name, hourly_rate=hourly_rate, max_hours_per_month=max_hours_per_month, magic_token=new_token(16), active=True)
     db.add(s); db.commit()
     return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
 
@@ -252,9 +251,7 @@ async def admin_export(token: str, month: str, db=Depends(get_db)):
     w = csv.DictWriter(output, fieldnames=headers)
     w.writeheader()
     for r in rows: w.writerow(r)
-    return StreamingResponse(iter([output.getvalue().encode("utf-8")]), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=report-{month}.csv"})
-
-# -------------------- Cleaner --------------------
+    return StreamingResponse(iter([output.getvalue().encode('utf-8')]), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=report-{month}.csv"})
 
 @app.get("/cleaner/{token}")
 async def cleaner_home(request: Request, token: str, db=Depends(get_db)):
@@ -263,13 +260,14 @@ async def cleaner_home(request: Request, token: str, db=Depends(get_db)):
     tasks = db.query(Task).filter(Task.assigned_staff_id==s.id).order_by(Task.date, Task.id).all()
     apts = db.query(Apartment).all()
     apt_map = {a.id: a.name for a in apts}
+    book_map = {b.id: b.guest_name for b in db.query(Booking).all()}
     month = dt.date.today().strftime("%Y-%m")
     minutes = 0
     logs = db.query(TimeLog).filter(TimeLog.staff_id==s.id, TimeLog.actual_minutes!=None).all()
     for tl in logs:
         if tl.started_at[:7]==month and tl.actual_minutes: minutes += int(tl.actual_minutes)
     used_hours = round(minutes/60.0, 2)
-    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "staff": s})
+    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "book_map": book_map, "staff": s})
 
 @app.post("/cleaner/{token}/start")
 async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)):
