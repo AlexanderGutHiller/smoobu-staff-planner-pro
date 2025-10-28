@@ -1,32 +1,41 @@
+import os
+import logging
+import requests
+from datetime import date
 
-import os, requests, logging
-from typing import Any
+logger = logging.getLogger("smoobu")
 
-BASE_URL = os.getenv("SMOOBU_BASE_URL", "https://login.smoobu.com/api")
-API_KEY = os.getenv("SMOOBU_API_KEY", "")
-log = logging.getLogger("smoobu")
+SMOOBU_API_KEY = os.getenv("SMOOBU_API_KEY")
+SMOOBU_API_BASE = "https://api.smoobu.com/v1"
 
-class SmoobuClient:
-    def __init__(self, api_key: str | None = None, base_url: str | None = None):
-        self.api_key = api_key or API_KEY
-        self.base_url = (base_url or BASE_URL).rstrip("/")
+headers = {
+    "Api-Key": SMOOBU_API_KEY,
+    "Content-Type": "application/json"
+}
 
-    def _headers(self) -> dict[str, str]:
-        return {"Api-Key": self.api_key, "Accept": "application/json"}
 
-    def get_reservations(self, date_from: str, date_to: str, page_size: int = 200) -> list[dict[str, Any]]:
-        out, page = [], 1
-        while True:
-            url = f"{self.base_url}/reservations"
-            params = {"from": date_from, "to": date_to, "pageSize": page_size, "page": page}
-            r = requests.get(url, headers=self._headers(), params=params, timeout=30)
-            r.raise_for_status()
-            data = r.json()
-            items = data.get("bookings") or data.get("items") or []
-            out.extend(items)
-            total = data.get("total_items") or len(out)
-            if len(out) >= total or not items:
-                break
-            page += 1
-        log.info("Smoobu: %d reservations fetched (%s..%s)", len(out), date_from, date_to)
-        return out
+# --------------------------------------------------
+# Hauptfunktion, die von main.py aufgerufen wird
+# --------------------------------------------------
+async def fetch_bookings_from_smoobu(start_date: date, end_date: date):
+    """
+    Ruft Buchungen im angegebenen Zeitraum aus der Smoobu API ab.
+    Gibt eine Liste von dicts mit Buchungsdaten zurück.
+    """
+    url = f"{SMOOBU_API_BASE}/reservations?from={start_date}&to={end_date}"
+
+    logger.info(f"Smoobu: Fetching bookings from {start_date} to {end_date}")
+    try:
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+
+        # API liefert in ["reservations"] die Liste
+        bookings = data.get("reservations", [])
+        logger.info(f"Smoobu returned {len(bookings)} reservations")
+
+        return bookings
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching from Smoobu API: {e}")
+        return []
