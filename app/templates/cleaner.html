@@ -9,6 +9,10 @@
 tr.row-done{opacity:.6;}
 .progress.over{--bs-progress-bar-bg: #dc3545;}
 .small-note{color:#6c757d; font-style: italic;}
+.timer-display{font-size: 1.2em; font-weight: bold; color: #198754;}
+.timer-running{animation: pulse 2s infinite;}
+@keyframes pulse{0%, 100%{opacity:1}50%{opacity:0.6}}
+.guest-info{background:#f8f9fa; padding:.25rem .5rem; border-radius:.25rem; font-size:.85em;}
 </style>
 </head>
 <body class="bg-light"><div class="container py-4">
@@ -28,55 +32,83 @@ tr.row-done{opacity:.6;}
 </div>
 
 <table class="table table-sm table-hover bg-white align-middle">
-<thead><tr><th>Datum</th><th>Start</th><th>Apartment</th><th>Geplant</th><th>Status</th><th>Fortschritt</th><th>Aktion</th></tr></thead>
+<thead><tr><th>Datum</th><th>Apartment & Gast Info</th><th>Geplant</th><th>Status & Timer</th><th>Progress</th><th>Aktion</th></tr></thead>
 <tbody>
 {% for t in tasks %}
 {% set started = run_map.get(t.id) %}
 <tr class="{% if t.status=='done' %}row-done{% endif %}">
-  <td>{{ t.date | date_wd_de('short') }}</td>
-  <td>{{ t.start_time or '-' }}</td>
+  <td><strong>{{ t.date | date_wd_de('short') }}</strong></td>
   <td>
-    {{ apt_map.get(t.apartment_id, t.apartment_id) }}<br>
-    <small class="text-muted fst-italic">{{ book_map.get(t.booking_id, '') }}</small>
-    {% if t.notes %}<div class="small-note"><i class="bi bi-sticky"></i> {{ t.notes }}</div>{% endif %}
-  </td>
-  <td>{{ t.planned_minutes }} min</td>
-  <td>
-    {% if t.status=='running' %}
-      <span class="badge badge-running">🟢 läuft</span>
-      <div id="runinfo-{{ t.id }}" data-started="{{ started or '' }}" data-planned="{{ t.planned_minutes }}"></div>
-    {% elif t.status=='done' %}
-      <span class="badge badge-done">✅ erledigt</span>
-    {% else %}-{% endif %}
-  </td>
-  <td style="min-width:180px;">
-    {% if t.status=='running' %}
-      <div class="progress" id="prog-{{ t.id }}">
-        <div class="progress-bar" role="progressbar" style="width: 0%" id="pb-{{ t.id }}">0%</div>
+    <div class="fw-bold mb-1">{{ apt_map.get(t.apartment_id, t.apartment_id) }}</div>
+    {% if t.next_arrival %}
+      <div class="guest-info">
+        <div><i class="bi bi-people-fill"></i> <strong>{{ t.next_arrival_adults or 0 }}</strong> Erw.
+        {% if t.next_arrival_children and t.next_arrival_children > 0 %}
+          + <strong>{{ t.next_arrival_children }}</strong> Kinder
+        {% endif %}</div>
+        {% if t.next_arrival_guest_name %}
+          <div><i class="bi bi-person-fill"></i> <strong>{{ t.next_arrival_guest_name }}</strong></div>
+        {% endif %}
+        <small>{{ t.next_arrival | date_wd_de('short') }}</small>
+        {% if t.next_arrival_comments %}
+          <br><small class="text-muted"><i class="bi bi-chat-text"></i> {{ t.next_arrival_comments[:80] }}</small>
+        {% endif %}
       </div>
-    {% else %}-{% endif %}
-  </td>
-  <td class="d-flex flex-wrap gap-2">
-    <form method="post" action="/cleaner/{{ staff.magic_token }}/start">
-      <input type="hidden" name="task_id" value="{{ t.id }}"/>
-      <button class="btn btn-sm btn-success"><i class="bi bi-play-fill"></i> Start</button>
-    </form>
-    <form method="post" action="/cleaner/{{ staff.magic_token }}/stop">
-      <input type="hidden" name="task_id" value="{{ t.id }}"/>
-      <button class="btn btn-sm btn-warning"><i class="bi bi-pause-fill"></i> Stop</button>
-    </form>
-    <form method="post" action="/cleaner/{{ staff.magic_token }}/done">
-      <input type="hidden" name="task_id" value="{{ t.id }}"/>
-      <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-check2-square"></i> Erledigt</button>
-    </form>
-    {% if t.status=='done' %}
-    <form method="post" action="/cleaner/{{ staff.magic_token }}/reopen">
-      <input type="hidden" name="task_id" value="{{ t.id }}"/>
-      <button class="btn btn-sm btn-outline-danger"><i class="bi bi-arrow-counterclockwise"></i> Rückgängig</button>
-    </form>
+    {% elif book_map.get(t.booking_id) %}
+      <div class="small text-muted"><i class="bi bi-person"></i> {{ book_map.get(t.booking_id, '') }}</div>
     {% endif %}
-    <!-- AJAX Note -->
-    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#noteModal" data-task="{{ t.id }}" data-current="{{ t.notes|e }}"><i class="bi bi-pencil-square"></i> Notiz</button>
+    {% if t.notes %}
+      <div class="small-note mt-1"><i class="bi bi-sticky"></i> {{ t.notes[:80] }}</div>
+    {% endif %}
+  </td>
+  <td class="text-center">
+    <div class="fw-bold">{{ t.planned_minutes }} min</div>
+  </td>
+  <td>
+    {% if t.status=='running' %}
+      <div class="timer-display timer-running">
+        <div id="timer-{{ t.id }}" data-started="{{ started or '' }}" data-planned="{{ t.planned_minutes }}">⏱️ 0:00</div>
+      </div>
+      <div class="small text-muted mt-1" id="remaining-{{ t.id }}">verbleibend: --</div>
+    {% elif t.status=='done' %}
+      <span class="badge badge-done"><i class="bi bi-check-circle"></i> Erledigt</span>
+    {% else %}
+      <span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> Offen</span>
+    {% endif %}
+  </td>
+  <td style="min-width:200px;">
+    {% if t.status=='running' %}
+      <div class="progress" id="prog-{{ t.id }}" style="height:25px;">
+        <div class="progress-bar" role="progressbar" style="width: 0%; line-height:25px;" id="pb-{{ t.id }}">0%</div>
+      </div>
+    {% else %}<div class="text-center text-muted">-</div>{% endif %}
+  </td>
+  <td>
+    <div class="d-flex flex-column gap-1">
+      {% if t.status=='open' %}
+      <form method="post" action="/cleaner/{{ staff.magic_token }}/start">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <button class="btn btn-sm btn-success w-100"><i class="bi bi-play-fill"></i> Start</button>
+      </form>
+      {% elif t.status=='running' %}
+      <div class="btn-group d-flex" role="group">
+        <form method="post" action="/cleaner/{{ staff.magic_token }}/stop" class="flex-fill">
+          <input type="hidden" name="task_id" value="{{ t.id }}"/>
+          <button class="btn btn-sm btn-warning w-100"><i class="bi bi-pause-fill"></i> Pause</button>
+        </form>
+        <form method="post" action="/cleaner/{{ staff.magic_token }}/done" class="flex-fill">
+          <input type="hidden" name="task_id" value="{{ t.id }}"/>
+          <button class="btn btn-sm btn-primary w-100"><i class="bi bi-check-circle"></i> Fertig</button>
+        </form>
+      </div>
+      {% elif t.status=='done' %}
+      <form method="post" action="/cleaner/{{ staff.magic_token }}/reopen">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <button class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-arrow-counterclockwise"></i> Öffnen</button>
+      </form>
+      {% endif %}
+      <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#noteModal" data-task="{{ t.id }}" data-current="{{ t.notes|e }}"><i class="bi bi-pencil-square"></i> Notiz</button>
+    </div>
   </td>
 </tr>
 {% endfor %}
@@ -142,36 +174,69 @@ document.getElementById('saveNoteBtn').addEventListener('click', async () => {
   }
 });
 
-// Live timer + remaining + progress
+// Live timer mit besserer Anzeige
 function minutesBetween(startIso){
   if(!startIso) return 0;
   const start = new Date(startIso.replace(' ', 'T'));
   const now = new Date();
   return Math.floor((now - start)/60000);
 }
+
+function formatTime(minutes){
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2,'0')}` : `${m} min`;
+}
+
 function updateTimers(){
-  document.querySelectorAll('[id^=runinfo-]').forEach(el => {
+  document.querySelectorAll('[id^=timer-]').forEach(el => {
     const id = el.id.split('-')[1];
     const started = el.getAttribute('data-started');
     const planned = parseInt(el.getAttribute('data-planned') || '0', 10);
+    
+    if(!started){
+      el.textContent = '⏱️ 0:00';
+      return;
+    }
+    
     const elapsed = minutesBetween(started);
     const remaining = Math.max(0, planned - elapsed);
-    el.textContent = `läuft seit ${elapsed} min — noch ca. ${remaining} min (von ${planned})`;
+    
+    // Timer-Anzeige
+    el.textContent = `⏱️ ${formatTime(elapsed)}`;
+    
+    // Verbleibende Zeit
+    const remainingEl = document.getElementById('remaining-'+id);
+    if(remainingEl){
+      remainingEl.textContent = elapsed >= planned ? 
+        `⚠️ Über Zeit (+${elapsed - planned} min)` : 
+        `noch ca. ${remaining} min`;
+      remainingEl.style.color = elapsed >= planned ? '#dc3545' : '';
+    }
+    
+    // Progress Bar
     const pb = document.getElementById('pb-'+id);
     if(pb){
       const pct = Math.min(100, Math.round(elapsed / Math.max(1, planned) * 100));
       pb.style.width = pct + '%';
       pb.textContent = pct + '%';
+      
       const prog = document.getElementById('prog-'+id);
-      if (elapsed > planned) {
-        prog.classList.add('over');
-      } else {
-        prog.classList.remove('over');
+      if(prog){
+        if(elapsed >= planned){
+          prog.classList.add('over');
+          pb.classList.add('bg-danger');
+          pb.classList.remove('bg-success');
+        } else {
+          prog.classList.remove('over');
+          pb.classList.add('bg-success');
+          pb.classList.remove('bg-danger');
+        }
       }
     }
   });
 }
 updateTimers();
-setInterval(updateTimers, 30000);
+setInterval(updateTimers, 5000); // Update alle 5 Sekunden für live-feeling
 </script>
 </div></body></html>

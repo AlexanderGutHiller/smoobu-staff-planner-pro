@@ -21,8 +21,23 @@
 <table id="task-table" class="table table-sm table-hover bg-white align-middle">
 <thead>
   <tr>
-    <th>Datum<br><input id="f-date" type="text" class="form-control form-control-sm filter-input" placeholder="z.B. 2025-10"></th>
-    <th>Apartment<br><input id="f-apt" type="text" class="form-control form-control-sm filter-input" placeholder="Name/Gast/Notiz"></th>
+    <th>Datum<br>
+      <select id="f-date" class="form-select form-select-sm filter-input">
+        <option value="">Alle</option>
+        <option value="today">Heute</option>
+        <option value="week">Diese Woche</option>
+        <option value="month">Dieser Monat</option>
+        <option value="next7">Nächste 7 Tage</option>
+      </select>
+    </th>
+    <th>Apartment<br>
+      <select id="f-apt" class="form-select form-select-sm filter-input">
+        <option value="">Alle</option>
+        {% for apt in apartments %}
+          <option value="{{ apt.name }}">{{ apt.name }}</option>
+        {% endfor %}
+      </select>
+    </th>
     <th>Geplant</th>
     <th>Next Arrival</th>
     <th>MA<br>
@@ -33,7 +48,13 @@
         {% endfor %}
       </select>
     </th>
-    <th>Lock</th>
+    <th>Lock<br>
+      <select id="f-lock" class="form-select form-select-sm filter-input">
+        <option value="">Alle</option>
+        <option value="locked">Gesperrt</option>
+        <option value="unlocked">Offen</option>
+      </select>
+    </th>
     <th>#</th>
   </tr>
 </thead>
@@ -42,16 +63,26 @@
 <tr class="{% if t.assigned_staff_id %}table-success{% else %}table-warning{% endif %}">
   <td data-col="date">{{ t.date | date_wd_de('short') }}</td>
   <td data-col="apt">
-    {{ apt_map.get(t.apartment_id, t.apartment_id) }}<br>
-    <small class="small-muted">{{ book_map.get(t.booking_id, '') }}</small>
-    {% if t.notes %}<div><small class="text-muted"><i class="bi bi-sticky"></i> {{ t.notes }}</small></div>{% endif %}
+    <div class="fw-bold">{{ apt_map.get(t.apartment_id, t.apartment_id) }}</div>
+    <small class="text-muted">{{ book_map.get(t.booking_id, '') }}</small>
+    {% if t.notes %}<div class="mt-1"><small class="text-muted"><i class="bi bi-sticky"></i> {{ t.notes }}</small></div>{% endif %}
   </td>
   <td data-col="planned">{{ t.planned_minutes }} min</td>
   <td data-col="next">
     {% if t.next_arrival %}
-      {{ t.next_arrival | date_wd_de('short') }}
-      ({{ t.next_arrival_adults or 0 }}+{{ t.next_arrival_children or 0 }})<br>
-      <small class="text-muted">{{ t.next_arrival_comments }}</small>
+      <div class="fw-bold">{{ t.next_arrival | date_wd_de('short') }}</div>
+      <div class="small">
+        <i class="bi bi-people"></i> {{ t.next_arrival_adults or 0 }} Erw.
+        {% if t.next_arrival_children and t.next_arrival_children > 0 %}
+          + {{ t.next_arrival_children }} Kind
+        {% endif %}
+      </div>
+      {% if t.next_arrival_guest_name %}
+        <div class="small text-primary"><i class="bi bi-person"></i> {{ t.next_arrival_guest_name }}</div>
+      {% endif %}
+      {% if t.next_arrival_comments %}
+        <div class="small text-muted"><i class="bi bi-chat-text"></i> {{ t.next_arrival_comments[:60] }}</div>
+      {% endif %}
     {% else %}-{% endif %}
   </td>
   <td data-col="staff">
@@ -81,22 +112,59 @@
 </tbody></table>
 <script>
 const rows = Array.from(document.querySelectorAll("#task-table tbody tr"));
+const today = new Date().toISOString().split('T')[0];
+
+function matchesDateFilter(taskDate, filter) {
+  if (!filter) return true;
+  const [day, month, year] = taskDate.split('.');
+  const taskDateIso = `${year}-${month}-${day}`;
+  const todayObj = new Date(today);
+  
+  switch(filter) {
+    case 'today':
+      return taskDateIso === today;
+    case 'week':
+      const weekStart = new Date(todayObj.setDate(todayObj.getDate() - todayObj.getDay()));
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const taskDateObj = new Date(taskDateIso);
+      return taskDateObj >= weekStart && taskDateObj <= weekEnd;
+    case 'month':
+      return taskDateIso.startsWith(today.substring(0, 7));
+    case 'next7':
+      const next7 = new Date(today);
+      next7.setDate(next7.getDate() + 7);
+      const taskDateObj2 = new Date(taskDateIso);
+      return taskDateObj2 >= new Date(today) && taskDateObj2 <= next7;
+    default:
+      return true;
+  }
+}
+
 function applyFilter(){
-  const fDate = document.getElementById('f-date').value.toLowerCase();
-  const fApt  = document.getElementById('f-apt').value.toLowerCase();
-  const fStaff= document.getElementById('f-staff').value.toLowerCase();
+  const fDate = document.getElementById('f-date').value;
+  const fApt = document.getElementById('f-apt').value;
+  const fStaff = document.getElementById('f-staff').value;
+  const fLock = document.getElementById('f-lock').value;
+  
   rows.forEach(tr => {
-    const dateTxt = tr.querySelector('[data-col="date"]').innerText.toLowerCase();
-    const aptTxt  = tr.querySelector('[data-col="apt"]').innerText.toLowerCase();
-    const staffTxt= tr.querySelector('[data-col="staff"]').innerText.toLowerCase();
-    const ok = (!fDate || dateTxt.includes(fDate))
-            && (!fApt || aptTxt.includes(fApt))
-            && (!fStaff || staffTxt.includes(fStaff));
+    const dateTxt = tr.querySelector('[data-col="date"]').innerText;
+    const aptTxt = tr.querySelector('[data-col="apt"]').innerText;
+    const staffTxt = tr.querySelector('[data-col="staff"]').innerText;
+    
+    let lockEl = tr.querySelector('[name="lock"]');
+    const isLocked = lockEl && lockEl.value === '1';
+    
+    const ok = matchesDateFilter(dateTxt, fDate)
+            && (!fApt || aptTxt.toLowerCase().includes(fApt.toLowerCase()))
+            && (!fStaff || staffTxt.toLowerCase().includes(fStaff.toLowerCase()))
+            && (!fLock || (fLock === 'locked' && isLocked) || (fLock === 'unlocked' && !isLocked));
+    
     tr.style.display = ok ? '' : 'none';
   });
 }
-['f-date','f-apt','f-staff'].forEach(id => {
-  document.getElementById(id).addEventListener('input', applyFilter);
+
+['f-date','f-apt','f-staff','f-lock'].forEach(id => {
   document.getElementById(id).addEventListener('change', applyFilter);
 });
 </script>

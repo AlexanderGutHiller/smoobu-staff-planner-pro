@@ -170,6 +170,8 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     apt_map = {a.id: a.name for a in apts}
     book_map = {b.id: b.guest_name for b in db.query(Booking).all()}
     base_url = BASE_URL.rstrip("/")
+    if not base_url:
+        base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
     return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "base_url": base_url})
 
 @app.get("/admin/{token}/staff")
@@ -178,6 +180,8 @@ async def admin_staff(request: Request, token: str, db=Depends(get_db)):
         raise HTTPException(status_code=403)
     staff = db.query(Staff).order_by(Staff.name).all()
     base_url = BASE_URL.rstrip("/")
+    if not base_url:
+        base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
     return templates.TemplateResponse("admin_staff.html", {"request": request, "token": token, "staff": staff, "base_url": base_url})
 
 @app.post("/admin/{token}/staff/add")
@@ -218,7 +222,34 @@ async def admin_apartments(request: Request, token: str, db=Depends(get_db)):
 @app.post("/admin/{token}/apartments/update")
 async def admin_apartments_update(token: str, apartment_id: int = Form(...), planned_minutes: int = Form(...), db=Depends(get_db)):
     if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
-    a = db.get(Apartment, apartment_id); a.planned_minutes = int(planned_minutes); db.commit()
+    a = db.get(Apartment, apartment_id)
+    a.planned_minutes = int(planned_minutes)
+    db.commit()
+    return RedirectResponse(url=f"/admin/{token}/apartments", status_code=303)
+
+@app.post("/admin/{token}/apartments/apply")
+async def admin_apartments_apply(token: str, apartment_id: int = Form(...), db=Depends(get_db)):
+    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    a = db.get(Apartment, apartment_id)
+    if not a:
+        raise HTTPException(status_code=404, detail="Apartment nicht gefunden")
+    
+    # Get today's date
+    today_iso = dt.date.today().isoformat()
+    
+    # Update all tasks for this apartment that are today or in the future
+    tasks = db.query(Task).filter(
+        Task.apartment_id == apartment_id,
+        Task.date >= today_iso
+    ).all()
+    
+    updated = 0
+    for t in tasks:
+        t.planned_minutes = a.planned_minutes
+        updated += 1
+    
+    db.commit()
+    log.info("Updated %d tasks for apartment %s to %d minutes", updated, a.name, a.planned_minutes)
     return RedirectResponse(url=f"/admin/{token}/apartments", status_code=303)
 
 @app.get("/admin/{token}/import")

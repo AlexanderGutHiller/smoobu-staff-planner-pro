@@ -24,10 +24,11 @@
   <td>{{ s.max_hours_per_month }}</td>
   <td>{{ 'Aktiv' if s.active else 'Inaktiv' }}</td>
   <td>
-    {% set link = (base_url ~ '/cleaner/' ~ s.magic_token) if base_url else ('/cleaner/' ~ s.magic_token) %}
+    {% set link = (base_url ~ '/cleaner/' ~ s.magic_token) %}
     <div class="input-group input-group-sm">
       <input class="form-control" value="{{ link }}" readonly id="link-{{ s.id }}">
-      <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('link-{{ s.id }}').value)"><i class="bi bi-clipboard"></i></button>
+      <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText('{{ link }}')" title="Link kopieren"><i class="bi bi-clipboard"></i></button>
+      <a class="btn btn-outline-primary" href="{{ link }}" target="_blank" title="Link öffnen"><i class="bi bi-box-arrow-up-right"></i></a>
     </div>
   </td>
   <td>

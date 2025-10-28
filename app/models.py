@@ -53,6 +53,7 @@ class Task(Base):
     next_arrival_adults: Mapped[int | None] = mapped_column(Integer, nullable=True)
     next_arrival_children: Mapped[int | None] = mapped_column(Integer, nullable=True)
     next_arrival_comments: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_arrival_guest_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 class TimeLog(Base):
     __tablename__ = "timelogs"
