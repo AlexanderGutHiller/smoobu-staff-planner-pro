@@ -91,9 +91,9 @@ def _best_guest_name(it: dict) -> str:
 async def refresh_bookings_job():
     client = SmoobuClient()
     start, end = _daterange(60)
-    log.info("Refreshing bookings from %s to %s", start, end)
+    log.info("🔄 Starting refresh: %s to %s", start, end)
     items = client.get_reservations(start, end)
-    log.info("Fetched %d bookings", len(items))
+    log.info("📥 Fetched %d bookings from Smoobu", len(items))
     with SessionLocal() as db:
         seen_booking_ids: List[int] = []
         seen_apartment_ids: List[int] = []
@@ -103,6 +103,11 @@ async def refresh_bookings_job():
             apt_id = int(apt.get("id")) if apt.get("id") is not None else None
             apt_name = apt.get("name") or ""
             guest_name = _best_guest_name(it)
+            arrival = (it.get("arrival") or "")[:10]
+            departure = (it.get("departure") or "")[:10]
+
+            log.debug("Smoobu booking %d: apt='%s' (id=%s), arrival='%s', departure='%s', guest='%s'", 
+                     b_id, apt_name, apt_id, arrival, departure, guest_name)
 
             if apt_id is not None and apt_id not in seen_apartment_ids:
                 a = db.get(Apartment, apt_id)
@@ -126,6 +131,17 @@ async def refresh_bookings_job():
             b.children = int(it.get("children") or 0)
             b.guest_comments = (it.get("guestComments") or it.get("comments") or "")[:2000]
             b.guest_name = guest_name or ""
+            
+            # Prüfe ob Buchung valid ist bevor wir sie speichern
+            if not departure or not departure.strip():
+                log.warning("⚠️ INVALID booking from Smoobu: %d (%s) - NO DEPARTURE, arrival='%s'", b_id, apt_name, arrival)
+            elif not arrival or not arrival.strip():
+                log.warning("⚠️ INVALID booking from Smoobu: %d (%s) - NO ARRIVAL, departure='%s'", b_id, apt_name, departure)
+            elif departure <= arrival:
+                log.warning("⚠️ INVALID booking from Smoobu: %d (%s) - departure <= arrival ('%s' <= '%s')", b_id, apt_name, departure, arrival)
+            else:
+                log.info("✓ Booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
+            
             seen_booking_ids.append(b_id)
 
         existing_ids = [row[0] for row in db.query(Booking.id).all()]
@@ -136,6 +152,7 @@ async def refresh_bookings_job():
         db.commit()
 
         bookings = db.query(Booking).all()
+        log.info("📋 Processing %d bookings from database", len(bookings))
         upsert_tasks_from_bookings(bookings)
 
         removed = 0
@@ -143,8 +160,9 @@ async def refresh_bookings_job():
             if not t.date or not t.date.strip():
                 db.delete(t); removed += 1
         if removed:
-            log.info("Cleanup: %d Tasks ohne Datum entfernt.", removed)
+            log.info("🧹 Cleanup: %d Tasks ohne Datum entfernt.", removed)
         db.commit()
+        log.info("✅ Refresh completed successfully")
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
@@ -168,7 +186,9 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     staff = db.query(Staff).filter(Staff.active==True).all()
     apts = db.query(Apartment).filter(Apartment.active==True).all()
     apt_map = {a.id: a.name for a in apts}
-    book_map = {b.id: b.guest_name for b in db.query(Booking).all()}
+    bookings = db.query(Booking).all()
+    book_map = {b.id: b.guest_name for b in bookings}
+    booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0} for b in bookings}
     
     # Timelog-Daten für jedes Task
     timelog_map = {}
@@ -184,7 +204,7 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     base_url = BASE_URL.rstrip("/")
     if not base_url:
         base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
-    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "timelog_map": timelog_map, "base_url": base_url})
+    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "base_url": base_url})
 
 @app.get("/admin/{token}/staff")
 async def admin_staff(request: Request, token: str, db=Depends(get_db)):
@@ -384,7 +404,9 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
     tasks = q.order_by(Task.date, Task.id).all()
     apts = db.query(Apartment).all()
     apt_map = {a.id: a.name for a in apts}
-    book_map = {b.id: b.guest_name for b in db.query(Booking).all()}
+    bookings = db.query(Booking).all()
+    book_map = {b.id: b.guest_name for b in bookings}
+    booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0} for b in bookings}
     month = dt.date.today().strftime("%Y-%m")
     minutes = 0
     logs = db.query(TimeLog).filter(TimeLog.staff_id==s.id, TimeLog.actual_minutes!=None).all()
@@ -397,7 +419,7 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
         if tl:
             run_map[t.id] = tl.started_at
     warn_limit = used_hours > float(s.max_hours_per_month or 0)
-    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "book_map": book_map, "staff": s, "show_done": show_done, "run_map": run_map, "warn_limit": warn_limit})
+    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "run_map": run_map, "warn_limit": warn_limit})
 
 @app.post("/cleaner/{token}/start")
 async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)):

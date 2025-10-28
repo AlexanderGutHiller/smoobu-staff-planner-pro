@@ -42,6 +42,14 @@ tr.row-done{opacity:.6;}
     <div class="fw-bold mb-1">{{ apt_map.get(t.apartment_id, t.apartment_id) }}</div>
     {% if book_map.get(t.booking_id) %}
       <div class="small text-primary mb-1"><i class="bi bi-person-fill"></i> <strong>{{ book_map.get(t.booking_id, '') }}</strong></div>
+      {% if booking_details_map.get(t.booking_id) %}
+        <div class="small text-muted mb-1">
+          <i class="bi bi-people"></i> {{ booking_details_map[t.booking_id].adults }} Erw.
+          {% if booking_details_map[t.booking_id].children > 0 %}
+            + {{ booking_details_map[t.booking_id].children }} Kinder
+          {% endif %}
+        </div>
+      {% endif %}
     {% endif %}
     {% if t.next_arrival %}
       <div class="guest-info">
@@ -176,17 +184,24 @@ document.getElementById('saveNoteBtn').addEventListener('click', async () => {
 });
 
 // Live timer mit besserer Anzeige
-function minutesBetween(startIso){
+function secondsSince(startIso){
   if(!startIso) return 0;
   const start = new Date(startIso.replace(' ', 'T'));
   const now = new Date();
-  return Math.floor((now - start)/60000);
+  return Math.floor((now - start)/1000);
 }
 
-function formatTime(minutes){
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return h > 0 ? `${h}:${String(m).padStart(2,'0')}` : `${m} min`;
+function formatTimeSeconds(totalSeconds){
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  
+  if (hours > 0) {
+    return `${hours}:${String(mins).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+  } else {
+    return `${mins}:${String(seconds).padStart(2,'0')}`;
+  }
 }
 
 function updateTimers(){
@@ -200,31 +215,32 @@ function updateTimers(){
       return;
     }
     
-    const elapsed = minutesBetween(started);
-    const remaining = Math.max(0, planned - elapsed);
+    const elapsedSeconds = secondsSince(started);
+    const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+    const remaining = Math.max(0, planned - elapsedMinutes);
     
-    // Timer-Anzeige
-    el.textContent = `⏱️ ${formatTime(elapsed)}`;
+    // Timer-Anzeige mit Sekunden
+    el.textContent = `⏱️ ${formatTimeSeconds(elapsedSeconds)}`;
     
     // Verbleibende Zeit
     const remainingEl = document.getElementById('remaining-'+id);
     if(remainingEl){
-      remainingEl.textContent = elapsed >= planned ? 
-        `⚠️ Über Zeit (+${elapsed - planned} min)` : 
+      remainingEl.textContent = elapsedMinutes >= planned ? 
+        `⚠️ Über Zeit (+${elapsedMinutes - planned} min)` : 
         `noch ca. ${remaining} min`;
-      remainingEl.style.color = elapsed >= planned ? '#dc3545' : '';
+      remainingEl.style.color = elapsedMinutes >= planned ? '#dc3545' : '';
     }
     
     // Progress Bar
     const pb = document.getElementById('pb-'+id);
     if(pb){
-      const pct = Math.min(100, Math.round(elapsed / Math.max(1, planned) * 100));
+      const pct = Math.min(100, Math.round(elapsedMinutes / Math.max(1, planned) * 100));
       pb.style.width = pct + '%';
       pb.textContent = pct + '%';
       
       const prog = document.getElementById('prog-'+id);
       if(prog){
-        if(elapsed >= planned){
+        if(elapsedMinutes >= planned){
           prog.classList.add('over');
           pb.classList.add('bg-danger');
           pb.classList.remove('bg-success');
@@ -237,7 +253,7 @@ function updateTimers(){
     }
   });
 }
-updateTimers();
-setInterval(updateTimers, 5000); // Update alle 5 Sekunden für live-feeling
+updateTimers(); // Sofort beim Laden
+setInterval(updateTimers, 1000); // Update jede Sekunde für echtes live-feeling
 </script>
 </div></body></html>

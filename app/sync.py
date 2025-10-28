@@ -39,35 +39,43 @@ def get_planned_minutes_for(apartment_id: int | None, default=90) -> int:
 
 def upsert_tasks_from_bookings(bookings: list[Booking]):
     if not bookings:
+        log.info("No bookings to process")
         return
+    
+    log.info("Processing %d bookings from database", len(bookings))
     clean = []
     for b in bookings:
+        log.debug("Checking booking %d: apartment='%s', arrival='%s', departure='%s'", b.id, b.apartment_name, b.arrival, b.departure)
+        
         # Prüfe auf leeres oder ungültiges departure
         if not b.departure or not b.departure.strip():
-            log.info("Skip booking %s (%s) – no departure", b.id, b.apartment_name)
+            log.info("❌ Skip booking %d (%s) – no departure", b.id, b.apartment_name)
             continue
         
         # Prüfe auf valides Datumsformat (yyyy-mm-dd)
         if len(b.departure) != 10 or b.departure.count('-') != 2:
-            log.info("Skip booking %s (%s) – invalid departure format: %s", b.id, b.apartment_name, b.departure)
+            log.info("❌ Skip booking %d (%s) – invalid departure format: '%s'", b.id, b.apartment_name, b.departure)
             continue
         
         # Prüfe auf leeres arrival (Langzeitbuchungen ohne Check-Out)
         if not b.arrival or not b.arrival.strip():
-            log.info("Skip booking %s (%s) – no arrival (long-term booking)", b.id, b.apartment_name)
+            log.info("❌ Skip booking %d (%s) – no arrival (long-term booking)", b.id, b.apartment_name)
             continue
         
         # Prüfe departure <= arrival (ungültige Buchung)
         if b.departure <= b.arrival:
-            log.info("Skip booking %s (%s) – invalid departure <= arrival", b.id, b.apartment_name)
+            log.info("❌ Skip booking %d (%s) – invalid departure <= arrival (%s <= %s)", b.id, b.apartment_name, b.departure, b.arrival)
             continue
         
         # Prüfe auf zu alte Datumsangaben (vor 2020)
         if b.departure < "2020-01-01":
-            log.info("Skip booking %s (%s) – departure too old: %s", b.id, b.apartment_name, b.departure)
+            log.info("❌ Skip booking %d (%s) – departure too old: %s", b.id, b.apartment_name, b.departure)
             continue
         
+        log.info("✅ Accept booking %d (%s) - departure: %s", b.id, b.apartment_name, b.departure)
         clean.append(b)
+    
+    log.info("Filtered: %d valid bookings out of %d total", len(clean), len(bookings))
 
     booking_ids = [b.id for b in clean]
     next_map = _index_next_arrivals(clean)
@@ -107,6 +115,7 @@ def upsert_tasks_from_bookings(bookings: list[Booking]):
                 ))
 
         # Cleanup invalid or stale
+        log.info("🧹 Starting cleanup of invalid tasks...")
         removed_count = 0
         for t in s.execute(select(Task)).scalars().all():
             # Entferne Tasks ohne Datum
@@ -185,7 +194,7 @@ def upsert_tasks_from_bookings(bookings: list[Booking]):
             if should_delete:
                 s.delete(t)
                 removed_count += 1
-                log.info("Removing task %d - %s (locked: %s, date: %s, apt: %s)", t.id, reason, t.locked, t.date, t.apartment_id)
+                log.info("🗑️ Removing task %d - %s (locked: %s, date: %s, apt: %s, booking: %s)", t.id, reason, t.locked, t.date, t.apartment_id, t.booking_id)
         
         if removed_count > 0:
             log.info("Cleanup completed: %d invalid/stale tasks removed", removed_count)
