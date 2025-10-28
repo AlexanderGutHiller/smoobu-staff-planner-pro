@@ -25,8 +25,14 @@ async def fetch_bookings_from_smoobu(start_date: date, end_date: date):
     url = f"{SMOOBU_API_BASE}/reservations?from={start_date}&to={end_date}"
 
     logger.info(f"Smoobu: Fetching bookings from {start_date} to {end_date}")
+    logger.info(f"Smoobu: API Key present: {bool(SMOOBU_API_KEY)}")
+    
     try:
         response = requests.get(url, headers=headers, timeout=30)
+        logger.info(f"Smoobu: Response status code: {response.status_code}")
+        logger.info(f"Smoobu: Response headers: {dict(response.headers)}")
+        logger.info(f"Smoobu: Response content (first 200 chars): {response.text[:200]}")
+        
         response.raise_for_status()
         data = response.json()
 
@@ -38,4 +44,7 @@ async def fetch_bookings_from_smoobu(start_date: date, end_date: date):
 
     except requests.exceptions.RequestException as e:
         logger.error(f"Error fetching from Smoobu API: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            logger.error(f"Response status: {e.response.status_code}")
+            logger.error(f"Response text: {e.response.text[:500]}")
         return []
