@@ -14,6 +14,39 @@ from .services_smoobu import SmoobuClient
 from .utils import new_token, today_iso, now_iso
 from .sync import upsert_tasks_from_bookings
 
+def detect_language(request: Request) -> str:
+    """Erkenne Browser-Sprache aus Accept-Language Header"""
+    accept_lang = request.headers.get("accept-language", "de").lower()
+    if "en" in accept_lang:
+        return "en"
+    elif "fr" in accept_lang:
+        return "fr"
+    elif "it" in accept_lang:
+        return "it"
+    elif "es" in accept_lang:
+        return "es"
+    return "de"  # Default: Deutsch
+
+def get_translations(lang: str) -> Dict[str, str]:
+    """Übersetzungen für verschiedene Sprachen"""
+    translations = {
+        "de": {
+            "tasks": "Einsätze", "team": "Team", "apartments": "Apartments", "import_now": "Import jetzt",
+            "cleanup": "Bereinigen", "date": "Datum", "apartment": "Apartment", "planned": "Geplant",
+            "status": "Status", "actual": "Tatsächlich", "next_arrival": "Nächste Anreise", "locked": "Lock",
+            "save": "Speichern", "today": "Heute", "week": "Diese Woche", "month": "Dieser Monat",
+            "next7": "Nächste 7 Tage", "all": "Alle", "lock": "Gesperrt", "unlock": "Offen"
+        },
+        "en": {
+            "tasks": "Tasks", "team": "Team", "apartments": "Apartments", "import_now": "Import now",
+            "cleanup": "Clean up", "date": "Date", "apartment": "Apartment", "planned": "Planned",
+            "status": "Status", "actual": "Actual", "next_arrival": "Next Arrival", "locked": "Lock",
+            "save": "Save", "today": "Today", "week": "This Week", "month": "This Month",
+            "next7": "Next 7 Days", "all": "All", "lock": "Locked", "unlock": "Open"
+        }
+    }
+    return translations.get(lang, translations["de"])
+
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 TIMEZONE = os.getenv("TIMEZONE", "Europe/Berlin")
 REFRESH_INTERVAL_MINUTES = int(os.getenv("REFRESH_INTERVAL_MINUTES", "60"))
@@ -123,8 +156,8 @@ async def refresh_bookings_job():
             # Log ALL fields for Romantik to debug
             if apt_name and "romantik" in apt_name.lower() and "2025-10-29" in departure:
                 log.warning("🎯 ROMANTIK FULL BOOKING DATA: %s", it)
-                log.warning("🎯 Status fields: status='%s', cancelled=%s, blocked=%s, internal=%s, draft=%s, pending=%s, on_hold=%s", 
-                           status, cancelled, is_blocked, is_internal, is_draft, is_pending, is_on_hold)
+                log.warning("🎯 Status fields: type='%s', status='%s', cancelled=%s, blocked=%s, internal=%s, draft=%s, pending=%s, on_hold=%s", 
+                           it.get("type"), status, cancelled, is_blocked, is_internal, is_draft, is_pending, is_on_hold)
 
             if apt_id is not None and apt_id not in seen_apartment_ids:
                 a = db.get(Apartment, apt_id)
@@ -149,8 +182,14 @@ async def refresh_bookings_job():
             b.guest_comments = (it.get("guestComments") or it.get("comments") or "")[:2000]
             b.guest_name = guest_name or ""
             
-            # Check for cancelled, blocked, internal, draft, pending, or on-hold bookings - SKIP these!
-            if cancelled:
+            # Check booking type
+            booking_type = it.get("type", "").lower()
+            
+            # Check for cancelled, blocked, internal, draft, pending, on-hold bookings OR cancellation type - SKIP these!
+            if booking_type == "cancellation":
+                log.info("⛔ SKIP cancellation type booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
+                continue
+            elif cancelled:
                 log.info("⛔ SKIP cancelled booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
                 continue
             elif is_blocked:
@@ -214,6 +253,10 @@ async def health():
 async def admin_home(request: Request, token: str, date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None), staff_id: Optional[int] = Query(None), apartment_id: Optional[int] = Query(None), db=Depends(get_db)):
     if token != ADMIN_TOKEN:
         raise HTTPException(status_code=403)
+    
+    lang = detect_language(request)
+    trans = get_translations(lang)
+    
     q = db.query(Task)
     if date_from: q = q.filter(Task.date >= date_from)
     if date_to: q = q.filter(Task.date <= date_to)
@@ -241,17 +284,19 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     base_url = BASE_URL.rstrip("/")
     if not base_url:
         base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
-    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "base_url": base_url})
+    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "base_url": base_url, "lang": lang, "t": trans})
 
 @app.get("/admin/{token}/staff")
 async def admin_staff(request: Request, token: str, db=Depends(get_db)):
     if token != ADMIN_TOKEN:
         raise HTTPException(status_code=403)
+    lang = detect_language(request)
+    trans = get_translations(lang)
     staff = db.query(Staff).order_by(Staff.name).all()
     base_url = BASE_URL.rstrip("/")
     if not base_url:
         base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
-    return templates.TemplateResponse("admin_staff.html", {"request": request, "token": token, "staff": staff, "base_url": base_url})
+    return templates.TemplateResponse("admin_staff.html", {"request": request, "token": token, "staff": staff, "base_url": base_url, "lang": lang, "t": trans})
 
 @app.post("/admin/{token}/staff/add")
 async def admin_staff_add(token: str, name: str = Form(...), hourly_rate: float = Form(0.0), max_hours_per_month: int = Form(160), db=Depends(get_db)):
@@ -285,8 +330,10 @@ async def admin_task_lock(token: str, task_id: int = Form(...), lock: int = Form
 async def admin_apartments(request: Request, token: str, db=Depends(get_db)):
     if token != ADMIN_TOKEN:
         raise HTTPException(status_code=403)
+    lang = detect_language(request)
+    trans = get_translations(lang)
     apts = db.query(Apartment).order_by(Apartment.name).all()
-    return templates.TemplateResponse("admin_apartments.html", {"request": request, "token": token, "apartments": apts})
+    return templates.TemplateResponse("admin_apartments.html", {"request": request, "token": token, "apartments": apts, "lang": lang, "t": trans})
 
 @app.post("/admin/{token}/apartments/update")
 async def admin_apartments_update(token: str, apartment_id: int = Form(...), planned_minutes: int = Form(...), db=Depends(get_db)):
@@ -458,7 +505,9 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
         if tl:
             run_map[t.id] = tl.started_at
     warn_limit = used_hours > float(s.max_hours_per_month or 0)
-    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "run_map": run_map, "warn_limit": warn_limit})
+    lang = detect_language(request)
+    trans = get_translations(lang)
+    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "run_map": run_map, "warn_limit": warn_limit, "lang": lang, "t": trans})
 
 @app.post("/cleaner/{token}/start")
 async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)):
