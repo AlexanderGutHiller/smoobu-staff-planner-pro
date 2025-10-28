@@ -6,7 +6,7 @@ from datetime import date
 logger = logging.getLogger("smoobu")
 
 SMOOBU_API_KEY = os.getenv("SMOOBU_API_KEY")
-SMOOBU_API_BASE = "https://api.smoobu.com/v1"
+SMOOBU_API_BASE = "https://api.smoobu.com"
 
 headers = {
     "X-Api-Key": SMOOBU_API_KEY,
@@ -22,7 +22,7 @@ async def fetch_bookings_from_smoobu(start_date: date, end_date: date):
     Ruft Buchungen im angegebenen Zeitraum aus der Smoobu API ab.
     Gibt eine Liste von dicts mit Buchungsdaten zurück.
     """
-    url = f"{SMOOBU_API_BASE}/reservations?from={start_date}&to={end_date}"
+    url = f"{SMOOBU_API_BASE}/v1/reservations?from={start_date}&to={end_date}"
 
     logger.info(f"Smoobu: Fetching bookings from {start_date} to {end_date}")
     logger.info(f"Smoobu: API Key present: {bool(SMOOBU_API_KEY)}")
