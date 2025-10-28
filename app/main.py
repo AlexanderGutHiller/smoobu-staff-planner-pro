@@ -1,5 +1,5 @@
 
-import os, json, datetime as dt, csv, io, logging
+import os, json, datetime as dt, io, logging
 from typing import List, Optional, Dict
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, Query
 from fastapi.responses import RedirectResponse, StreamingResponse, PlainTextResponse, HTMLResponse, JSONResponse
@@ -7,6 +7,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
 
 from .db import init_db, SessionLocal
 from .models import Booking, Staff, Apartment, Task, TimeLog
@@ -22,7 +24,7 @@ BASE_URL = os.getenv("BASE_URL", "")
 log = logging.getLogger("smoobu")
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="Smoobu Staff Planner Pro (v6.3)")
+app = FastAPI(title="Smoobu Staff Planner Pro (v6.4)")
 
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -140,10 +142,11 @@ async def refresh_bookings_job():
 
         removed = 0
         for t in db.query(Task).all():
-            if not t.date or not t.date.strip():
+            b = db.get(Booking, t.booking_id) if t.booking_id else None
+            if (not t.date or not t.date.strip()) or (not b) or (not b.departure) or (not t.apartment_id):
                 db.delete(t); removed += 1
         if removed:
-            log.info("Cleanup: %d Tasks ohne Datum entfernt.", removed)
+            log.info("Cleanup: %d ungültige Tasks entfernt.", removed)
         db.commit()
 
 @app.get("/", response_class=HTMLResponse)
@@ -227,41 +230,58 @@ async def admin_import(token: str):
     await refresh_bookings_job()
     return PlainTextResponse("Import done.")
 
-@app.get("/admin/{token}/export")
-async def admin_export(token: str, month: str, db=Depends(get_db)):
+@app.get("/admin/{token}/timelogs")
+async def admin_timelogs(token: str, month: str, db=Depends(get_db)):
     if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
-    apts = db.query(Apartment).all()
-    apt_map = {a.id: a.name for a in apts}
+    if len(month) != 7 or month[4] != '-':
+        raise HTTPException(400, "month muss Format YYYY-MM haben")
+    apts = {a.id: a.name for a in db.query(Apartment).all()}
+    staff_map = {s.id: s for s in db.query(Staff).all()}
     rows = []
-    for t in db.query(Task).order_by(Task.date, Task.id).all():
-        if not t.date.startswith(month): continue
-        staff = db.get(Staff, t.assigned_staff_id) if t.assigned_staff_id else None
-        rate = float(staff.hourly_rate) if staff else 0.0
-        actual = 0
-        tl = db.query(TimeLog).filter(TimeLog.task_id==t.id, TimeLog.actual_minutes!=None).order_by(TimeLog.id.desc()).first()
-        if tl: actual = int(tl.actual_minutes)
-        cost = round((actual/60.0)*rate, 2)
-        rows.append({
-            "date": t.date,
-            "apartment_id": t.apartment_id,
-            "apartment_name": apt_map.get(t.apartment_id, ""),
-            "staff": staff.name if staff else "",
-            "planned_minutes": t.planned_minutes,
-            "actual_minutes": actual,
-            "hourly_rate": rate,
-            "cost_eur": cost,
-            "notes": t.notes,
-            "extras": t.extras_json,
-            "next_arrival": t.next_arrival or "",
-            "next_arrival_adults": t.next_arrival_adults or 0,
-            "next_arrival_children": t.next_arrival_children or 0,
-        })
-    headers = list(rows[0].keys()) if rows else ["date","apartment_id","apartment_name","staff","planned_minutes","actual_minutes","hourly_rate","cost_eur","notes","extras","next_arrival","next_arrival_adults","next_arrival_children"]
-    output = io.StringIO()
-    w = csv.DictWriter(output, fieldnames=headers)
-    w.writeheader()
-    for r in rows: w.writerow(r)
-    return StreamingResponse(iter([output.getvalue().encode('utf-8')]), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=report-{month}.csv"})
+    for tl in db.query(TimeLog).all():
+        if not tl.actual_minutes:
+            continue
+        if not tl.started_at or tl.started_at[:7] != month:
+            continue
+        t = db.get(Task, tl.task_id)
+        if not t:
+            continue
+        s = staff_map.get(tl.staff_id)
+        rate = float(s.hourly_rate) if s else 0.0
+        cost = round((float(tl.actual_minutes)/60.0)*rate, 2)
+        rows.append([
+            s.name if s else "",
+            t.date,
+            apts.get(t.apartment_id, ""),
+            t.id,
+            int(tl.actual_minutes),
+            rate,
+            cost
+        ])
+    totals = {}
+    for r in rows:
+        totals[r[0]] = round(totals.get(r[0], 0.0) + float(r[-1]), 2)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Timelogs {month}"
+    headers = ["Mitarbeiter","Datum","Apartment","TaskID","Minuten","Stundensatz (€)","Kosten (€)"]
+    ws.append(headers)
+    for r in rows:
+        ws.append(r)
+    for col in range(1, len(headers)+1):
+        ws.column_dimensions[get_column_letter(col)].width = 18
+    ws2 = wb.create_sheet("Summen")
+    ws2.append(["Mitarbeiter","Summe (€)"])
+    for name, val in totals.items():
+        ws2.append([name, val])
+    ws2.column_dimensions["A"].width = 24
+    ws2.column_dimensions["B"].width = 18
+
+    bytes_io = io.BytesIO()
+    wb.save(bytes_io); bytes_io.seek(0)
+    filename = f"timelogs-{month}.xlsx"
+    return StreamingResponse(bytes_io, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 # -------------------- Cleaner --------------------
 @app.get("/cleaner/{token}")
@@ -276,18 +296,22 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
     apt_map = {a.id: a.name for a in apts}
     book_map = {b.id: b.guest_name for b in db.query(Booking).all()}
     month = dt.date.today().strftime("%Y-%m")
-    minutes = 0
+    planned_total = sum(int(t.planned_minutes or 0) for t in tasks)
+    minutes = 0; cost_total = 0.0
     logs = db.query(TimeLog).filter(TimeLog.staff_id==s.id, TimeLog.actual_minutes!=None).all()
     for tl in logs:
-        if tl.started_at[:7]==month and tl.actual_minutes: minutes += int(tl.actual_minutes)
+        if tl.started_at and tl.started_at[:7]==month and tl.actual_minutes:
+            minutes += int(tl.actual_minutes)
+            cost_total += (float(tl.actual_minutes)/60.0) * float(s.hourly_rate or 0.0)
     used_hours = round(minutes/60.0, 2)
+    cost_total = round(cost_total, 2)
     run_map: Dict[int, str] = {}
     for t in tasks:
         tl = db.query(TimeLog).filter(TimeLog.task_id==t.id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
         if tl:
             run_map[t.id] = tl.started_at
     warn_limit = used_hours > float(s.max_hours_per_month or 0)
-    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "book_map": book_map, "staff": s, "show_done": show_done, "run_map": run_map, "warn_limit": warn_limit})
+    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "book_map": book_map, "staff": s, "show_done": show_done, "run_map": run_map, "warn_limit": warn_limit, "planned_total": planned_total, "cost_total": cost_total})
 
 @app.post("/cleaner/{token}/start")
 async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)):

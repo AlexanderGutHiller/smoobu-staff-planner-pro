@@ -16,6 +16,7 @@
   <a class="btn btn-outline-secondary" href="/admin/{{ token }}/staff"><i class="bi bi-people"></i> Team</a>
   <a class="btn btn-outline-secondary" href="/admin/{{ token }}/apartments"><i class="bi bi-building"></i> Apartments</a>
   <a class="btn btn-primary" href="/admin/{{ token }}/import"><i class="bi bi-arrow-repeat"></i> Import jetzt</a>
+  <a class="btn btn-success" href="/admin/{{ token }}/timelogs?month={{ (request.query_params.get('date_from') or '')[:7] or '' }}"><i class="bi bi-file-earmark-excel"></i> Excel-Export</a>
 </div>
 
 <table id="task-table" class="table table-sm table-hover bg-white align-middle">

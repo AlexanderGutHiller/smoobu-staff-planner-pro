@@ -31,22 +31,24 @@ def _index_next_arrivals(bookings: list[Booking]):
 def get_planned_minutes_for(apartment_id: int | None, default=90) -> int:
     with SessionLocal() as s:
         if apartment_id:
-            from sqlalchemy import select
             apt = s.execute(select(Apartment).where(Apartment.id == apartment_id)).scalar_one_or_none()
             if apt and getattr(apt, "planned_minutes", None):
                 return int(apt.planned_minutes)
     return default
+
+def _valid_departure(arrival: str, departure: str) -> bool:
+    if not departure: return False
+    if departure.strip() == "" or departure == "0000-00-00": return False
+    if arrival and departure <= arrival: return False
+    return True
 
 def upsert_tasks_from_bookings(bookings: list[Booking]):
     if not bookings:
         return
     clean = []
     for b in bookings:
-        if not b.departure or not b.departure.strip():
-            log.info("Skip booking %s (%s) – no departure", b.id, b.apartment_name)
-            continue
-        if b.arrival and b.departure <= b.arrival:
-            log.info("Skip booking %s (%s) – invalid departure <= arrival", b.id, b.apartment_name)
+        if not _valid_departure(b.arrival, b.departure):
+            log.info("Skip booking %s (%s) – invalid or missing departure", b.id, b.apartment_name)
             continue
         clean.append(b)
 
@@ -54,7 +56,6 @@ def upsert_tasks_from_bookings(bookings: list[Booking]):
     next_map = _index_next_arrivals(clean)
 
     with SessionLocal() as s:
-        from sqlalchemy import select
         existing = s.execute(select(Task).where(Task.booking_id.in_(booking_ids))).scalars().all()
         existing_by_booking = {t.booking_id: t for t in existing if t.booking_id is not None}
 
@@ -85,7 +86,7 @@ def upsert_tasks_from_bookings(bookings: list[Booking]):
                     next_arrival_comments=(n_comments or "")[:2000] if n_comments else None,
                 ))
 
-        # Cleanup invalid or stale
+        # Basic cleanup
         for t in s.execute(select(Task)).scalars().all():
             if not t.date or not t.date.strip():
                 s.delete(t)
@@ -93,4 +94,11 @@ def upsert_tasks_from_bookings(bookings: list[Booking]):
         for t in s.execute(select(Task)).scalars().all():
             if t.auto_generated and (not t.locked) and (t.booking_id and t.booking_id not in current_ids):
                 s.delete(t)
+
+        # Extra cleanup against phantom tasks
+        for t in s.execute(select(Task)).scalars().all():
+            b = s.get(Booking, t.booking_id) if t.booking_id else None
+            if (not b) or (not _valid_departure(b.arrival, b.departure)) or (not t.apartment_id):
+                s.delete(t)
+
         s.commit()
