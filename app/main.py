@@ -106,8 +106,25 @@ async def refresh_bookings_job():
             arrival = (it.get("arrival") or "")[:10]
             departure = (it.get("departure") or "")[:10]
 
-            log.debug("Smoobu booking %d: apt='%s' (id=%s), arrival='%s', departure='%s', guest='%s'", 
-                     b_id, apt_name, apt_id, arrival, departure, guest_name)
+            # Check if booking is cancelled or blocked
+            is_blocked = it.get("isBlockedBooking", False) or it.get("blocked", False)
+            status = it.get("status", "").lower() if it.get("status") else ""
+            cancelled = status == "cancelled" or it.get("cancelled", False)
+            is_internal = it.get("isInternal", False)
+            
+            # Check for various status
+            is_draft = status == "draft"
+            is_pending = status == "pending"
+            is_on_hold = status == "on hold" or status == "on_hold"
+            
+            log.debug("Smoobu booking %d: apt='%s', arrival='%s', departure='%s', status='%s'", 
+                     b_id, apt_name, arrival, departure, it.get("status"))
+            
+            # Log ALL fields for Romantik to debug
+            if apt_name and "romantik" in apt_name.lower() and "2025-10-29" in departure:
+                log.warning("🎯 ROMANTIK FULL BOOKING DATA: %s", it)
+                log.warning("🎯 Status fields: status='%s', cancelled=%s, blocked=%s, internal=%s, draft=%s, pending=%s, on_hold=%s", 
+                           status, cancelled, is_blocked, is_internal, is_draft, is_pending, is_on_hold)
 
             if apt_id is not None and apt_id not in seen_apartment_ids:
                 a = db.get(Apartment, apt_id)
@@ -132,6 +149,26 @@ async def refresh_bookings_job():
             b.guest_comments = (it.get("guestComments") or it.get("comments") or "")[:2000]
             b.guest_name = guest_name or ""
             
+            # Check for cancelled, blocked, internal, draft, pending, or on-hold bookings - SKIP these!
+            if cancelled:
+                log.info("⛔ SKIP cancelled booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
+                continue
+            elif is_blocked:
+                log.info("⛔ SKIP blocked booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
+                continue
+            elif is_internal:
+                log.info("⛔ SKIP internal booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
+                continue
+            elif is_draft:
+                log.info("⛔ SKIP draft booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
+                continue
+            elif is_pending:
+                log.info("⛔ SKIP pending booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
+                continue
+            elif is_on_hold:
+                log.info("⛔ SKIP on-hold booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
+                continue
+            
             # Prüfe ob Buchung valid ist bevor wir sie speichern
             if not departure or not departure.strip():
                 log.warning("⚠️ INVALID booking from Smoobu: %d (%s) - NO DEPARTURE, arrival='%s'", b_id, apt_name, arrival)
@@ -140,7 +177,7 @@ async def refresh_bookings_job():
             elif departure <= arrival:
                 log.warning("⚠️ INVALID booking from Smoobu: %d (%s) - departure <= arrival ('%s' <= '%s')", b_id, apt_name, departure, arrival)
             else:
-                log.info("✓ Booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
+                log.info("✓ Valid booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
             
             seen_booking_ids.append(b_id)
 
@@ -314,6 +351,7 @@ async def admin_cleanup(token: str, db=Depends(get_db)):
     
     removed_count = 0
     all_bookings = {b.id for b in db.query(Booking).all()}
+    log.info("🔍 Cleanup started. Checking %d tasks against %d bookings", db.query(Task).count(), len(all_bookings))
     
     # Finde ALLE ungültigen Tasks
     for t in db.query(Task).all():
@@ -352,10 +390,11 @@ async def admin_cleanup(token: str, db=Depends(get_db)):
         if should_delete:
             db.delete(t)
             removed_count += 1
-            log.info("Removing invalid task %d - %s (locked: %s, date: %s, apt: %s)", t.id, reason, t.locked, t.date, t.apartment_id)
+            log.info("🗑️ Removing invalid task %d (date: %s, apt: %s, booking: %s) - %s", t.id, t.date, t.apartment_id, t.booking_id, reason)
     
     db.commit()
-    return PlainTextResponse(f"Cleanup done. Removed {removed_count} invalid tasks (including locked ones).")
+    log.info("✅ Cleanup done. Removed %d invalid tasks", removed_count)
+    return PlainTextResponse(f"Cleanup done. Removed {removed_count} invalid tasks (including locked ones). Check logs for details.")
 
 @app.get("/admin/{token}/export")
 async def admin_export(token: str, month: str, db=Depends(get_db)):
