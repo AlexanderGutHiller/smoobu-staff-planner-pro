@@ -4,12 +4,14 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <title>{{ trans.meine_einsätze }}</title>
 <style>
-body { padding-bottom: 20px; }
 .task-card {
   border: 2px solid #dee2e6;
-  border-radius: 12px;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   transition: all 0.2s;
-  overflow: hidden;
 }
 .task-card:hover {
   border-color: #0d6efd;
@@ -18,6 +20,7 @@ body { padding-bottom: 20px; }
 .task-card.done {
   opacity: 0.6;
   border-color: #6c757d;
+  background-color: #f8f9fa;
 }
 .task-card.disabled {
   opacity: 0.5;
@@ -29,6 +32,14 @@ body { padding-bottom: 20px; }
   border-width: 3px;
   background-color: #e7f8ff;
 }
+.task-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #dee2e6;
+}
 .timer-display {
   font-size: 2.5rem;
   font-weight: bold;
@@ -39,7 +50,6 @@ body { padding-bottom: 20px; }
   animation: pulse 2s infinite;
 }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-.progress.over { --bs-progress-bar-bg: #dc3545; }
 .guest-info {
   background: #f8f9fa;
   padding: 0.5rem;
@@ -60,31 +70,25 @@ body { padding-bottom: 20px; }
   font-size: 1.1rem;
   padding: 0.5rem 1rem;
 }
-.task-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 1rem;
-}
 @media (max-width: 768px) {
   .container { padding-left: 10px; padding-right: 10px; }
   .btn { padding: 0.5rem 0.75rem; font-size: 0.875rem; }
   .timer-display { font-size: 2rem; }
-  .task-card { margin-bottom: 1rem; }
 }
 </style>
 </head>
-<body class="bg-light"><div class="container py-3 px-2">
-<div class="d-flex justify-content-between align-items-center mb-3">
+<body class="bg-light"><div class="container py-4">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
   <h1 class="mb-0" style="font-size: 1.5rem;">{{ trans.meine_einsätze }}</h1>
-  <select class="form-select form-select-sm" style="width: auto; max-width: 140px;" onchange="setLanguage(this.value)">
-    <option value="de" {% if lang == 'de' %}selected{% endif %}>🇩🇪 DE</option>
-    <option value="en" {% if lang == 'en' %}selected{% endif %}>🇬🇧 EN</option>
-    <option value="fr" {% if lang == 'fr' %}selected{% endif %}>🇫🇷 FR</option>
-    <option value="it" {% if lang == 'it' %}selected{% endif %}>🇮🇹 IT</option>
-    <option value="es" {% if lang == 'es' %}selected{% endif %}>🇪🇸 ES</option>
-    <option value="ro" {% if lang == 'ro' %}selected{% endif %}>🇷🇴 RO</option>
-    <option value="ru" {% if lang == 'ru' %}selected{% endif %}>🇷🇺 RU</option>
-    <option value="bg" {% if lang == 'bg' %}selected{% endif %}>🇧🇬 BG</option>
+  <select class="form-select form-select-sm" style="width: auto;" onchange="setLanguage(this.value)">
+    <option value="de" {% if lang == 'de' %}selected{% endif %}>🇩🇪 Deutsch</option>
+    <option value="en" {% if lang == 'en' %}selected{% endif %}>🇬🇧 English</option>
+    <option value="fr" {% if lang == 'fr' %}selected{% endif %}>🇫🇷 Français</option>
+    <option value="it" {% if lang == 'it' %}selected{% endif %}>🇮🇹 Italiano</option>
+    <option value="es" {% if lang == 'es' %}selected{% endif %}>🇪🇸 Español</option>
+    <option value="ro" {% if lang == 'ro' %}selected{% endif %}>🇷🇴 Română</option>
+    <option value="ru" {% if lang == 'ru' %}selected{% endif %}>🇷🇺 Русский</option>
+    <option value="bg" {% if lang == 'bg' %}selected{% endif %}>🇧🇬 Български</option>
   </select>
 </div>
 <script>
@@ -119,19 +123,29 @@ function setLanguage(lang) {
 {% set is_disabled = running_task_id and running_task_id != t.id and t.status != 'running' and t.status != 'done' %}
 {% set tl = timelog_map.get(t.id, {}) if timelog_map else {} %}
 <div class="col-12 task-card {% if t.status=='done' %}done{% elif is_disabled %}disabled{% elif t.status=='paused' %}paused{% endif %}">
-  <div class="task-header d-flex justify-content-between align-items-center">
+  <div class="task-card-header">
     <div>
       <strong style="font-size: 1.1rem;">{{ t.date | date_wd_de('short') }}</strong>
+      <div class="fw-bold text-primary" style="font-size: 1.2rem;">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
     </div>
-    <div class="fw-bold" style="font-size: 1.5rem;">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
+    <div>
+      {% if t.status=='running' %}
+        <span class="badge bg-success"><i class="bi bi-play-circle"></i> {{ trans.läuft }}</span>
+      {% elif t.status=='paused' %}
+        <span class="badge bg-info"><i class="bi bi-pause-circle"></i> {{ trans.pausiert }}</span>
+      {% elif t.status=='done' %}
+        <span class="badge bg-secondary"><i class="bi bi-check-circle"></i> {{ trans.erledigt }}</span>
+      {% else %}
+        <span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> {{ trans.offen }}</span>
+      {% endif %}
+    </div>
   </div>
-  <div class="p-3">
-    <div class="row">
-      <div class="col-12">
+  <div class="row">
+    <div class="col-12">
         {% if t.booking_id %}
           {% set guest_name = book_map.get(t.booking_id) or booking_details_map.get(t.booking_id, {}).get('guest_name', '') %}
-          {% if guest_name %}
-            <div class="mb-2"><i class="bi bi-person-fill"></i> <strong class="text-primary">{{ guest_name }}</strong></div>
+          {% if guest_name and guest_name.strip() %}
+            <div class="mb-2" style="font-size: 1.1rem;"><i class="bi bi-person-fill"></i> <strong class="text-primary">{{ guest_name }}</strong></div>
           {% endif %}
         {% endif %}
         
@@ -165,15 +179,11 @@ function setLanguage(lang) {
         <div class="fw-bold" style="font-size: 1.3rem;">{{ t.planned_minutes }} {{ trans.min }}</div>
       </div>
       <div class="col-6 text-center">
-        <div class="text-muted small">{{ trans.status }}</div>
-        {% if t.status=='running' %}
-          <span class="badge bg-success status-badge"><i class="bi bi-play-circle-fill"></i> {{ trans.läuft }}</span>
-        {% elif t.status=='paused' %}
-          <span class="badge bg-info status-badge"><i class="bi bi-pause-circle"></i> {{ trans.pausiert }}</span>
-        {% elif t.status=='done' %}
-          <span class="badge bg-secondary status-badge"><i class="bi bi-check-circle"></i> {{ trans.erledigt }}</span>
+        <div class="text-muted small">{{ trans.actual }}</div>
+        {% if tl.get('actual_minutes') %}
+          <div class="fw-bold" style="font-size: 1.3rem;">{{ tl.actual_minutes }} {{ trans.min }}</div>
         {% else %}
-          <span class="badge bg-secondary status-badge"><i class="bi bi-hourglass-split"></i> {{ trans.offen }}</span>
+          <div class="text-muted">-</div>
         {% endif %}
       </div>
     </div>

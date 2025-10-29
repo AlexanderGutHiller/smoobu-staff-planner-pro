@@ -291,6 +291,8 @@ async def refresh_bookings_job():
             apt_id = int(apt.get("id")) if apt.get("id") is not None else None
             apt_name = apt.get("name") or ""
             guest_name = _best_guest_name(it)
+            if guest_name:
+                log.debug("📝 Guest name for booking %d: '%s'", b_id, guest_name)
             arrival = (it.get("arrival") or "")[:10]
             departure = (it.get("departure") or "")[:10]
 
@@ -390,7 +392,11 @@ async def refresh_bookings_job():
             b.adults = int(it.get("adults") or 1)
             b.children = int(it.get("children") or 0)
             b.guest_comments = (it.get("guestComments") or it.get("comments") or "")[:2000]
-            b.guest_name = guest_name or ""
+            b.guest_name = (guest_name or "").strip()
+            if b.guest_name:
+                log.debug("✅ Saving guest name '%s' for booking %d", b.guest_name, b_id)
+            else:
+                log.warning("⚠️ No guest name found for booking %d (apt: %s)", b_id, apt_name)
             
             seen_booking_ids.append(b_id)
 
@@ -459,8 +465,9 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     apts = db.query(Apartment).filter(Apartment.active==True).all()
     apt_map = {a.id: a.name for a in apts}
     bookings = db.query(Booking).all()
-    book_map = {b.id: b.guest_name for b in bookings}
-    booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0, 'guest_name': b.guest_name or ''} for b in bookings}
+    book_map = {b.id: (b.guest_name or "").strip() for b in bookings if b.guest_name}
+    booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0, 'guest_name': (b.guest_name or "").strip()} for b in bookings}
+    log.debug("📊 Created book_map with %d entries, %d have guest names", len(bookings), len([b for b in bookings if b.guest_name and b.guest_name.strip()]))
     
     # Timelog-Daten für jedes Task
     timelog_map = {}
@@ -784,8 +791,8 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
     apts = db.query(Apartment).all()
     apt_map = {a.id: a.name for a in apts}
     bookings = db.query(Booking).all()
-    book_map = {b.id: b.guest_name for b in bookings}
-    booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0, 'guest_name': b.guest_name or ''} for b in bookings}
+    book_map = {b.id: (b.guest_name or "").strip() for b in bookings if b.guest_name}
+    booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0, 'guest_name': (b.guest_name or "").strip()} for b in bookings}
     month = dt.date.today().strftime("%Y-%m")
     minutes = 0
     logs = db.query(TimeLog).filter(TimeLog.staff_id==s.id, TimeLog.actual_minutes!=None).all()

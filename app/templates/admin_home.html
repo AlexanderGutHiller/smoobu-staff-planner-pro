@@ -190,8 +190,8 @@ function setLanguage(lang) {
     <div class="fw-bold">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
     {% if t.booking_id %}
       {% set guest_name = book_map.get(t.booking_id) or booking_details_map.get(t.booking_id, {}).get('guest_name', '') %}
-      {% if guest_name %}
-        <div class="small text-primary"><i class="bi bi-person"></i> <strong>{{ guest_name }}</strong></div>
+      {% if guest_name and guest_name.strip() %}
+        <div class="small text-primary mb-1" style="font-size: 0.95rem;"><i class="bi bi-person"></i> <strong>{{ guest_name }}</strong></div>
       {% endif %}
     {% endif %}
     {% if t.booking_id and booking_details_map.get(t.booking_id) %}
@@ -312,8 +312,8 @@ function setLanguage(lang) {
   </div>
   
   {% if t.booking_id %}
-    {% set guest_name = book_map.get(t.booking_id) or '' %}
-    {% if guest_name %}
+    {% set guest_name = book_map.get(t.booking_id) or booking_details_map.get(t.booking_id, {}).get('guest_name', '') %}
+    {% if guest_name and guest_name.strip() %}
       <div class="task-info-row">
         <span class="task-info-label"><i class="bi bi-person"></i> Gast:</span>
         <span class="text-primary fw-bold">{{ guest_name }}</span>
