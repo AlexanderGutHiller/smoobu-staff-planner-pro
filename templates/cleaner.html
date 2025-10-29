@@ -1,0 +1,467 @@
+
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<title>{{ trans.meine_einsätze }}</title>
+<style>
+.task-card {
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: all 0.2s;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.task-card:hover {
+  border-color: #0d6efd;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.task-card.done {
+  opacity: 0.6;
+  border-color: #6c757d;
+  background-color: #f8f9fa;
+}
+.task-card.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  background-color: #f8f9fa;
+}
+.task-card.paused {
+  border-color: #0dcaf0;
+  border-width: 3px;
+  background-color: #e7f8ff;
+}
+.task-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #dee2e6;
+}
+.task-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f0f0f0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+.task-info-label {
+  font-weight: 600;
+  color: #6c757d;
+  min-width: 100px;
+  flex-shrink: 0;
+}
+.task-info-row > span:last-child {
+  flex: 1;
+  text-align: right;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+.row.g-3 > .col-12 {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.timer-display {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #198754;
+  text-align: center;
+}
+.timer-running {
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+.btn-touch {
+  min-height: 48px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.btn-touch-sm {
+  min-height: 44px;
+  font-size: 1rem;
+}
+.status-badge {
+  font-size: 1.1rem;
+  padding: 0.5rem 1rem;
+}
+@media (max-width: 768px) {
+  .container { padding-left: 10px; padding-right: 10px; }
+  .btn { padding: 0.5rem 0.75rem; font-size: 0.875rem; }
+  .timer-display { font-size: 2rem; }
+}
+</style>
+</head>
+<body class="bg-light"><div class="container py-4">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+  <h1 class="mb-0" style="font-size: 1.5rem;">{{ trans.meine_einsätze }}</h1>
+  <select class="form-select form-select-sm" style="width: auto;" onchange="setLanguage(this.value)">
+    <option value="de" {% if lang == 'de' %}selected{% endif %}>🇩🇪 Deutsch</option>
+    <option value="en" {% if lang == 'en' %}selected{% endif %}>🇬🇧 English</option>
+    <option value="fr" {% if lang == 'fr' %}selected{% endif %}>🇫🇷 Français</option>
+    <option value="it" {% if lang == 'it' %}selected{% endif %}>🇮🇹 Italiano</option>
+    <option value="es" {% if lang == 'es' %}selected{% endif %}>🇪🇸 Español</option>
+    <option value="ro" {% if lang == 'ro' %}selected{% endif %}>🇷🇴 Română</option>
+    <option value="ru" {% if lang == 'ru' %}selected{% endif %}>🇷🇺 Русский</option>
+    <option value="bg" {% if lang == 'bg' %}selected{% endif %}>🇧🇬 Български</option>
+  </select>
+</div>
+<script>
+function setLanguage(lang) {
+  const currentPath = window.location.pathname + window.location.search;
+  window.location.href = `/set-language?lang=${lang}&redirect=${encodeURIComponent(currentPath)}`;
+}
+</script>
+{% if warn_limit %}
+  <div class="alert alert-warning alert-dismissible fade show"><i class="bi bi-exclamation-triangle-fill"></i> {{ trans.monatslimit }} {{ staff.max_hours_per_month }} {{ trans.std_überschritten }} ({{ trans.aktuell }} {{ used_hours }} {{ trans.std_überschritten }})</div>
+{% else %}
+  <div class="alert alert-info alert-dismissible fade show"><i class="bi bi-info-circle"></i> {{ trans.monat_erfasst }} {{ used_hours }} {{ trans.std_überschritten }}</div>
+{% endif %}
+
+<div class="mb-3">
+  {% if show_done %}
+    <a class="btn btn-outline-secondary btn-touch-sm" href="/cleaner/{{ staff.magic_token }}"><i class="bi bi-eye-slash"></i> {{ trans.erledigte_ausblenden }}</a>
+  {% else %}
+    <a class="btn btn-outline-secondary btn-touch-sm" href="/cleaner/{{ staff.magic_token }}?show_done=1"><i class="bi bi-eye"></i> {{ trans.erledigte_anzeigen }}</a>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+{% set running_task_id = none %}
+{% for t in tasks %}
+  {% if t.status == 'running' %}
+    {% set running_task_id = t.id %}
+  {% endif %}
+{% endfor %}
+{% for t in tasks %}
+{% set started = run_map.get(t.id) %}
+{% set is_disabled = running_task_id and running_task_id != t.id and t.status != 'running' and t.status != 'done' %}
+{% set tl = timelog_map.get(t.id, {}) if timelog_map else {} %}
+<div class="col-12 task-card {% if t.status=='done' %}done{% elif is_disabled %}disabled{% elif t.status=='paused' %}paused{% endif %}">
+  <div class="task-card-header">
+    <div>
+      <strong style="font-size: 1.1rem;">{{ t.date | date_wd_de('short') }}</strong>
+      <div class="fw-bold text-primary" style="font-size: 1.2rem;">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
+    </div>
+    <div>
+      {% if t.status=='running' %}
+        <span class="badge bg-success"><i class="bi bi-play-circle"></i> {{ trans.läuft }}</span>
+      {% elif t.status=='paused' %}
+        <span class="badge bg-info"><i class="bi bi-pause-circle"></i> {{ trans.pausiert }}</span>
+      {% elif t.status=='done' %}
+        <span class="badge bg-secondary"><i class="bi bi-check-circle"></i> {{ trans.erledigt }}</span>
+      {% else %}
+        <span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> {{ trans.offen }}</span>
+      {% endif %}
+    </div>
+  </div>
+  
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.planned }}:</span>
+    <span class="fw-bold">{{ t.planned_minutes }} {{ trans.min }}</span>
+  </div>
+  
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.actual }}:</span>
+    <span>
+      {% if tl.get('actual_minutes') %}
+        <span class="fw-bold {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">
+          {{ tl.actual_minutes }} {{ trans.min }}
+        </span>
+        {% if tl.actual_minutes > t.planned_minutes %}
+          <small class="text-danger d-block">+{{ tl.actual_minutes - t.planned_minutes }} {{ trans.min }}</small>
+        {% endif %}
+      {% else %}
+        <span class="text-muted">-</span>
+      {% endif %}
+    </span>
+  </div>
+  
+  {% if t.booking_id %}
+    {% set guest_name = book_map.get(t.booking_id) or booking_details_map.get(t.booking_id, {}).get('guest_name', '') %}
+    {% if guest_name and guest_name.strip() %}
+      <div class="task-info-row">
+        <span class="task-info-label"><i class="bi bi-person"></i> Gast:</span>
+        <span class="text-primary fw-bold">{{ guest_name }}</span>
+      </div>
+    {% endif %}
+  {% endif %}
+  
+  {% if t.next_arrival %}
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.next_arrival }}:</span>
+    <span>
+      <div class="fw-bold">{{ t.next_arrival | date_wd_de('short') }}</div>
+      <div class="small">
+        <i class="bi bi-people"></i> {{ t.next_arrival_adults or 0 }} {{ trans.erw }}
+        {% if t.next_arrival_children and t.next_arrival_children > 0 %}
+          + {{ t.next_arrival_children }} {{ trans.kinder }}
+        {% endif %}
+      </div>
+      {% if t.next_arrival_guest_name %}
+        <div class="small text-primary"><i class="bi bi-person"></i> {{ t.next_arrival_guest_name }}</div>
+      {% endif %}
+      {% if t.next_arrival_comments %}
+        <div class="small text-muted"><i class="bi bi-chat-text"></i> {{ t.next_arrival_comments[:100] }}</div>
+      {% endif %}
+    </span>
+  </div>
+  {% endif %}
+  
+  {% if t.notes %}
+  <div class="task-info-row">
+    <span class="task-info-label"><i class="bi bi-sticky"></i> {{ trans.notiz }}:</span>
+    <span class="text-muted">{{ t.notes }}</span>
+  </div>
+  {% endif %}
+    
+    {% if t.status=='running' %}
+      <div class="text-center mb-3">
+        <div class="timer-display timer-running">
+          <div id="timer-{{ t.id }}" data-started="{{ started or '' }}" data-planned="{{ t.planned_minutes }}">⏱️ 0:00</div>
+        </div>
+        <div class="small text-muted" id="remaining-{{ t.id }}" data-lang-over="{{ trans.über_zeit }}" data-lang-min="{{ trans.min }}" data-lang-remaining="{{ trans.noch }}">{{ trans.verbleibend }} --</div>
+      </div>
+    {% elif t.status=='paused' and tl.get('actual_minutes') %}
+      <div class="text-center mb-3">
+        <div class="timer-display" style="color: #0dcaf0;">
+          <div><i class="bi bi-pause-circle-fill"></i> {{ tl.actual_minutes }} {{ trans.min }}</div>
+        </div>
+        <div class="small text-muted">{{ trans.pausiert }}</div>
+      </div>
+    {% endif %}
+    
+    <div class="d-grid gap-2">
+      {% if t.assignment_status == 'pending' %}
+      <div class="alert alert-warning mb-2">
+        <i class="bi bi-hourglass-split"></i> <strong>{{ trans.zuweisung }} {{ trans.pending }}</strong>
+      </div>
+      <div class="row g-2 mb-2">
+        <div class="col-6">
+          <form method="post" action="/cleaner/{{ staff.magic_token }}/accept">
+            <input type="hidden" name="task_id" value="{{ t.id }}"/>
+            <button class="btn btn-success btn-touch w-100"><i class="bi bi-check-circle"></i> {{ trans.annehmen }}</button>
+          </form>
+        </div>
+        <div class="col-6">
+          <form method="post" action="/cleaner/{{ staff.magic_token }}/reject">
+            <input type="hidden" name="task_id" value="{{ t.id }}"/>
+            <button class="btn btn-danger btn-touch w-100"><i class="bi bi-x-circle"></i> {{ trans.ablehnen }}</button>
+          </form>
+        </div>
+      </div>
+      {% elif t.status=='open' and t.assignment_status != 'pending' %}
+      <form method="post" action="/cleaner/{{ staff.magic_token }}/start">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <button class="btn btn-success btn-touch" {% if is_disabled %}disabled{% endif %}><i class="bi bi-play-fill"></i> {{ trans.start }}</button>
+      </form>
+      {% elif t.status=='paused' and t.assignment_status != 'pending' %}
+      <form method="post" action="/cleaner/{{ staff.magic_token }}/start">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <button class="btn btn-success btn-touch"><i class="bi bi-play-fill"></i> {{ trans.start }}</button>
+      </form>
+      {% elif t.status=='running' %}
+      <div class="row g-2">
+        <div class="col-6">
+          <form method="post" action="/cleaner/{{ staff.magic_token }}/stop">
+            <input type="hidden" name="task_id" value="{{ t.id }}"/>
+            <button class="btn btn-warning btn-touch w-100"><i class="bi bi-pause-fill"></i> {{ trans.pause }}</button>
+          </form>
+        </div>
+        <div class="col-6">
+          <form method="post" action="/cleaner/{{ staff.magic_token }}/done">
+            <input type="hidden" name="task_id" value="{{ t.id }}"/>
+            <button class="btn btn-primary btn-touch w-100"><i class="bi bi-check-circle"></i> {{ trans.fertig }}</button>
+          </form>
+        </div>
+      </div>
+      {% elif t.status=='done' %}
+      <form method="post" action="/cleaner/{{ staff.magic_token }}/reopen">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <button class="btn btn-outline-danger btn-touch-sm"><i class="bi bi-arrow-counterclockwise"></i> {{ trans.wieder_öffnen }}</button>
+      </form>
+      {% endif %}
+      <button class="btn btn-outline-primary btn-touch-sm" data-bs-toggle="modal" data-bs-target="#noteModal" data-task="{{ t.id }}" data-current="{{ t.notes|e }}">
+        <i class="bi bi-pencil-square"></i> {{ trans.notiz }}
+      </button>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+<!-- End row container -->
+{% if not tasks %}
+  <div class="text-center py-5">
+    <i class="bi bi-inbox" style="font-size: 4rem; color: #dee2e6;"></i>
+    <p class="text-muted mt-3">Keine Einsätze vorhanden</p>
+  </div>
+{% endif %}
+
+<!-- Note Modal -->
+<div class="modal fade" id="noteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Notiz bearbeiten</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="noteTaskId">
+        <textarea class="form-control" id="noteText" rows="4" placeholder="Deine Notiz..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-primary" id="saveNoteBtn"><i class="bi bi-floppy"></i> Speichern</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Modal setup
+const noteModal = document.getElementById('noteModal');
+noteModal.addEventListener('show.bs.modal', event => {
+  const button = event.relatedTarget;
+  const taskId = button.getAttribute('data-task');
+  const current = button.getAttribute('data-current') || '';
+  document.getElementById('noteTaskId').value = taskId;
+  document.getElementById('noteText').value = current;
+});
+
+document.getElementById('saveNoteBtn').addEventListener('click', async () => {
+  const taskId = document.getElementById('noteTaskId').value;
+  const note = document.getElementById('noteText').value;
+  const formData = new FormData();
+  formData.append('task_id', taskId);
+  formData.append('note', note);
+  const resp = await fetch('/cleaner/{{ staff.magic_token }}/note', { method: 'POST', body: formData });
+  const data = await resp.json();
+  if(data.ok){
+    // Update note text in card
+    const cards = document.querySelectorAll('.task-card');
+    cards.forEach(card => {
+      const button = card.querySelector(`button[data-task="${taskId}"]`);
+      if (button){
+        let noteDiv = card.querySelector('.mt-2.text-muted');
+        if(!noteDiv){
+          noteDiv = document.createElement('div');
+          noteDiv.className = 'mt-2 text-muted';
+          const col = card.querySelector('.col-12');
+          col.appendChild(noteDiv);
+        }
+        noteDiv.innerHTML = '<i class="bi bi-sticky"></i> ' + (data.note || '');
+      }
+    });
+    const modal = bootstrap.Modal.getInstance(noteModal);
+    modal.hide();
+  }
+});
+
+// Live timer mit besserer Anzeige
+function secondsSince(startIso){
+  if(!startIso || startIso === '' || startIso.trim() === '') return 0;
+  try {
+    // Konvertiere "YYYY-MM-DD HH:MM:SS" zu "YYYY-MM-DDTHH:MM:SS" für ISO-Format
+    const isoString = startIso.replace(' ', 'T');
+    const start = new Date(isoString);
+    const now = new Date();
+    
+    // Prüfe ob das Datum gültig ist
+    if(isNaN(start.getTime())) {
+      return 0;
+    }
+    
+    let diff = Math.floor((now - start)/1000);
+    
+    // Wenn negativ (Zeitzonen-Problem oder Zukunft), auf 0 setzen
+    if(diff < 0) {
+      diff = 0;
+    }
+    
+    // Erkenne Zeitzonen-Probleme: Wenn die Differenz genau 1 Stunde (3600s) ist oder nahe dran,
+    // und die Seite gerade erst geladen wurde, ist es wahrscheinlich ein Zeitzonen-Offset
+    const pageAge = Math.floor((Date.now() - (window.pageLoadTime || Date.now())) / 1000);
+    
+    // Wenn Diff genau 3600 (±60 Sekunden) und Seite gerade geladen, ist es ein Zeitzonen-Problem
+    if((diff >= 3540 && diff <= 3660) && pageAge < 120) {
+      diff = Math.max(0, pageAge);
+    }
+    // Oder wenn Diff > 30 Min aber Seite < 2 Min alt
+    else if(pageAge < 120 && diff > 1800) {
+      diff = Math.max(0, pageAge);
+    }
+    
+    // Stelle sicher, dass der Wert nicht zu groß ist
+    return Math.min(Math.max(0, diff), 86400 * 30); // Maximal 30 Tage, minimal 0
+  } catch(e) {
+    return 0;
+  }
+}
+
+// Speichere Seitenladezeit beim ersten Laden
+if(!window.pageLoadTime) {
+  window.pageLoadTime = Date.now();
+}
+
+function formatTimeSeconds(totalSeconds){
+  if(totalSeconds < 0) totalSeconds = 0;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+  } else {
+    return `${minutes}:${String(seconds).padStart(2,'0')}`;
+  }
+}
+
+function updateTimers(){
+  document.querySelectorAll('[id^=timer-]').forEach(el => {
+    const id = el.id.split('-')[1];
+    const started = el.getAttribute('data-started');
+    const planned = parseInt(el.getAttribute('data-planned') || '0', 10);
+    
+    if(!started || started === '' || started.trim() === ''){
+      el.textContent = '⏱️ 0:00';
+      const remainingEl = document.getElementById('remaining-'+id);
+      if(remainingEl){
+        const langRemaining = remainingEl.getAttribute('data-lang-remaining') || 'noch ca.';
+        const langMin = remainingEl.getAttribute('data-lang-min') || 'min';
+        remainingEl.textContent = `${langRemaining} ${planned} ${langMin}`;
+        remainingEl.style.color = '';
+      }
+      return;
+    }
+    
+    const elapsedSeconds = secondsSince(started);
+    const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+    const remaining = Math.max(0, planned - elapsedMinutes);
+    
+    // Timer-Anzeige mit Sekunden - startet bei 0:00
+    el.textContent = `⏱️ ${formatTimeSeconds(elapsedSeconds)}`;
+    
+    // Verbleibende Zeit
+    const remainingEl = document.getElementById('remaining-'+id);
+    if(remainingEl){
+      const langOver = remainingEl.getAttribute('data-lang-over') || 'Über Zeit';
+      const langRemaining = remainingEl.getAttribute('data-lang-remaining') || 'noch ca.';
+      const langMin = remainingEl.getAttribute('data-lang-min') || 'min';
+      remainingEl.textContent = elapsedMinutes >= planned ? 
+        `⚠️ ${langOver} (+${elapsedMinutes - planned} ${langMin})` : 
+        `${langRemaining} ${remaining} ${langMin}`;
+      remainingEl.style.color = elapsedMinutes >= planned ? '#dc3545' : '';
+    }
+  });
+}
+updateTimers(); // Sofort beim Laden
+setInterval(updateTimers, 1000); // Update jede Sekunde für echtes live-feeling
+</script>
+</div></body></html>
