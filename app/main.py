@@ -807,6 +807,9 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403)
     q = db.query(Task).filter(Task.assigned_staff_id==s.id)
+    # Abgelehnte Tasks ausblenden - zeige nur Tasks die nicht rejected sind
+    from sqlalchemy import or_
+    q = q.filter(or_(Task.assignment_status != "rejected", Task.assignment_status.is_(None)))
     if not show_done:
         q = q.filter(Task.status != "done")
     tasks = q.order_by(Task.date, Task.id).all()

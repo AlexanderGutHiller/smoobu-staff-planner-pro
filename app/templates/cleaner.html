@@ -12,6 +12,9 @@
   background: white;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   transition: all 0.2s;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .task-card:hover {
   border-color: #0d6efd;
@@ -45,11 +48,25 @@
   justify-content: space-between;
   padding: 0.5rem 0;
   border-bottom: 1px solid #f0f0f0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 .task-info-label {
   font-weight: 600;
   color: #6c757d;
   min-width: 100px;
+  flex-shrink: 0;
+}
+.task-info-row > span:last-child {
+  flex: 1;
+  text-align: right;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+.row.g-3 > .col-12 {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .timer-display {
   font-size: 2.5rem;
@@ -278,6 +295,7 @@ function setLanguage(lang) {
 </div>
 {% endfor %}
 </div>
+<!-- End row container -->
 {% if not tasks %}
   <div class="text-center py-5">
     <i class="bi bi-inbox" style="font-size: 4rem; color: #dee2e6;"></i>
