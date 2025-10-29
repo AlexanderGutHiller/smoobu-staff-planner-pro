@@ -32,4 +32,5 @@ primary_region = "fra"
 [[mounts]]
   source = "smoobu_data"
   destination = "/app/data"
+  initial_size = "3gb"
 
