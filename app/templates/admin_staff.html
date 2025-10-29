@@ -33,13 +33,32 @@ function setLanguage(lang) {
 </form>
 
 <table class="table table-sm table-hover bg-white align-middle">
-<thead><tr><th>Name</th><th>Stundensatz</th><th>Max/Monat</th><th>Status</th><th>Magic-Link</th><th>Aktion</th></tr></thead>
+<thead><tr>
+  <th>Name</th>
+  <th>Stundensatz</th>
+  <th>Max/Monat</th>
+  <th>{{ trans.geleistete_stunden }}</th>
+  <th>Status</th>
+  <th>Magic-Link</th>
+  <th>Aktion</th>
+</tr></thead>
 <tbody>
 {% for s in staff %}
 <tr>
   <td>{{ s.name }}</td>
   <td>{{ '%.2f'|format(s.hourly_rate) }} €</td>
   <td>{{ s.max_hours_per_month }}</td>
+  <td>
+    {% if staff_hours.get(s.id) %}
+      <div class="small">
+        <div><strong>{{ prev_last_month }}:</strong> {{ '%.2f'|format(staff_hours[s.id].prev_last_month) }} {{ trans.stunden }}</div>
+        <div><strong>{{ last_month }}:</strong> {{ '%.2f'|format(staff_hours[s.id].last_month) }} {{ trans.stunden }}</div>
+        <div><strong>{{ current_month }}:</strong> {{ '%.2f'|format(staff_hours[s.id].current_month) }} {{ trans.stunden }}</div>
+      </div>
+    {% else %}
+      <span class="text-muted">-</span>
+    {% endif %}
+  </td>
   <td>{{ 'Aktiv' if s.active else 'Inaktiv' }}</td>
   <td>
     {% set link = (base_url ~ '/cleaner/' ~ s.magic_token) %}

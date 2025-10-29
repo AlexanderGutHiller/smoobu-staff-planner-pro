@@ -60,7 +60,11 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "Keine Einsätze vorhanden", "nächste_anreise": "Nächste Anreise",
                    "erw": "Erw.", "kinder": "Kinder", "verbleibend": "verbleibend:",
                    "erledigte_ausblenden": "Erledigte ausblenden", "erledigte_anzeigen": "Erledigte anzeigen",
-                   "datum": "Datum", "ma": "MA", "lock": "Lock", "zurück": "Zurück"
+                   "datum": "Datum", "ma": "MA", "lock": "Lock", "zurück": "Zurück",
+                   "neue_aufgabe": "Neue Aufgabe", "tätigkeit": "Tätigkeit", "dauer": "Dauer (Min)", "beschreibung": "Beschreibung",
+                   "erstellen": "Erstellen", "abbrechen": "Abbrechen",
+                   "stunden": "Stunden", "vorletzter_monat": "Vorletzter Monat", "letzter_monat": "Letzter Monat", "aktueller_monat": "Aktueller Monat",
+                   "geleistete_stunden": "Geleistete Stunden"
                },
                "en": {
                    "tasks": "Tasks", "team": "Team", "apartments": "Apartments", "import_now": "Import now",
@@ -75,7 +79,11 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "No tasks available", "nächste_anreise": "Next Arrival",
                    "erw": "Adults", "kinder": "Children", "verbleibend": "remaining:",
                    "erledigte_ausblenden": "Hide completed", "erledigte_anzeigen": "Show completed",
-                   "datum": "Date", "ma": "Staff", "lock": "Lock", "zurück": "Back"
+                   "datum": "Date", "ma": "Staff", "lock": "Lock", "zurück": "Back",
+                   "neue_aufgabe": "New Task", "tätigkeit": "Activity", "dauer": "Duration (Min)", "beschreibung": "Description",
+                   "erstellen": "Create", "abbrechen": "Cancel",
+                   "stunden": "Hours", "vorletzter_monat": "2 Months Ago", "letzter_monat": "Last Month", "aktueller_monat": "Current Month",
+                   "geleistete_stunden": "Hours Worked"
                },
                "fr": {
                    "tasks": "Tâches", "team": "Équipe", "apartments": "Appartements", "import_now": "Importer maintenant",
@@ -90,7 +98,11 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "Aucune tâche disponible", "nächste_anreise": "Prochaine arrivée",
                    "erw": "Adultes", "kinder": "Enfants", "verbleibend": "restant:",
                    "erledigte_ausblenden": "Masquer terminées", "erledigte_anzeigen": "Afficher terminées",
-                   "datum": "Date", "ma": "Équipe", "lock": "Verrouillé", "zurück": "Retour"
+                   "datum": "Date", "ma": "Équipe", "lock": "Verrouillé", "zurück": "Retour",
+                   "neue_aufgabe": "Nouvelle tâche", "tätigkeit": "Activité", "dauer": "Durée (Min)", "beschreibung": "Description",
+                   "erstellen": "Créer", "abbrechen": "Annuler",
+                   "stunden": "Heures", "vorletzter_monat": "Il y a 2 mois", "letzter_monat": "Mois dernier", "aktueller_monat": "Mois actuel",
+                   "geleistete_stunden": "Heures travaillées"
                },
                "it": {
                    "tasks": "Compiti", "team": "Squadra", "apartments": "Appartamenti", "import_now": "Importa ora",
@@ -105,7 +117,11 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "Nessun compito disponibile", "nächste_anreise": "Prossimo arrivo",
                    "erw": "Adulti", "kinder": "Bambini", "verbleibend": "rimanenti:",
                    "erledigte_ausblenden": "Nascondi completati", "erledigte_anzeigen": "Mostra completati",
-                   "datum": "Data", "ma": "Squadra", "lock": "Bloccato", "zurück": "Indietro"
+                   "datum": "Data", "ma": "Squadra", "lock": "Bloccato", "zurück": "Indietro",
+                   "neue_aufgabe": "Nuovo compito", "tätigkeit": "Attività", "dauer": "Durata (Min)", "beschreibung": "Descrizione",
+                   "erstellen": "Crea", "abbrechen": "Annulla",
+                   "stunden": "Ore", "vorletzter_monat": "2 mesi fa", "letzter_monat": "Mese scorso", "aktueller_monat": "Mese corrente",
+                   "geleistete_stunden": "Ore lavorate"
                },
                "es": {
                    "tasks": "Tareas", "team": "Equipo", "apartments": "Apartamentos", "import_now": "Importar ahora",
@@ -120,7 +136,11 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "No hay tareas disponibles", "nächste_anreise": "Próxima llegada",
                    "erw": "Adultos", "kinder": "Niños", "verbleibend": "restantes:",
                    "erledigte_ausblenden": "Ocultar completadas", "erledigte_anzeigen": "Mostrar completadas",
-                   "datum": "Fecha", "ma": "Equipo", "lock": "Bloqueado", "zurück": "Atrás"
+                   "datum": "Fecha", "ma": "Equipo", "lock": "Bloqueado", "zurück": "Atrás",
+                   "neue_aufgabe": "Nueva tarea", "tätigkeit": "Actividad", "dauer": "Duración (Min)", "beschreibung": "Descripción",
+                   "erstellen": "Crear", "abbrechen": "Cancelar",
+                   "stunden": "Horas", "vorletzter_monat": "Hace 2 meses", "letzter_monat": "Mes pasado", "aktueller_monat": "Mes actual",
+                   "geleistete_stunden": "Horas trabajadas"
                },
                "ro": {
                    "tasks": "Sarcini", "team": "Echipa", "apartments": "Apartamente", "import_now": "Importă acum",
@@ -135,7 +155,11 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "Nu există sarcini", "nächste_anreise": "Următoarea sosire",
                    "erw": "Adulți", "kinder": "Copii", "verbleibend": "rămâne:",
                    "erledigte_ausblenden": "Ascunde finalizate", "erledigte_anzeigen": "Afișează finalizate",
-                   "datum": "Dată", "ma": "Echipa", "lock": "Blocare", "zurück": "Înapoi"
+                   "datum": "Dată", "ma": "Echipa", "lock": "Blocare", "zurück": "Înapoi",
+                   "neue_aufgabe": "Sarcină nouă", "tätigkeit": "Activitate", "dauer": "Durată (Min)", "beschreibung": "Descriere",
+                   "erstellen": "Creează", "abbrechen": "Anulează",
+                   "stunden": "Ore", "vorletzter_monat": "Acum 2 luni", "letzter_monat": "Luna trecută", "aktueller_monat": "Luna curentă",
+                   "geleistete_stunden": "Ore lucrate"
                },
                "ru": {
                    "tasks": "Задачи", "team": "Команда", "apartments": "Апартаменты", "import_now": "Импорт сейчас",
@@ -150,7 +174,11 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "Нет задач", "nächste_anreise": "Следующий приезд",
                    "erw": "Взрослые", "kinder": "Дети", "verbleibend": "осталось:",
                    "erledigte_ausblenden": "Скрыть выполненные", "erledigte_anzeigen": "Показать выполненные",
-                   "datum": "Дата", "ma": "Команда", "lock": "Заблокировано", "zurück": "Назад"
+                   "datum": "Дата", "ma": "Команда", "lock": "Заблокировано", "zurück": "Назад",
+                   "neue_aufgabe": "Новая задача", "tätigkeit": "Деятельность", "dauer": "Длительность (Мин)", "beschreibung": "Описание",
+                   "erstellen": "Создать", "abbrechen": "Отмена",
+                   "stunden": "Часы", "vorletzter_monat": "2 месяца назад", "letzter_monat": "Прошлый месяц", "aktueller_monat": "Текущий месяц",
+                   "geleistete_stunden": "Отработанные часы"
                },
                "bg": {
                    "tasks": "Задачи", "team": "Екип", "apartments": "Апартаменти", "import_now": "Импортирай сега",
@@ -165,7 +193,11 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "Няма задачи", "nächste_anreise": "Следващо пристигане",
                    "erw": "Възрастни", "kinder": "Деца", "verbleibend": "остават:",
                    "erledigte_ausblenden": "Скрий завършени", "erledigte_anzeigen": "Покажи завършени",
-                   "datum": "Дата", "ma": "Екип", "lock": "Заключено", "zurück": "Назад"
+                   "datum": "Дата", "ma": "Екип", "lock": "Заключено", "zurück": "Назад",
+                   "neue_aufgabe": "Нова задача", "tätigkeit": "Дейност", "dauer": "Продължителност (Мин)", "beschreibung": "Описание",
+                   "erstellen": "Създай", "abbrechen": "Отказ",
+                   "stunden": "Часове", "vorletzter_monat": "Преди 2 месеца", "letzter_monat": "Миналия месец", "aktueller_monat": "Текущ месец",
+                   "geleistete_stunden": "Отработени часове"
                }
     }
     return translations.get(lang, translations["de"])
@@ -453,10 +485,66 @@ async def admin_staff(request: Request, token: str, db=Depends(get_db)):
     lang = detect_language(request)
     trans = get_translations(lang)
     staff = db.query(Staff).order_by(Staff.name).all()
+    
+    # Berechne Stunden für jeden Mitarbeiter (vorletzter, letzter, aktueller Monat)
+    today = dt.date.today()
+    current_month = today.strftime("%Y-%m")
+    
+    # Berechne vorletzten und letzten Monat
+    if today.month >= 3:
+        last_month = (today.year, today.month - 1)
+        prev_last_month = (today.year, today.month - 2)
+    elif today.month == 2:
+        last_month = (today.year, 1)
+        prev_last_month = (today.year - 1, 12)
+    else:  # today.month == 1
+        last_month = (today.year - 1, 12)
+        prev_last_month = (today.year - 1, 11)
+    
+    last_month_str = f"{last_month[0]}-{last_month[1]:02d}"
+    prev_last_month_str = f"{prev_last_month[0]}-{prev_last_month[1]:02d}"
+    
+    staff_hours = {}
+    for s in staff:
+        # Hole alle TimeLog-Einträge für diesen Mitarbeiter mit actual_minutes
+        logs = db.query(TimeLog).filter(
+            TimeLog.staff_id == s.id,
+            TimeLog.actual_minutes != None
+        ).all()
+        
+        hours_data = {
+            'prev_last_month': 0.0,
+            'last_month': 0.0,
+            'current_month': 0.0
+        }
+        
+        for tl in logs:
+            if not tl.started_at:
+                continue
+            
+            # Extrahiere Monat aus started_at (Format: "yyyy-mm-dd HH:MM:SS")
+            month_str = tl.started_at[:7]  # "yyyy-mm"
+            minutes = int(tl.actual_minutes or 0)
+            hours = round(minutes / 60.0, 2)
+            
+            if month_str == prev_last_month_str:
+                hours_data['prev_last_month'] += hours
+            elif month_str == last_month_str:
+                hours_data['last_month'] += hours
+            elif month_str == current_month:
+                hours_data['current_month'] += hours
+        
+        # Runde auf 2 Dezimalstellen
+        hours_data['prev_last_month'] = round(hours_data['prev_last_month'], 2)
+        hours_data['last_month'] = round(hours_data['last_month'], 2)
+        hours_data['current_month'] = round(hours_data['current_month'], 2)
+        
+        staff_hours[s.id] = hours_data
+    
     base_url = BASE_URL.rstrip("/")
     if not base_url:
         base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
-    return templates.TemplateResponse("admin_staff.html", {"request": request, "token": token, "staff": staff, "base_url": base_url, "lang": lang, "trans": trans})
+    return templates.TemplateResponse("admin_staff.html", {"request": request, "token": token, "staff": staff, "staff_hours": staff_hours, "current_month": current_month, "last_month": last_month_str, "prev_last_month": prev_last_month_str, "base_url": base_url, "lang": lang, "trans": trans})
 
 @app.post("/admin/{token}/staff/add")
 async def admin_staff_add(token: str, name: str = Form(...), hourly_rate: float = Form(0.0), max_hours_per_month: int = Form(160), db=Depends(get_db)):
@@ -478,6 +566,47 @@ async def admin_task_assign(token: str, task_id: int = Form(...), staff_id_raw: 
     staff_id: Optional[int] = int(staff_id_raw) if staff_id_raw.strip() else None
     t.assigned_staff_id = staff_id
     db.commit()
+    return RedirectResponse(url=f"/admin/{token}", status_code=303)
+
+@app.post("/admin/{token}/task/create")
+async def admin_task_create(token: str, date: str = Form(...), apartment_id: int = Form(...), planned_minutes: int = Form(90), description: str = Form(""), staff_id_raw: str = Form(""), db=Depends(get_db)):
+    if token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403)
+    
+    # Validierung
+    if not date or not date.strip():
+        raise HTTPException(status_code=400, detail="Datum ist erforderlich")
+    
+    # Apartment prüfen
+    apt = db.get(Apartment, apartment_id)
+    if not apt:
+        raise HTTPException(status_code=404, detail="Apartment nicht gefunden")
+    
+    # Staff-ID optional
+    staff_id: Optional[int] = None
+    if staff_id_raw and staff_id_raw.strip():
+        try:
+            staff_id = int(staff_id_raw)
+            staff = db.get(Staff, staff_id)
+            if not staff:
+                staff_id = None  # Ungültige Staff-ID ignorieren
+        except ValueError:
+            staff_id = None
+    
+    # Neue Aufgabe erstellen
+    new_task = Task(
+        date=date[:10],  # Nur Datum, ohne Zeit
+        apartment_id=apartment_id,
+        planned_minutes=planned_minutes,
+        notes=(description[:2000] if description else None),  # Beschreibung als Notiz speichern
+        assigned_staff_id=staff_id,
+        status="open",
+        auto_generated=False  # Manuell erstellt
+    )
+    db.add(new_task)
+    db.commit()
+    
+    log.info("✅ Manuell erstellte Aufgabe: %s für %s am %s", new_task.id, apt.name, date)
     return RedirectResponse(url=f"/admin/{token}", status_code=303)
 
 @app.get("/admin/{token}/apartments")

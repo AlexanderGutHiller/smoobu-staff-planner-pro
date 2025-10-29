@@ -7,10 +7,73 @@
   .filter-input { width: 160px; }
   thead input, thead select { font-size: .875rem; padding: .25rem .5rem; }
   .small-muted { color:#6c757d; font-style: italic; font-size: .9em; }
+  
+  /* Mobile Optimierungen */
+  @media (max-width: 768px) {
+    .container { padding-left: 10px; padding-right: 10px; }
+    .btn { padding: 0.5rem 0.75rem; font-size: 0.875rem; }
+    .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .desktop-view { display: none; }
+    .mobile-view { display: block; }
+    .filter-input { width: 100%; margin-bottom: 0.5rem; }
+    
+    .task-card-mobile {
+      border: 2px solid #dee2e6;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      background: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .task-card-mobile.done {
+      opacity: 0.6;
+    }
+    
+    .task-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #dee2e6;
+    }
+    
+    .task-info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .task-info-label {
+      font-weight: 600;
+      color: #6c757d;
+      min-width: 100px;
+    }
+    
+    .mobile-filter-section {
+      background: white;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+  }
+  
+  @media (min-width: 769px) {
+    .desktop-view { display: block; }
+    .mobile-view { display: none; }
+  }
 </style>
 </head>
 <body class="bg-light"><div class="container py-4">
-<h1 class="mb-3">{{ trans.tasks }}</h1>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+  <h1 class="mb-0" style="font-size: 1.5rem;">{{ trans.tasks }}</h1>
+  <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#newTaskModal">
+    <i class="bi bi-plus-circle"></i> <span class="d-none d-md-inline">{{ trans.neue_aufgabe }}</span>
+  </button>
+</div>
 
 <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
         <a class="btn btn-outline-secondary" href="/admin/{{ token }}/staff"><i class="bi bi-people"></i> {{ trans.team }}</a>
@@ -34,6 +97,36 @@ function setLanguage(lang) {
 }
 </script>
 
+<!-- Mobile Filter Section -->
+<div class="mobile-view mobile-filter-section">
+  <h6 class="mb-2">{{ trans.date }}:</h6>
+  <select id="f-date-mobile" class="form-select form-select-sm mb-3">
+    <option value="">{{ trans.all }}</option>
+    <option value="today">{{ trans.today }}</option>
+    <option value="week">{{ trans.week }}</option>
+    <option value="month">{{ trans.month }}</option>
+    <option value="next7">{{ trans.next7 }}</option>
+  </select>
+  
+  <h6 class="mb-2">{{ trans.apartment }}:</h6>
+  <select id="f-apt-mobile" class="form-select form-select-sm mb-3">
+    <option value="">{{ trans.all }}</option>
+    {% for apt in apartments %}
+      <option value="{{ apt.name }}">{{ apt.name }}</option>
+    {% endfor %}
+  </select>
+  
+  <h6 class="mb-2">{{ trans.ma }}:</h6>
+  <select id="f-staff-mobile" class="form-select form-select-sm">
+    <option value="">{{ trans.all }}</option>
+    {% for s in staff %}
+      <option value="{{ s.name }}">{{ s.name }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+<!-- Desktop View -->
+<div class="desktop-view">
 <table id="task-table" class="table table-sm table-hover bg-white align-middle">
 <thead>
   <tr>
@@ -145,6 +238,113 @@ function setLanguage(lang) {
 </tr>
 {% endfor %}
 </tbody></table>
+</div>
+
+<!-- Mobile View -->
+<div class="mobile-view">
+{% for t in tasks %}
+{% set tl = timelog_map.get(t.id, {}) %}
+<div class="task-card-mobile {% if t.status=='done' %}done{% endif %}" data-date="{{ t.date }}" data-apt="{{ apt_map.get(t.apartment_id, t.apartment_id) }}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id==t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
+  <div class="task-card-header">
+    <div>
+      <strong style="font-size: 1.1rem;">{{ t.date | date_wd_de('short') }}</strong>
+      <div class="fw-bold text-primary" style="font-size: 1.2rem;">{{ apt_map.get(t.apartment_id, t.apartment_id) }}</div>
+    </div>
+    <div>
+      {% if t.status == 'done' %}
+        <span class="badge bg-success"><i class="bi bi-check-circle"></i> {{ trans.erledigt }}</span>
+      {% elif t.status == 'running' %}
+        <span class="badge bg-primary"><i class="bi bi-play-circle"></i> {{ trans.läuft }}</span>
+      {% else %}
+        <span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> {{ trans.offen }}</span>
+      {% endif %}
+    </div>
+  </div>
+  
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.planned }}:</span>
+    <span class="fw-bold">{{ t.planned_minutes }} {{ trans.min }}</span>
+  </div>
+  
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.actual }}:</span>
+    <span>
+      {% if tl.actual_minutes %}
+        <span class="fw-bold {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">
+          {{ tl.actual_minutes }} {{ trans.min }}
+        </span>
+        {% if tl.actual_minutes > t.planned_minutes %}
+          <small class="text-danger d-block">+{{ tl.actual_minutes - t.planned_minutes }} {{ trans.min }}</small>
+        {% endif %}
+      {% elif tl.started_at and not tl.ended_at %}
+        <span class="badge bg-warning text-dark"><i class="bi bi-clock"></i> {{ trans.läuft }}...</span>
+      {% else %}
+        <span class="text-muted">-</span>
+      {% endif %}
+    </span>
+  </div>
+  
+  {% if t.booking_id and book_map.get(t.booking_id) %}
+  <div class="task-info-row">
+    <span class="task-info-label"><i class="bi bi-person"></i> Gast:</span>
+    <span class="text-primary fw-bold">{{ book_map.get(t.booking_id, '') }}</span>
+  </div>
+  {% endif %}
+  
+  {% if t.next_arrival %}
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.next_arrival }}:</span>
+    <span>
+      <div class="fw-bold">{{ t.next_arrival | date_wd_de('short') }}</div>
+      <div class="small">
+        <i class="bi bi-people"></i> {{ t.next_arrival_adults or 0 }} {{ trans.erw }}
+        {% if t.next_arrival_children and t.next_arrival_children > 0 %}
+          + {{ t.next_arrival_children }} {{ trans.kinder }}
+        {% endif %}
+      </div>
+      {% if t.next_arrival_guest_name %}
+        <div class="small text-primary"><i class="bi bi-person"></i> {{ t.next_arrival_guest_name }}</div>
+      {% endif %}
+    </span>
+  </div>
+  {% endif %}
+  
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.ma }}:</span>
+    <span>
+      <form method="post" action="/admin/{{ token }}/task/assign" class="assign-form" id="assign-form-mobile-{{ t.id }}">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <select name="staff_id_raw" class="form-select form-select-sm" onchange="document.getElementById('assign-form-mobile-{{ t.id }}').submit()">
+          <option value="">–</option>
+          {% for s in staff %}
+            <option value="{{ s.id }}" {% if t.assigned_staff_id==s.id %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+    </span>
+  </div>
+  
+  {% if t.notes %}
+  <div class="task-info-row">
+    <span class="task-info-label"><i class="bi bi-sticky"></i> {{ trans.notiz }}:</span>
+    <span class="text-muted">{{ t.notes }}</span>
+  </div>
+  {% endif %}
+  
+  <div class="mt-2 text-muted text-end">
+    <small>#{{ t.id }}</small>
+  </div>
+</div>
+{% endfor %}
+
+{% if not tasks %}
+  <div class="text-center py-5">
+    <i class="bi bi-inbox" style="font-size: 4rem; color: #dee2e6;"></i>
+    <p class="text-muted mt-3">{{ trans.keine_einsätze }}</p>
+  </div>
+{% endif %}
+</div>
+
 <script>
 const rows = Array.from(document.querySelectorAll("#task-table tbody tr"));
 const today = new Date().toISOString().split('T')[0];
@@ -194,8 +394,106 @@ function applyFilter(){
   });
 }
 
-['f-date','f-apt','f-staff'].forEach(id => {
-  document.getElementById(id).addEventListener('change', applyFilter);
+// Mobile-Filter auch hinzufügen
+['f-date','f-apt','f-staff','f-date-mobile','f-apt-mobile','f-staff-mobile'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', function() {
+    applyFilter();
+    // Mobile Cards filtern
+    const fDate = document.getElementById('f-date')?.value || document.getElementById('f-date-mobile')?.value || '';
+    const fApt = document.getElementById('f-apt')?.value || document.getElementById('f-apt-mobile')?.value || '';
+    const fStaff = document.getElementById('f-staff')?.value || document.getElementById('f-staff-mobile')?.value || '';
+    
+    // Synchronisiere Filter
+    if (document.getElementById('f-date')) document.getElementById('f-date').value = fDate;
+    if (document.getElementById('f-date-mobile')) document.getElementById('f-date-mobile').value = fDate;
+    if (document.getElementById('f-apt')) document.getElementById('f-apt').value = fApt;
+    if (document.getElementById('f-apt-mobile')) document.getElementById('f-apt-mobile').value = fApt;
+    if (document.getElementById('f-staff')) document.getElementById('f-staff').value = fStaff;
+    if (document.getElementById('f-staff-mobile')) document.getElementById('f-staff-mobile').value = fStaff;
+    
+    const mobileCards = document.querySelectorAll('.task-card-mobile');
+    mobileCards.forEach(card => {
+      const dateTxt = card.getAttribute('data-date') || '';
+      const aptTxt = card.getAttribute('data-apt') || '';
+      const staffTxt = card.getAttribute('data-staff') || '';
+      
+      const ok = matchesDateFilter(dateTxt, fDate)
+              && (!fApt || aptTxt.toLowerCase().includes(fApt.toLowerCase()))
+              && (!fStaff || staffTxt.toLowerCase().includes(fStaff.toLowerCase()));
+      
+      card.style.display = ok ? '' : 'none';
+    });
+  });
+});
+</script>
+
+<!-- Modal für neue Aufgabe -->
+<div class="modal fade" id="newTaskModal" tabindex="-1" aria-labelledby="newTaskModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="newTaskModalLabel">{{ trans.neue_aufgabe }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="/admin/{{ token }}/task/create">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="task-date" class="form-label">{{ trans.date }} *</label>
+            <input type="date" class="form-control" id="task-date" name="date" required>
+          </div>
+          <div class="mb-3">
+            <label for="task-apartment" class="form-label">{{ trans.apartment }} *</label>
+            <select class="form-select" id="task-apartment" name="apartment_id" required>
+              <option value="">{{ trans.all }}</option>
+              {% for apt in apartments %}
+                <option value="{{ apt.id }}">{{ apt.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="task-description" class="form-label">{{ trans.beschreibung }}</label>
+            <textarea class="form-control" id="task-description" name="description" rows="3" placeholder="{{ trans.tätigkeit }}"></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="task-duration" class="form-label">{{ trans.dauer }} *</label>
+            <input type="number" class="form-control" id="task-duration" name="planned_minutes" min="1" value="90" required>
+          </div>
+          <div class="mb-3">
+            <label for="task-staff" class="form-label">{{ trans.ma }}</label>
+            <select class="form-select" id="task-staff" name="staff_id">
+              <option value="">{{ trans.all }}</option>
+              {% for s in staff %}
+                <option value="{{ s.id }}">{{ s.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans.abbrechen }}</button>
+          <button type="submit" class="btn btn-primary">{{ trans.erstellen }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// Heutiges Datum als Standard setzen beim Öffnen des Modals
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = document.getElementById('newTaskModal');
+  if (modal) {
+    modal.addEventListener('show.bs.modal', function() {
+      const dateInput = document.getElementById('task-date');
+      if (dateInput && !dateInput.value) {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        dateInput.value = `${year}-${month}-${day}`;
+      }
+    });
+  }
 });
 </script>
 </div></body></html>
