@@ -108,8 +108,11 @@ function setLanguage(lang) {
   <div class="p-3">
     <div class="row">
       <div class="col-12">
-        {% if t.booking_id and book_map.get(t.booking_id) %}
-          <div class="mb-2"><i class="bi bi-person-fill"></i> <strong class="text-primary">{{ book_map.get(t.booking_id, '') }}</strong></div>
+        {% if t.booking_id %}
+          {% set guest_name = book_map.get(t.booking_id) or booking_details_map.get(t.booking_id, {}).get('guest_name', '') %}
+          {% if guest_name %}
+            <div class="mb-2"><i class="bi bi-person-fill"></i> <strong class="text-primary">{{ guest_name }}</strong></div>
+          {% endif %}
         {% endif %}
         
         {% if t.next_arrival %}
@@ -269,13 +272,46 @@ document.getElementById('saveNoteBtn').addEventListener('click', async () => {
 function secondsSince(startIso){
   if(!startIso || startIso === '' || startIso.trim() === '') return 0;
   try {
-    const start = new Date(startIso.replace(' ', 'T'));
+    // Konvertiere "YYYY-MM-DD HH:MM:SS" zu "YYYY-MM-DDTHH:MM:SS" für ISO-Format
+    const isoString = startIso.replace(' ', 'T');
+    const start = new Date(isoString);
     const now = new Date();
-    const diff = Math.floor((now - start)/1000);
-    return Math.max(0, diff); // Ensure non-negative
+    
+    // Prüfe ob das Datum gültig ist
+    if(isNaN(start.getTime())) {
+      return 0;
+    }
+    
+    let diff = Math.floor((now - start)/1000);
+    
+    // Wenn negativ (Zeitzonen-Problem oder Zukunft), auf 0 setzen
+    if(diff < 0) {
+      diff = 0;
+    }
+    
+    // Erkenne Zeitzonen-Probleme: Wenn die Differenz genau 1 Stunde (3600s) ist oder nahe dran,
+    // und die Seite gerade erst geladen wurde, ist es wahrscheinlich ein Zeitzonen-Offset
+    const pageAge = Math.floor((Date.now() - (window.pageLoadTime || Date.now())) / 1000);
+    
+    // Wenn Diff genau 3600 (±60 Sekunden) und Seite gerade geladen, ist es ein Zeitzonen-Problem
+    if((diff >= 3540 && diff <= 3660) && pageAge < 120) {
+      diff = Math.max(0, pageAge);
+    }
+    // Oder wenn Diff > 30 Min aber Seite < 2 Min alt
+    else if(pageAge < 120 && diff > 1800) {
+      diff = Math.max(0, pageAge);
+    }
+    
+    // Stelle sicher, dass der Wert nicht zu groß ist
+    return Math.min(Math.max(0, diff), 86400 * 30); // Maximal 30 Tage, minimal 0
   } catch(e) {
     return 0;
   }
+}
+
+// Speichere Seitenladezeit beim ersten Laden
+if(!window.pageLoadTime) {
+  window.pageLoadTime = Date.now();
 }
 
 function formatTimeSeconds(totalSeconds){
@@ -297,8 +333,15 @@ function updateTimers(){
     const started = el.getAttribute('data-started');
     const planned = parseInt(el.getAttribute('data-planned') || '0', 10);
     
-    if(!started){
+    if(!started || started === '' || started.trim() === ''){
       el.textContent = '⏱️ 0:00';
+      const remainingEl = document.getElementById('remaining-'+id);
+      if(remainingEl){
+        const langRemaining = remainingEl.getAttribute('data-lang-remaining') || 'noch ca.';
+        const langMin = remainingEl.getAttribute('data-lang-min') || 'min';
+        remainingEl.textContent = `${langRemaining} ${planned} ${langMin}`;
+        remainingEl.style.color = '';
+      }
       return;
     }
     
@@ -306,7 +349,7 @@ function updateTimers(){
     const elapsedMinutes = Math.floor(elapsedSeconds / 60);
     const remaining = Math.max(0, planned - elapsedMinutes);
     
-    // Timer-Anzeige mit Sekunden
+    // Timer-Anzeige mit Sekunden - startet bei 0:00
     el.textContent = `⏱️ ${formatTimeSeconds(elapsedSeconds)}`;
     
     // Verbleibende Zeit
