@@ -258,6 +258,15 @@ function setLanguage(lang) {
         {% endfor %}
       </select>
     </form>
+    {% if t.assigned_staff_id %}
+      {% if t.assignment_status == 'pending' %}
+        <small class="text-warning d-block mt-1"><i class="bi bi-hourglass-split"></i> {{ trans.pending }}</small>
+      {% elif t.assignment_status == 'accepted' %}
+        <small class="text-success d-block mt-1"><i class="bi bi-check-circle"></i> {{ trans.accepted }}</small>
+      {% elif t.assignment_status == 'rejected' %}
+        <small class="text-danger d-block mt-1"><i class="bi bi-x-circle"></i> {{ trans.rejected }}</small>
+      {% endif %}
+    {% endif %}
   </td>
   <td><small>#{{ t.id }}</small></td>
 </tr>
@@ -351,6 +360,15 @@ function setLanguage(lang) {
           {% endfor %}
         </select>
       </form>
+      {% if t.assigned_staff_id %}
+        {% if t.assignment_status == 'pending' %}
+          <small class="text-warning d-block mt-1"><i class="bi bi-hourglass-split"></i> {{ trans.pending }}</small>
+        {% elif t.assignment_status == 'accepted' %}
+          <small class="text-success d-block mt-1"><i class="bi bi-check-circle"></i> {{ trans.accepted }}</small>
+        {% elif t.assignment_status == 'rejected' %}
+          <small class="text-danger d-block mt-1"><i class="bi bi-x-circle"></i> {{ trans.rejected }}</small>
+        {% endif %}
+      {% endif %}
     </span>
   </div>
   

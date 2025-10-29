@@ -40,6 +40,17 @@
   padding-bottom: 0.5rem;
   border-bottom: 1px solid #dee2e6;
 }
+.task-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.task-info-label {
+  font-weight: 600;
+  color: #6c757d;
+  min-width: 100px;
+}
 .timer-display {
   font-size: 2.5rem;
   font-weight: bold;
@@ -50,13 +61,6 @@
   animation: pulse 2s infinite;
 }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-.guest-info {
-  background: #f8f9fa;
-  padding: 0.5rem;
-  border-radius: 0.375rem;
-  font-size: 0.9em;
-  margin-top: 0.5rem;
-}
 .btn-touch {
   min-height: 48px;
   font-size: 1.1rem;
@@ -140,53 +144,65 @@ function setLanguage(lang) {
       {% endif %}
     </div>
   </div>
-  <div class="row">
-    <div class="col-12">
-        {% if t.booking_id %}
-          {% set guest_name = book_map.get(t.booking_id) or booking_details_map.get(t.booking_id, {}).get('guest_name', '') %}
-          {% if guest_name and guest_name.strip() %}
-            <div class="mb-2" style="font-size: 1.1rem;"><i class="bi bi-person-fill"></i> <strong class="text-primary">{{ guest_name }}</strong></div>
-          {% endif %}
+  
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.planned }}:</span>
+    <span class="fw-bold">{{ t.planned_minutes }} {{ trans.min }}</span>
+  </div>
+  
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.actual }}:</span>
+    <span>
+      {% if tl.get('actual_minutes') %}
+        <span class="fw-bold {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">
+          {{ tl.actual_minutes }} {{ trans.min }}
+        </span>
+        {% if tl.actual_minutes > t.planned_minutes %}
+          <small class="text-danger d-block">+{{ tl.actual_minutes - t.planned_minutes }} {{ trans.min }}</small>
         {% endif %}
-        
-        {% if t.next_arrival %}
-          <div class="guest-info">
-            <div class="fw-bold mb-1"><i class="bi bi-calendar3"></i> {{ trans.nächste_anreise }}: {{ t.next_arrival | date_wd_de('short') }}</div>
-            <div><i class="bi bi-people-fill"></i> <strong>{{ t.next_arrival_adults or 0 }}</strong> {{ trans.erw }}
-            {% if t.next_arrival_children and t.next_arrival_children > 0 %}
-              + <strong>{{ t.next_arrival_children }}</strong> {{ trans.kinder }}
-            {% endif %}</div>
-            {% if t.next_arrival_guest_name %}
-              <div class="mt-1"><i class="bi bi-person-fill"></i> <strong>{{ t.next_arrival_guest_name }}</strong></div>
-            {% endif %}
-            {% if t.next_arrival_comments %}
-              <div class="mt-1 text-muted"><i class="bi bi-chat-text"></i> {{ t.next_arrival_comments[:100] }}</div>
-            {% endif %}
-          </div>
-        {% endif %}
-        
-        {% if t.notes %}
-          <div class="mt-2 text-muted"><i class="bi bi-sticky"></i> {{ t.notes }}</div>
+      {% else %}
+        <span class="text-muted">-</span>
+      {% endif %}
+    </span>
+  </div>
+  
+  {% if t.booking_id %}
+    {% set guest_name = book_map.get(t.booking_id) or booking_details_map.get(t.booking_id, {}).get('guest_name', '') %}
+    {% if guest_name and guest_name.strip() %}
+      <div class="task-info-row">
+        <span class="task-info-label"><i class="bi bi-person"></i> Gast:</span>
+        <span class="text-primary fw-bold">{{ guest_name }}</span>
+      </div>
+    {% endif %}
+  {% endif %}
+  
+  {% if t.next_arrival %}
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.next_arrival }}:</span>
+    <span>
+      <div class="fw-bold">{{ t.next_arrival | date_wd_de('short') }}</div>
+      <div class="small">
+        <i class="bi bi-people"></i> {{ t.next_arrival_adults or 0 }} {{ trans.erw }}
+        {% if t.next_arrival_children and t.next_arrival_children > 0 %}
+          + {{ t.next_arrival_children }} {{ trans.kinder }}
         {% endif %}
       </div>
-    </div>
-    
-    <hr>
-    
-    <div class="row align-items-center mb-3">
-      <div class="col-6 text-center">
-        <div class="text-muted small">{{ trans.planned }}</div>
-        <div class="fw-bold" style="font-size: 1.3rem;">{{ t.planned_minutes }} {{ trans.min }}</div>
-      </div>
-      <div class="col-6 text-center">
-        <div class="text-muted small">{{ trans.actual }}</div>
-        {% if tl.get('actual_minutes') %}
-          <div class="fw-bold" style="font-size: 1.3rem;">{{ tl.actual_minutes }} {{ trans.min }}</div>
-        {% else %}
-          <div class="text-muted">-</div>
-        {% endif %}
-      </div>
-    </div>
+      {% if t.next_arrival_guest_name %}
+        <div class="small text-primary"><i class="bi bi-person"></i> {{ t.next_arrival_guest_name }}</div>
+      {% endif %}
+      {% if t.next_arrival_comments %}
+        <div class="small text-muted"><i class="bi bi-chat-text"></i> {{ t.next_arrival_comments[:100] }}</div>
+      {% endif %}
+    </span>
+  </div>
+  {% endif %}
+  
+  {% if t.notes %}
+  <div class="task-info-row">
+    <span class="task-info-label"><i class="bi bi-sticky"></i> {{ trans.notiz }}:</span>
+    <span class="text-muted">{{ t.notes }}</span>
+  </div>
+  {% endif %}
     
     {% if t.status=='running' %}
       <div class="text-center mb-3">
@@ -205,12 +221,30 @@ function setLanguage(lang) {
     {% endif %}
     
     <div class="d-grid gap-2">
-      {% if t.status=='open' %}
+      {% if t.assignment_status == 'pending' %}
+      <div class="alert alert-warning mb-2">
+        <i class="bi bi-hourglass-split"></i> <strong>{{ trans.zuweisung }} {{ trans.pending }}</strong>
+      </div>
+      <div class="row g-2 mb-2">
+        <div class="col-6">
+          <form method="post" action="/cleaner/{{ staff.magic_token }}/accept">
+            <input type="hidden" name="task_id" value="{{ t.id }}"/>
+            <button class="btn btn-success btn-touch w-100"><i class="bi bi-check-circle"></i> {{ trans.annehmen }}</button>
+          </form>
+        </div>
+        <div class="col-6">
+          <form method="post" action="/cleaner/{{ staff.magic_token }}/reject">
+            <input type="hidden" name="task_id" value="{{ t.id }}"/>
+            <button class="btn btn-danger btn-touch w-100"><i class="bi bi-x-circle"></i> {{ trans.ablehnen }}</button>
+          </form>
+        </div>
+      </div>
+      {% elif t.status=='open' and t.assignment_status != 'pending' %}
       <form method="post" action="/cleaner/{{ staff.magic_token }}/start">
         <input type="hidden" name="task_id" value="{{ t.id }}"/>
         <button class="btn btn-success btn-touch" {% if is_disabled %}disabled{% endif %}><i class="bi bi-play-fill"></i> {{ trans.start }}</button>
       </form>
-      {% elif t.status=='paused' %}
+      {% elif t.status=='paused' and t.assignment_status != 'pending' %}
       <form method="post" action="/cleaner/{{ staff.magic_token }}/start">
         <input type="hidden" name="task_id" value="{{ t.id }}"/>
         <button class="btn btn-success btn-touch"><i class="bi bi-play-fill"></i> {{ trans.start }}</button>

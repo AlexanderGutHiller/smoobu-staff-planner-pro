@@ -64,7 +64,9 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "Neue Aufgabe", "tätigkeit": "Tätigkeit", "dauer": "Dauer (Min)", "beschreibung": "Beschreibung",
                    "erstellen": "Erstellen", "abbrechen": "Abbrechen",
                    "stunden": "Stunden", "vorletzter_monat": "Vorletzter Monat", "letzter_monat": "Letzter Monat", "aktueller_monat": "Aktueller Monat",
-                   "geleistete_stunden": "Geleistete Stunden", "manuelle_aufgabe": "Manuelle Aufgabe"
+                   "geleistete_stunden": "Geleistete Stunden", "manuelle_aufgabe": "Manuelle Aufgabe",
+                   "pending": "Ausstehend", "accepted": "Angenommen", "rejected": "Abgelehnt",
+                   "annehmen": "Annehmen", "ablehnen": "Ablehnen", "zuweisung": "Zuweisung"
                },
                "en": {
                    "tasks": "Tasks", "team": "Team", "apartments": "Apartments", "import_now": "Import now",
@@ -83,7 +85,9 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "New Task", "tätigkeit": "Activity", "dauer": "Duration (Min)", "beschreibung": "Description",
                    "erstellen": "Create", "abbrechen": "Cancel",
                    "stunden": "Hours", "vorletzter_monat": "2 Months Ago", "letzter_monat": "Last Month", "aktueller_monat": "Current Month",
-                   "geleistete_stunden": "Hours Worked", "manuelle_aufgabe": "Manual Task"
+                   "geleistete_stunden": "Hours Worked", "manuelle_aufgabe": "Manual Task",
+                   "pending": "Pending", "accepted": "Accepted", "rejected": "Rejected",
+                   "annehmen": "Accept", "ablehnen": "Reject", "zuweisung": "Assignment"
                },
                "fr": {
                    "tasks": "Tâches", "team": "Équipe", "apartments": "Appartements", "import_now": "Importer maintenant",
@@ -102,7 +106,9 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "Nouvelle tâche", "tätigkeit": "Activité", "dauer": "Durée (Min)", "beschreibung": "Description",
                    "erstellen": "Créer", "abbrechen": "Annuler",
                    "stunden": "Heures", "vorletzter_monat": "Il y a 2 mois", "letzter_monat": "Mois dernier", "aktueller_monat": "Mois actuel",
-                   "geleistete_stunden": "Heures travaillées", "manuelle_aufgabe": "Tâche manuelle"
+                   "geleistete_stunden": "Heures travaillées", "manuelle_aufgabe": "Tâche manuelle",
+                   "pending": "En attente", "accepted": "Accepté", "rejected": "Refusé",
+                   "annehmen": "Accepter", "ablehnen": "Refuser", "zuweisung": "Affectation"
                },
                "it": {
                    "tasks": "Compiti", "team": "Squadra", "apartments": "Appartamenti", "import_now": "Importa ora",
@@ -121,7 +127,9 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "Nuovo compito", "tätigkeit": "Attività", "dauer": "Durata (Min)", "beschreibung": "Descrizione",
                    "erstellen": "Crea", "abbrechen": "Annulla",
                    "stunden": "Ore", "vorletzter_monat": "2 mesi fa", "letzter_monat": "Mese scorso", "aktueller_monat": "Mese corrente",
-                   "geleistete_stunden": "Ore lavorate", "manuelle_aufgabe": "Compito manuale"
+                   "geleistete_stunden": "Ore lavorate", "manuelle_aufgabe": "Compito manuale",
+                   "pending": "In attesa", "accepted": "Accettato", "rejected": "Rifiutato",
+                   "annehmen": "Accetta", "ablehnen": "Rifiuta", "zuweisung": "Assegnazione"
                },
                "es": {
                    "tasks": "Tareas", "team": "Equipo", "apartments": "Apartamentos", "import_now": "Importar ahora",
@@ -140,7 +148,9 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "Nueva tarea", "tätigkeit": "Actividad", "dauer": "Duración (Min)", "beschreibung": "Descripción",
                    "erstellen": "Crear", "abbrechen": "Cancelar",
                    "stunden": "Horas", "vorletzter_monat": "Hace 2 meses", "letzter_monat": "Mes pasado", "aktueller_monat": "Mes actual",
-                   "geleistete_stunden": "Horas trabajadas", "manuelle_aufgabe": "Tarea manual"
+                   "geleistete_stunden": "Horas trabajadas", "manuelle_aufgabe": "Tarea manual",
+                   "pending": "Pendiente", "accepted": "Aceptado", "rejected": "Rechazado",
+                   "annehmen": "Aceptar", "ablehnen": "Rechazar", "zuweisung": "Asignación"
                },
                "ro": {
                    "tasks": "Sarcini", "team": "Echipa", "apartments": "Apartamente", "import_now": "Importă acum",
@@ -159,7 +169,9 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "Sarcină nouă", "tätigkeit": "Activitate", "dauer": "Durată (Min)", "beschreibung": "Descriere",
                    "erstellen": "Creează", "abbrechen": "Anulează",
                    "stunden": "Ore", "vorletzter_monat": "Acum 2 luni", "letzter_monat": "Luna trecută", "aktueller_monat": "Luna curentă",
-                   "geleistete_stunden": "Ore lucrate", "manuelle_aufgabe": "Sarcină manuală"
+                   "geleistete_stunden": "Ore lucrate", "manuelle_aufgabe": "Sarcină manuală",
+                   "pending": "În așteptare", "accepted": "Acceptat", "rejected": "Refuzat",
+                   "annehmen": "Acceptă", "ablehnen": "Refuză", "zuweisung": "Atribuire"
                },
                "ru": {
                    "tasks": "Задачи", "team": "Команда", "apartments": "Апартаменты", "import_now": "Импорт сейчас",
@@ -178,7 +190,9 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "Новая задача", "tätigkeit": "Деятельность", "dauer": "Длительность (Мин)", "beschreibung": "Описание",
                    "erstellen": "Создать", "abbrechen": "Отмена",
                    "stunden": "Часы", "vorletzter_monat": "2 месяца назад", "letzter_monat": "Прошлый месяц", "aktueller_monat": "Текущий месяц",
-                   "geleistete_stunden": "Отработанные часы", "manuelle_aufgabe": "Ручная задача"
+                   "geleistete_stunden": "Отработанные часы", "manuelle_aufgabe": "Ручная задача",
+                   "pending": "Ожидание", "accepted": "Принято", "rejected": "Отклонено",
+                   "annehmen": "Принять", "ablehnen": "Отклонить", "zuweisung": "Назначение"
                },
                "bg": {
                    "tasks": "Задачи", "team": "Екип", "apartments": "Апартаменти", "import_now": "Импортирай сега",
@@ -197,7 +211,9 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "Нова задача", "tätigkeit": "Дейност", "dauer": "Продължителност (Мин)", "beschreibung": "Описание",
                    "erstellen": "Създай", "abbrechen": "Отказ",
                    "stunden": "Часове", "vorletzter_monat": "Преди 2 месеца", "letzter_monat": "Миналия месец", "aktueller_monat": "Текущ месец",
-                   "geleistete_stunden": "Отработени часове", "manuelle_aufgabe": "Ръчна задача"
+                   "geleistete_stunden": "Отработени часове", "manuelle_aufgabe": "Ръчна задача",
+                   "pending": "В очакване", "accepted": "Прието", "rejected": "Отхвърлено",
+                   "annehmen": "Приеми", "ablehnen": "Отхвърли", "zuweisung": "Назначаване"
                }
     }
     return translations.get(lang, translations["de"])
@@ -572,6 +588,11 @@ async def admin_task_assign(token: str, task_id: int = Form(...), staff_id_raw: 
     t = db.get(Task, task_id)
     staff_id: Optional[int] = int(staff_id_raw) if staff_id_raw.strip() else None
     t.assigned_staff_id = staff_id
+    # Setze assignment_status auf "pending" wenn ein MA zugewiesen wird, sonst None
+    if staff_id:
+        t.assignment_status = "pending"
+    else:
+        t.assignment_status = None
     db.commit()
     return RedirectResponse(url=f"/admin/{token}", status_code=303)
 
@@ -619,6 +640,7 @@ async def admin_task_create(token: str, date: str = Form(...), apartment_id_raw:
         planned_minutes=planned_minutes,
         notes=(description[:2000] if description else None),  # Beschreibung als Notiz speichern
         assigned_staff_id=staff_id,
+        assignment_status="pending" if staff_id else None,
         status="open",
         auto_generated=False  # Manuell erstellt
     )
@@ -915,6 +937,28 @@ async def cleaner_done(token: str, task_id: int = Form(...), db=Depends(get_db))
             pass
     
     t.status = "done"
+    db.commit()
+    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+
+@app.post("/cleaner/{token}/accept")
+async def cleaner_accept(token: str, task_id: int = Form(...), db=Depends(get_db)):
+    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
+    if not s: raise HTTPException(status_code=403)
+    t = db.get(Task, task_id)
+    if not t or t.assigned_staff_id != s.id:
+        raise HTTPException(status_code=404, detail="Task nicht gefunden oder nicht zugewiesen")
+    t.assignment_status = "accepted"
+    db.commit()
+    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+
+@app.post("/cleaner/{token}/reject")
+async def cleaner_reject(token: str, task_id: int = Form(...), db=Depends(get_db)):
+    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
+    if not s: raise HTTPException(status_code=403)
+    t = db.get(Task, task_id)
+    if not t or t.assigned_staff_id != s.id:
+        raise HTTPException(status_code=404, detail="Task nicht gefunden oder nicht zugewiesen")
+    t.assignment_status = "rejected"
     db.commit()
     return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
 

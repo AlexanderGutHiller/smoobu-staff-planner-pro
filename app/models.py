@@ -43,6 +43,7 @@ class Task(Base):
     apartment_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("apartments.id"), nullable=True)
     booking_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("bookings.id"))
     assigned_staff_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("staff.id"))
+    assignment_status: Mapped[str | None] = mapped_column(String(16), nullable=True)  # pending|accepted|rejected
     status: Mapped[str] = mapped_column(String(16), default="open")  # open|running|done
 
     auto_generated: Mapped[bool] = mapped_column(Boolean, default=True)
