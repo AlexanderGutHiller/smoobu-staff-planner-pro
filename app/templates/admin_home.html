@@ -37,6 +37,16 @@
       border-width: 3px;
       background-color: #e7f8ff;
     }
+    .task-card-mobile.assigned {
+      border-color: #198754;
+      border-width: 2px;
+      background-color: #d1e7dd;
+    }
+    .task-card-mobile.open {
+      border-color: #ffc107;
+      border-width: 2px;
+      background-color: #fff3cd;
+    }
     
     .task-card-header {
       display: flex;
@@ -259,7 +269,7 @@ function setLanguage(lang) {
 <div class="mobile-view">
 {% for t in tasks %}
 {% set tl = timelog_map.get(t.id, {}) %}
-<div class="task-card-mobile {% if t.status=='done' %}done{% elif t.status=='running' or t.status=='paused' %}running{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id==t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
+<div class="task-card-mobile {% if t.status=='done' %}done{% elif t.status=='running' or t.status=='paused' %}running{% elif t.assigned_staff_id %}assigned{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id==t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
   <div class="task-card-header">
     <div>
       <strong style="font-size: 1.1rem;">{{ t.date | date_wd_de('short') }}</strong>

@@ -2,10 +2,60 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-<title>Admin - Apartments</title></head>
+<title>Admin - Apartments</title>
+<style>
+  /* Mobile Optimierungen */
+  @media (max-width: 768px) {
+    .container { padding-left: 10px; padding-right: 10px; }
+    .btn { padding: 0.5rem 0.75rem; font-size: 0.875rem; }
+    .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .desktop-view { display: none; }
+    .mobile-view { display: block; }
+    
+    .apartment-card-mobile {
+      border: 2px solid #dee2e6;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      background: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .apartment-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #dee2e6;
+    }
+    
+    .apartment-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    
+    .apartment-actions form {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .apartment-actions input {
+      flex: 1;
+    }
+  }
+  
+  @media (min-width: 769px) {
+    .desktop-view { display: block; }
+    .mobile-view { display: none; }
+  }
+</style>
+</head>
 <body class="bg-light"><div class="container py-4">
 <h1 class="mb-3">{{ trans.apartments }}</h1>
-<div class="d-flex gap-2 mb-3 align-items-center">
+<div class="d-flex gap-2 mb-3 align-items-center flex-wrap">
   <a class="btn btn-outline-secondary" href="/admin/{{ token }}"><i class="bi bi-arrow-left"></i> {{ trans.zurück }}</a>
   <select class="form-select form-select-sm" style="width: auto;" onchange="setLanguage(this.value)">
     <option value="de" {% if lang == 'de' %}selected{% endif %}>🇩🇪 Deutsch</option>
@@ -25,6 +75,8 @@ function setLanguage(lang) {
 }
 </script>
 
+<!-- Desktop View -->
+<div class="desktop-view">
 <table class="table table-sm table-hover bg-white align-middle">
 <thead><tr><th>ID</th><th>Name</th><th>Reinigungszeit (Minuten)</th><th>Aktionen</th></tr></thead>
 <tbody>
@@ -49,6 +101,37 @@ function setLanguage(lang) {
 </tr>
 {% endfor %}
 </tbody></table>
+</div>
+
+<!-- Mobile View -->
+<div class="mobile-view">
+{% for a in apartments %}
+<div class="apartment-card-mobile">
+  <div class="apartment-card-header">
+    <div>
+      <h5 class="mb-0 fw-bold">{{ a.name }}</h5>
+      <small class="text-muted">ID: {{ a.id }}</small>
+    </div>
+  </div>
+  
+  <div class="apartment-actions">
+    <form id="form-mobile-{{ a.id }}" method="post" action="/admin/{{ token }}/apartments/update">
+      <input type="hidden" name="apartment_id" value="{{ a.id }}"/>
+      <input class="form-control form-control-sm" type="number" name="planned_minutes" value="{{ a.planned_minutes }}" min="15" step="15" placeholder="Minuten"/>
+      <button class="btn btn-sm btn-outline-primary" type="submit" title="Nur Standard speichern"><i class="bi bi-floppy"></i> Speichern</button>
+    </form>
+    
+    <form id="form-apply-mobile-{{ a.id }}" method="post" action="/admin/{{ token }}/apartments/apply">
+      <input type="hidden" name="apartment_id" value="{{ a.id }}"/>
+      <button class="btn btn-sm btn-success w-100" type="submit" title="Aktuelle Reinigungszeit auf alle Tasks ab heute anwenden">
+        <i class="bi bi-arrow-repeat"></i> Auf alle anwenden
+      </button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+</div>
+
 <div class="alert alert-info mt-3">
   <h6><i class="bi bi-info-circle"></i> Wie funktioniert's?</h6>
   <ul class="mb-0">
