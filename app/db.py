@@ -1,8 +1,14 @@
 
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
-engine = create_engine('sqlite:///./data.db', echo=False, future=True)
+# Verwende persistentes Volume auf Fly.io, falls vorhanden, sonst lokales Verzeichnis
+DATA_DIR = "/app/data" if os.path.isdir("/app/data") else "."
+DB_PATH = os.path.join(DATA_DIR, "data.db")
+DB_URL = f"sqlite:///{DB_PATH}"
+
+engine = create_engine(DB_URL, echo=False, future=True)
 
 class Base(DeclarativeBase):
     pass
