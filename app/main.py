@@ -52,7 +52,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "cleanup": "Bereinigen", "date": "Datum", "apartment": "Apartment", "planned": "Geplant",
                    "status": "Status", "actual": "Tatsächlich", "next_arrival": "Nächste Anreise",
                    "save": "Speichern", "today": "Heute", "week": "Diese Woche", "month": "Dieser Monat",
-                   "next7": "Nächste 7 Tage", "all": "Alle", "erledigt": "Erledigt", "läuft": "Läuft", "offen": "Offen",
+                   "next7": "Nächste 7 Tage", "all": "Alle", "erledigt": "Erledigt", "läuft": "Läuft", "offen": "Offen", "pausiert": "Pausiert",
                    "min": "min", "noch": "noch ca.", "über_zeit": "Über Zeit", "start": "Start", "pause": "Pause",
                    "fertig": "Fertig", "wieder_öffnen": "Wieder öffnen", "notiz": "Notiz", "meine_einsätze": "Meine Einsätze",
                    "monatslimit": "Achtung: Du hast dein Monatslimit von", "std_überschritten": "Std überschritten",
@@ -64,14 +64,14 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "Neue Aufgabe", "tätigkeit": "Tätigkeit", "dauer": "Dauer (Min)", "beschreibung": "Beschreibung",
                    "erstellen": "Erstellen", "abbrechen": "Abbrechen",
                    "stunden": "Stunden", "vorletzter_monat": "Vorletzter Monat", "letzter_monat": "Letzter Monat", "aktueller_monat": "Aktueller Monat",
-                   "geleistete_stunden": "Geleistete Stunden"
+                   "geleistete_stunden": "Geleistete Stunden", "manuelle_aufgabe": "Manuelle Aufgabe"
                },
                "en": {
                    "tasks": "Tasks", "team": "Team", "apartments": "Apartments", "import_now": "Import now",
                    "cleanup": "Clean up", "date": "Date", "apartment": "Apartment", "planned": "Planned",
                    "status": "Status", "actual": "Actual", "next_arrival": "Next Arrival",
                    "save": "Save", "today": "Today", "week": "This Week", "month": "This Month",
-                   "next7": "Next 7 Days", "all": "All", "erledigt": "Done", "läuft": "Running", "offen": "Open",
+                   "next7": "Next 7 Days", "all": "All", "erledigt": "Done", "läuft": "Running", "offen": "Open", "pausiert": "Paused",
                    "min": "min", "noch": "ca.", "über_zeit": "Over time", "start": "Start", "pause": "Pause",
                    "fertig": "Done", "wieder_öffnen": "Reopen", "notiz": "Note", "meine_einsätze": "My Tasks",
                    "monatslimit": "Warning: You have exceeded your monthly limit of", "std_überschritten": "hours",
@@ -83,14 +83,14 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "New Task", "tätigkeit": "Activity", "dauer": "Duration (Min)", "beschreibung": "Description",
                    "erstellen": "Create", "abbrechen": "Cancel",
                    "stunden": "Hours", "vorletzter_monat": "2 Months Ago", "letzter_monat": "Last Month", "aktueller_monat": "Current Month",
-                   "geleistete_stunden": "Hours Worked"
+                   "geleistete_stunden": "Hours Worked", "manuelle_aufgabe": "Manual Task"
                },
                "fr": {
                    "tasks": "Tâches", "team": "Équipe", "apartments": "Appartements", "import_now": "Importer maintenant",
                    "cleanup": "Nettoyer", "date": "Date", "apartment": "Appartement", "planned": "Prévu",
                    "status": "Statut", "actual": "Réel", "next_arrival": "Prochaine arrivée",
                    "save": "Sauvegarder", "today": "Aujourd'hui", "week": "Cette semaine", "month": "Ce mois",
-                   "next7": "7 prochains jours", "all": "Tous", "erledigt": "Terminé", "läuft": "En cours", "offen": "Ouvert",
+                   "next7": "7 prochains jours", "all": "Tous", "erledigt": "Terminé", "läuft": "En cours", "offen": "Ouvert", "pausiert": "En pause",
                    "min": "min", "noch": "encore", "über_zeit": "Dépassé", "start": "Démarrer", "pause": "Pause",
                    "fertig": "Terminé", "wieder_öffnen": "Rouvrir", "notiz": "Note", "meine_einsätze": "Mes tâches",
                    "monatslimit": "Attention: Vous avez dépassé votre limite mensuelle de", "std_überschritten": "heures",
@@ -102,14 +102,14 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "Nouvelle tâche", "tätigkeit": "Activité", "dauer": "Durée (Min)", "beschreibung": "Description",
                    "erstellen": "Créer", "abbrechen": "Annuler",
                    "stunden": "Heures", "vorletzter_monat": "Il y a 2 mois", "letzter_monat": "Mois dernier", "aktueller_monat": "Mois actuel",
-                   "geleistete_stunden": "Heures travaillées"
+                   "geleistete_stunden": "Heures travaillées", "manuelle_aufgabe": "Tâche manuelle"
                },
                "it": {
                    "tasks": "Compiti", "team": "Squadra", "apartments": "Appartamenti", "import_now": "Importa ora",
                    "cleanup": "Pulisci", "date": "Data", "apartment": "Appartamento", "planned": "Pianificato",
                    "status": "Stato", "actual": "Effettivo", "next_arrival": "Prossimo arrivo",
                    "save": "Salva", "today": "Oggi", "week": "Questa settimana", "month": "Questo mese",
-                   "next7": "Prossimi 7 giorni", "all": "Tutti", "erledigt": "Completato", "läuft": "In corso", "offen": "Aperto",
+                   "next7": "Prossimi 7 giorni", "all": "Tutti", "erledigt": "Completato", "läuft": "In corso", "offen": "Aperto", "pausiert": "In pausa",
                    "min": "min", "noch": "ancora", "über_zeit": "Oltre il tempo", "start": "Avvia", "pause": "Pausa",
                    "fertig": "Completato", "wieder_öffnen": "Riapri", "notiz": "Nota", "meine_einsätze": "I miei compiti",
                    "monatslimit": "Attenzione: Hai superato il tuo limite mensile di", "std_überschritten": "ore",
@@ -121,14 +121,14 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "Nuovo compito", "tätigkeit": "Attività", "dauer": "Durata (Min)", "beschreibung": "Descrizione",
                    "erstellen": "Crea", "abbrechen": "Annulla",
                    "stunden": "Ore", "vorletzter_monat": "2 mesi fa", "letzter_monat": "Mese scorso", "aktueller_monat": "Mese corrente",
-                   "geleistete_stunden": "Ore lavorate"
+                   "geleistete_stunden": "Ore lavorate", "manuelle_aufgabe": "Compito manuale"
                },
                "es": {
                    "tasks": "Tareas", "team": "Equipo", "apartments": "Apartamentos", "import_now": "Importar ahora",
                    "cleanup": "Limpiar", "date": "Fecha", "apartment": "Apartamento", "planned": "Planificado",
                    "status": "Estado", "actual": "Real", "next_arrival": "Próxima llegada",
                    "save": "Guardar", "today": "Hoy", "week": "Esta semana", "month": "Este mes",
-                   "next7": "Próximos 7 días", "all": "Todos", "erledigt": "Completado", "läuft": "En curso", "offen": "Abierto",
+                   "next7": "Próximos 7 días", "all": "Todos", "erledigt": "Completado", "läuft": "En curso", "offen": "Abierto", "pausiert": "Pausado",
                    "min": "min", "noch": "aún", "über_zeit": "Sobre tiempo", "start": "Iniciar", "pause": "Pausa",
                    "fertig": "Completado", "wieder_öffnen": "Reabrir", "notiz": "Nota", "meine_einsätze": "Mis tareas",
                    "monatslimit": "Atención: Has excedido tu límite mensual de", "std_überschritten": "horas",
@@ -140,14 +140,14 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "Nueva tarea", "tätigkeit": "Actividad", "dauer": "Duración (Min)", "beschreibung": "Descripción",
                    "erstellen": "Crear", "abbrechen": "Cancelar",
                    "stunden": "Horas", "vorletzter_monat": "Hace 2 meses", "letzter_monat": "Mes pasado", "aktueller_monat": "Mes actual",
-                   "geleistete_stunden": "Horas trabajadas"
+                   "geleistete_stunden": "Horas trabajadas", "manuelle_aufgabe": "Tarea manual"
                },
                "ro": {
                    "tasks": "Sarcini", "team": "Echipa", "apartments": "Apartamente", "import_now": "Importă acum",
                    "cleanup": "Curățare", "date": "Dată", "apartment": "Apartament", "planned": "Planificat",
                    "status": "Status", "actual": "Real", "next_arrival": "Următoarea sosire",
                    "save": "Salvează", "today": "Azi", "week": "Săptămâna aceasta", "month": "Luna aceasta",
-                   "next7": "Următoarele 7 zile", "all": "Toate", "erledigt": "Finalizat", "läuft": "În curs", "offen": "Deschis",
+                   "next7": "Următoarele 7 zile", "all": "Toate", "erledigt": "Finalizat", "läuft": "În curs", "offen": "Deschis", "pausiert": "Întrerupt",
                    "min": "min", "noch": "ca.", "über_zeit": "Peste timp", "start": "Start", "pause": "Pauză",
                    "fertig": "Finalizat", "wieder_öffnen": "Redeschide", "notiz": "Notă", "meine_einsätze": "Sarcinile mele",
                    "monatslimit": "Atenție: Ai depășit limita lunară de", "std_überschritten": "ore",
@@ -159,14 +159,14 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "Sarcină nouă", "tätigkeit": "Activitate", "dauer": "Durată (Min)", "beschreibung": "Descriere",
                    "erstellen": "Creează", "abbrechen": "Anulează",
                    "stunden": "Ore", "vorletzter_monat": "Acum 2 luni", "letzter_monat": "Luna trecută", "aktueller_monat": "Luna curentă",
-                   "geleistete_stunden": "Ore lucrate"
+                   "geleistete_stunden": "Ore lucrate", "manuelle_aufgabe": "Sarcină manuală"
                },
                "ru": {
                    "tasks": "Задачи", "team": "Команда", "apartments": "Апартаменты", "import_now": "Импорт сейчас",
                    "cleanup": "Очистка", "date": "Дата", "apartment": "Апартамент", "planned": "Запланировано",
                    "status": "Статус", "actual": "Фактически", "next_arrival": "Следующий приезд",
                    "save": "Сохранить", "today": "Сегодня", "week": "На этой неделе", "month": "В этом месяце",
-                   "next7": "Следующие 7 дней", "all": "Все", "erledigt": "Выполнено", "läuft": "Выполняется", "offen": "Открыто",
+                   "next7": "Следующие 7 дней", "all": "Все", "erledigt": "Выполнено", "läuft": "Выполняется", "offen": "Открыто", "pausiert": "Приостановлено",
                    "min": "мин", "noch": "около", "über_zeit": "Превышено", "start": "Старт", "pause": "Пауза",
                    "fertig": "Готово", "wieder_öffnen": "Открыть снова", "notiz": "Заметка", "meine_einsätze": "Мои задачи",
                    "monatslimit": "Внимание: Вы превысили месячный лимит", "std_überschritten": "часов",
@@ -178,14 +178,14 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "Новая задача", "tätigkeit": "Деятельность", "dauer": "Длительность (Мин)", "beschreibung": "Описание",
                    "erstellen": "Создать", "abbrechen": "Отмена",
                    "stunden": "Часы", "vorletzter_monat": "2 месяца назад", "letzter_monat": "Прошлый месяц", "aktueller_monat": "Текущий месяц",
-                   "geleistete_stunden": "Отработанные часы"
+                   "geleistete_stunden": "Отработанные часы", "manuelle_aufgabe": "Ручная задача"
                },
                "bg": {
                    "tasks": "Задачи", "team": "Екип", "apartments": "Апартаменти", "import_now": "Импортирай сега",
                    "cleanup": "Почистване", "date": "Дата", "apartment": "Апартамент", "planned": "Планирано",
                    "status": "Статус", "actual": "Действително", "next_arrival": "Следващо пристигане",
                    "save": "Запази", "today": "Днес", "week": "Тази седмица", "month": "Този месец",
-                   "next7": "Следващите 7 дни", "all": "Всички", "erledigt": "Завършено", "läuft": "В ход", "offen": "Отворено",
+                   "next7": "Следващите 7 дни", "all": "Всички", "erledigt": "Завършено", "läuft": "В ход", "offen": "Отворено", "pausiert": "Паузирано",
                    "min": "мин", "noch": "остават", "über_zeit": "Над времето", "start": "Старт", "pause": "Пауза",
                    "fertig": "Готово", "wieder_öffnen": "Отвори отново", "notiz": "Бележка", "meine_einsätze": "Моите задачи",
                    "monatslimit": "Внимание: Надхвърлихте месечния си лимит от", "std_überschritten": "часа",
@@ -197,7 +197,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "neue_aufgabe": "Нова задача", "tätigkeit": "Дейност", "dauer": "Продължителност (Мин)", "beschreibung": "Описание",
                    "erstellen": "Създай", "abbrechen": "Отказ",
                    "stunden": "Часове", "vorletzter_monat": "Преди 2 месеца", "letzter_monat": "Миналия месец", "aktueller_monat": "Текущ месец",
-                   "geleistete_stunden": "Отработени часове"
+                   "geleistete_stunden": "Отработени часове", "manuelle_aufgabe": "Ръчна задача"
                }
     }
     return translations.get(lang, translations["de"])
@@ -569,7 +569,7 @@ async def admin_task_assign(token: str, task_id: int = Form(...), staff_id_raw: 
     return RedirectResponse(url=f"/admin/{token}", status_code=303)
 
 @app.post("/admin/{token}/task/create")
-async def admin_task_create(token: str, date: str = Form(...), apartment_id: int = Form(...), planned_minutes: int = Form(90), description: str = Form(""), staff_id_raw: str = Form(""), db=Depends(get_db)):
+async def admin_task_create(token: str, date: str = Form(...), apartment_id_raw: str = Form(""), planned_minutes: int = Form(90), description: str = Form(""), staff_id_raw: str = Form(""), db=Depends(get_db)):
     if token != ADMIN_TOKEN:
         raise HTTPException(status_code=403)
     
@@ -577,10 +577,22 @@ async def admin_task_create(token: str, date: str = Form(...), apartment_id: int
     if not date or not date.strip():
         raise HTTPException(status_code=400, detail="Datum ist erforderlich")
     
-    # Apartment prüfen
-    apt = db.get(Apartment, apartment_id)
-    if not apt:
-        raise HTTPException(status_code=404, detail="Apartment nicht gefunden")
+    # Apartment-ID optional - kann leer sein für manuelle Aufgaben
+    apartment_id: Optional[int] = None
+    apt_name = "Manuelle Aufgabe"
+    if apartment_id_raw and apartment_id_raw.strip():
+        try:
+            apartment_id = int(apartment_id_raw)
+            if apartment_id > 0:
+                apt = db.get(Apartment, apartment_id)
+                if apt:
+                    apt_name = apt.name
+                else:
+                    apartment_id = None  # Ungültige Apartment-ID ignorieren
+            else:
+                apartment_id = None  # 0 oder negativ = keine Apartment
+        except (ValueError, TypeError):
+            apartment_id = None
     
     # Staff-ID optional
     staff_id: Optional[int] = None
@@ -596,7 +608,7 @@ async def admin_task_create(token: str, date: str = Form(...), apartment_id: int
     # Neue Aufgabe erstellen
     new_task = Task(
         date=date[:10],  # Nur Datum, ohne Zeit
-        apartment_id=apartment_id,
+        apartment_id=apartment_id,  # Kann None sein für manuelle Aufgaben
         planned_minutes=planned_minutes,
         notes=(description[:2000] if description else None),  # Beschreibung als Notiz speichern
         assigned_staff_id=staff_id,
@@ -606,7 +618,7 @@ async def admin_task_create(token: str, date: str = Form(...), apartment_id: int
     db.add(new_task)
     db.commit()
     
-    log.info("✅ Manuell erstellte Aufgabe: %s für %s am %s", new_task.id, apt.name, date)
+    log.info("✅ Manuell erstellte Aufgabe: %s für %s am %s", new_task.id, apt_name, date)
     return RedirectResponse(url=f"/admin/{token}", status_code=303)
 
 @app.get("/admin/{token}/apartments")
@@ -786,9 +798,19 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
         if tl:
             run_map[t.id] = tl.started_at
     warn_limit = used_hours > float(s.max_hours_per_month or 0)
+    # Timelog-Daten für jedes Task (für pausierte Aufgaben)
+    timelog_map = {}
+    for t in tasks:
+        tl = db.query(TimeLog).filter(TimeLog.task_id==t.id, TimeLog.staff_id==s.id).order_by(TimeLog.id.desc()).first()
+        if tl:
+            timelog_map[t.id] = {
+                'actual_minutes': tl.actual_minutes,
+                'started_at': tl.started_at,
+                'ended_at': tl.ended_at
+            }
     lang = detect_language(request)
     trans = get_translations(lang)
-    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "run_map": run_map, "warn_limit": warn_limit, "lang": lang, "trans": trans})
+    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "run_map": run_map, "timelog_map": timelog_map, "warn_limit": warn_limit, "lang": lang, "trans": trans})
 
 @app.post("/cleaner/{token}/start")
 async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)):
@@ -797,8 +819,8 @@ async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)
     t = db.get(Task, task_id)
     if not t: raise HTTPException(status_code=404, detail="Task nicht gefunden")
     
-    # Beende alle offenen TimeLogs dieses Staff
-    open_tls = db.query(TimeLog).filter(TimeLog.staff_id==s.id, TimeLog.ended_at==None).all()
+    # Beende alle offenen TimeLogs dieses Staff (außer für den aktuellen Task, falls er pausiert ist)
+    open_tls = db.query(TimeLog).filter(TimeLog.staff_id==s.id, TimeLog.ended_at==None, TimeLog.task_id!=task_id).all()
     for open_tl in open_tls:
         from datetime import datetime
         open_tl.ended_at = now_iso()
@@ -806,14 +828,29 @@ async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)
         try:
             start = datetime.strptime(open_tl.started_at, fmt)
             end = datetime.strptime(open_tl.ended_at, fmt)
-            open_tl.actual_minutes = int((end-start).total_seconds()//60)
+            elapsed = int((end-start).total_seconds()//60)
+            if open_tl.actual_minutes:
+                open_tl.actual_minutes += elapsed
+            else:
+                open_tl.actual_minutes = elapsed
         except Exception:
             pass
+        # Setze den Status der anderen Tasks auf 'open'
+        other_task = db.get(Task, open_tl.task_id)
+        if other_task and other_task.status == 'running':
+            other_task.status = 'open'
     
-    # Erstelle neues TimeLog für diesen Task
-    new_tl = TimeLog(task_id=task_id, staff_id=s.id, started_at=now_iso(), ended_at=None, actual_minutes=None)
+    # Prüfe ob bereits ein TimeLog für diesen Task existiert (pausierte Aufgabe)
+    existing_tl = db.query(TimeLog).filter(TimeLog.task_id==task_id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
+    if existing_tl:
+        # Setze started_at auf jetzt, damit die Zeit weiterläuft
+        existing_tl.started_at = now_iso()
+    else:
+        # Erstelle neues TimeLog für diesen Task
+        existing_tl = TimeLog(task_id=task_id, staff_id=s.id, started_at=now_iso(), ended_at=None, actual_minutes=None)
+        db.add(existing_tl)
+    
     t.status = "running"
-    db.add(new_tl)
     db.commit()
     return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
 
@@ -828,15 +865,25 @@ async def cleaner_stop(token: str, task_id: int = Form(...), db=Depends(get_db))
     if tl:
         from datetime import datetime
         fmt = "%Y-%m-%d %H:%M:%S"
-        tl.ended_at = now_iso()
+        # Speichere aktuelle Zeit, aber lasse ended_at auf None für spätere Fortsetzung
+        # Berechne die bisherige Zeit
         try:
             start = datetime.strptime(tl.started_at, fmt)
-            end = datetime.strptime(tl.ended_at, fmt)
-            tl.actual_minutes = int((end-start).total_seconds()//60)
-        except Exception:
+            now = datetime.now()
+            # Berechne bisherige Minuten und addiere zu eventuell bereits vorhandenen
+            current_elapsed = int((now - start).total_seconds() // 60)
+            if tl.actual_minutes:
+                tl.actual_minutes += current_elapsed
+            else:
+                tl.actual_minutes = current_elapsed
+            # Aktualisiere started_at auf jetzt, damit beim Weiterstarten die Zeit korrekt weiterläuft
+            tl.started_at = now_iso()
+            # Lassen ended_at auf None, damit wir wissen dass es pausiert ist
+        except Exception as e:
+            log.error("Error in cleaner_stop: %s", e)
             pass
     
-    t.status = "open"
+    t.status = "paused"  # Status auf "paused" setzen statt "open"
     db.commit()
     return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
 

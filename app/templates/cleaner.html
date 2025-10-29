@@ -19,6 +19,16 @@ body { padding-bottom: 20px; }
   opacity: 0.6;
   border-color: #6c757d;
 }
+.task-card.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  background-color: #f8f9fa;
+}
+.task-card.paused {
+  border-color: #0dcaf0;
+  border-width: 3px;
+  background-color: #e7f8ff;
+}
 .timer-display {
   font-size: 2.5rem;
   font-weight: bold;
@@ -96,14 +106,22 @@ function setLanguage(lang) {
 </div>
 
 <div class="row g-3">
+{% set running_task_id = none %}
+{% for t in tasks %}
+  {% if t.status == 'running' %}
+    {% set running_task_id = t.id %}
+  {% endif %}
+{% endfor %}
 {% for t in tasks %}
 {% set started = run_map.get(t.id) %}
-<div class="col-12 task-card {% if t.status=='done' %}done{% endif %}">
+{% set is_disabled = running_task_id and running_task_id != t.id and t.status != 'running' and t.status != 'done' %}
+{% set tl = timelog_map.get(t.id, {}) if timelog_map else {} %}
+<div class="col-12 task-card {% if t.status=='done' %}done{% elif is_disabled %}disabled{% elif t.status=='paused' %}paused{% endif %}">
   <div class="task-header d-flex justify-content-between align-items-center">
     <div>
       <strong style="font-size: 1.1rem;">{{ t.date | date_wd_de('short') }}</strong>
     </div>
-    <div class="fw-bold" style="font-size: 1.5rem;">{{ apt_map.get(t.apartment_id, t.apartment_id) }}</div>
+    <div class="fw-bold" style="font-size: 1.5rem;">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
   </div>
   <div class="p-3">
     <div class="row">
@@ -148,6 +166,8 @@ function setLanguage(lang) {
         <div class="text-muted small">{{ trans.status }}</div>
         {% if t.status=='running' %}
           <span class="badge bg-success status-badge"><i class="bi bi-play-circle-fill"></i> {{ trans.läuft }}</span>
+        {% elif t.status=='paused' %}
+          <span class="badge bg-info status-badge"><i class="bi bi-pause-circle"></i> {{ trans.pausiert }}</span>
         {% elif t.status=='done' %}
           <span class="badge bg-secondary status-badge"><i class="bi bi-check-circle"></i> {{ trans.erledigt }}</span>
         {% else %}
@@ -163,10 +183,22 @@ function setLanguage(lang) {
         </div>
         <div class="small text-muted" id="remaining-{{ t.id }}" data-lang-over="{{ trans.über_zeit }}" data-lang-min="{{ trans.min }}" data-lang-remaining="{{ trans.noch }}">{{ trans.verbleibend }} --</div>
       </div>
+    {% elif t.status=='paused' and tl.get('actual_minutes') %}
+      <div class="text-center mb-3">
+        <div class="timer-display" style="color: #0dcaf0;">
+          <div><i class="bi bi-pause-circle-fill"></i> {{ tl.actual_minutes }} {{ trans.min }}</div>
+        </div>
+        <div class="small text-muted">{{ trans.pausiert }}</div>
+      </div>
     {% endif %}
     
     <div class="d-grid gap-2">
       {% if t.status=='open' %}
+      <form method="post" action="/cleaner/{{ staff.magic_token }}/start">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <button class="btn btn-success btn-touch" {% if is_disabled %}disabled{% endif %}><i class="bi bi-play-fill"></i> {{ trans.start }}</button>
+      </form>
+      {% elif t.status=='paused' %}
       <form method="post" action="/cleaner/{{ staff.magic_token }}/start">
         <input type="hidden" name="task_id" value="{{ t.id }}"/>
         <button class="btn btn-success btn-touch"><i class="bi bi-play-fill"></i> {{ trans.start }}</button>

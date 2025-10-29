@@ -40,7 +40,7 @@ class Task(Base):
     planned_minutes: Mapped[int] = mapped_column(Integer, default=90)
     notes: Mapped[str] = mapped_column(Text, default="")
     extras_json: Mapped[str] = mapped_column(Text, default="{}")
-    apartment_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("apartments.id"))
+    apartment_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("apartments.id"), nullable=True)
     booking_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("bookings.id"))
     assigned_staff_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("staff.id"))
     status: Mapped[str] = mapped_column(String(16), default="open")  # open|running|done
