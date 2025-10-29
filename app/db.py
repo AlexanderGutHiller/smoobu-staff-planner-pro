@@ -4,7 +4,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 # Verwende persistentes Volume auf Fly.io, falls vorhanden, sonst lokales Verzeichnis
-DATA_DIR = "/app/data" if os.path.isdir("/app/data") else "."
+# Versuche zuerst das Volume-Verzeichnis, dann lokales Verzeichnis
+if os.path.isdir("/app/data"):
+    DATA_DIR = "/app/data"
+elif os.path.exists("/app/data"):
+    # Falls /app/data eine Datei ist (nicht Verzeichnis), verwende lokales Verzeichnis
+    DATA_DIR = "."
+else:
+    DATA_DIR = "."
+
 DB_PATH = os.path.join(DATA_DIR, "data.db")
 DB_URL = f"sqlite:///{DB_PATH}"
 
