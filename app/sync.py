@@ -90,16 +90,15 @@ def upsert_tasks_from_bookings(bookings: list[Booking]):
             n_arrival, n_adults, n_children, n_comments, n_guest = next_map.get(b.id, (None, None, None, None, None))
             t = existing_by_booking.get(b.id)
             if t:
-                if not t.locked:
-                    t.date = b.departure
-                    t.apartment_id = b.apartment_id
-                    t.booking_hash = h
-                    t.auto_generated = True
-                    t.next_arrival = n_arrival
-                    t.next_arrival_adults = n_adults
-                    t.next_arrival_children = n_children
-                    t.next_arrival_comments = (n_comments or "")[:2000] if n_comments else None
-                    t.next_arrival_guest_name = (n_guest or "")[:255] if n_guest else None
+                t.date = b.departure
+                t.apartment_id = b.apartment_id
+                t.booking_hash = h
+                t.auto_generated = True
+                t.next_arrival = n_arrival
+                t.next_arrival_adults = n_adults
+                t.next_arrival_children = n_children
+                t.next_arrival_comments = (n_comments or "")[:2000] if n_comments else None
+                t.next_arrival_guest_name = (n_guest or "")[:255] if n_guest else None
             else:
                 s.add(Task(
                     date=b.departure,
@@ -107,7 +106,7 @@ def upsert_tasks_from_bookings(bookings: list[Booking]):
                     booking_id=b.id,
                     planned_minutes=get_planned_minutes_for(b.apartment_id),
                     status="open",
-                    auto_generated=True, locked=False, booking_hash=h,
+                    auto_generated=True, booking_hash=h,
                     next_arrival=n_arrival, next_arrival_adults=n_adults,
                     next_arrival_children=n_children,
                     next_arrival_comments=(n_comments or "")[:2000] if n_comments else None,
@@ -194,7 +193,7 @@ def upsert_tasks_from_bookings(bookings: list[Booking]):
             if should_delete:
                 s.delete(t)
                 removed_count += 1
-                log.info("🗑️ Removing task %d - %s (locked: %s, date: %s, apt: %s, booking: %s)", t.id, reason, t.locked, t.date, t.apartment_id, t.booking_id)
+                log.info("🗑️ Removing task %d - %s (date: %s, apt: %s, booking: %s)", t.id, reason, t.date, t.apartment_id, t.booking_id)
         
         if removed_count > 0:
             log.info("Cleanup completed: %d invalid/stale tasks removed", removed_count)

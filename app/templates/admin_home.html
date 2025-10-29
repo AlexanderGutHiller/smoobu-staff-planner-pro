@@ -10,13 +10,12 @@
 </style>
 </head>
 <body class="bg-light"><div class="container py-4">
-<h1 class="mb-3">Einsätze</h1>
+<h1 class="mb-3">{{ trans.tasks }}</h1>
 
 <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
-  <a class="btn btn-outline-secondary" href="/admin/{{ token }}/staff"><i class="bi bi-people"></i> Team</a>
-  <a class="btn btn-outline-secondary" href="/admin/{{ token }}/apartments"><i class="bi bi-building"></i> Apartments</a>
-  <a class="btn btn-primary" href="/admin/{{ token }}/import"><i class="bi bi-arrow-repeat"></i> Import jetzt</a>
-  <a class="btn btn-outline-warning" href="/admin/{{ token }}/cleanup"><i class="bi bi-trash"></i> Bereinigen</a>
+        <a class="btn btn-outline-secondary" href="/admin/{{ token }}/staff"><i class="bi bi-people"></i> {{ trans.team }}</a>
+        <a class="btn btn-outline-secondary" href="/admin/{{ token }}/apartments"><i class="bi bi-building"></i> {{ trans.apartments }}</a>
+        <a class="btn btn-primary" href="/admin/{{ token }}/import"><i class="bi bi-arrow-repeat"></i> {{ trans.import_now }}</a>
   <select class="form-select form-select-sm" style="width: auto;" onchange="setLanguage(this.value)">
     <option value="de" {% if lang == 'de' %}selected{% endif %}>🇩🇪 Deutsch</option>
     <option value="en" {% if lang == 'en' %}selected{% endif %}>🇬🇧 English</option>
@@ -38,36 +37,35 @@ function setLanguage(lang) {
 <table id="task-table" class="table table-sm table-hover bg-white align-middle">
 <thead>
   <tr>
-    <th>Datum<br>
+    <th>{{ trans.date }}<br>
       <select id="f-date" class="form-select form-select-sm filter-input">
-        <option value="">Alle</option>
-        <option value="today">Heute</option>
-        <option value="week">Diese Woche</option>
-        <option value="month">Dieser Monat</option>
-        <option value="next7">Nächste 7 Tage</option>
+        <option value="">{{ trans.all }}</option>
+        <option value="today">{{ trans.today }}</option>
+        <option value="week">{{ trans.week }}</option>
+        <option value="month">{{ trans.month }}</option>
+        <option value="next7">{{ trans.next7 }}</option>
       </select>
     </th>
-    <th>Apartment<br>
+    <th>{{ trans.apartment }}<br>
       <select id="f-apt" class="form-select form-select-sm filter-input">
-        <option value="">Alle</option>
+        <option value="">{{ trans.all }}</option>
         {% for apt in apartments %}
           <option value="{{ apt.name }}">{{ apt.name }}</option>
         {% endfor %}
       </select>
     </th>
-    <th>Geplant</th>
-    <th>Status</th>
-    <th>Tatsächlich</th>
-    <th>Next Arrival</th>
-    <th>MA<br>
+    <th>{{ trans.planned }}</th>
+    <th>{{ trans.status }}</th>
+    <th>{{ trans.actual }}</th>
+    <th>{{ trans.next_arrival }}</th>
+    <th>{{ trans.ma }}<br>
       <select id="f-staff" class="form-select form-select-sm filter-input">
-        <option value="">Alle</option>
+        <option value="">{{ trans.all }}</option>
         {% for s in staff %}
           <option value="{{ s.name }}">{{ s.name }}</option>
         {% endfor %}
       </select>
     </th>
-    <th>Lock</th>
     <th>#</th>
   </tr>
 </thead>
@@ -90,27 +88,27 @@ function setLanguage(lang) {
     {% endif %}
     {% if t.notes %}<div class="mt-1"><small class="text-muted"><i class="bi bi-sticky"></i> {{ t.notes }}</small></div>{% endif %}
   </td>
-  <td data-col="planned">{{ t.planned_minutes }} min</td>
+  <td data-col="planned">{{ t.planned_minutes }} {{ trans.min }}</td>
   <td>
     {% if t.status == 'done' %}
-      <span class="badge bg-success"><i class="bi bi-check-circle"></i> Erledigt</span>
+      <span class="badge bg-success"><i class="bi bi-check-circle"></i> {{ trans.erledigt }}</span>
     {% elif t.status == 'running' %}
-      <span class="badge bg-primary"><i class="bi bi-play-circle"></i> Läuft</span>
+      <span class="badge bg-primary"><i class="bi bi-play-circle"></i> {{ trans.läuft }}</span>
     {% else %}
-      <span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> Offen</span>
+      <span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> {{ trans.offen }}</span>
     {% endif %}
   </td>
   <td>
     {% set tl = timelog_map.get(t.id, {}) %}
     {% if tl.actual_minutes %}
       <span class="fw-bold {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">
-        {{ tl.actual_minutes }} min
+        {{ tl.actual_minutes }} {{ trans.min }}
       </span>
       {% if tl.actual_minutes > t.planned_minutes %}
-        <small class="text-danger d-block">+{{ tl.actual_minutes - t.planned_minutes }} min</small>
+        <small class="text-danger d-block">+{{ tl.actual_minutes - t.planned_minutes }} {{ trans.min }}</small>
       {% endif %}
     {% elif tl.started_at and not tl.ended_at %}
-      <span class="badge bg-warning text-dark"><i class="bi bi-clock"></i> Läuft...</span>
+      <span class="badge bg-warning text-dark"><i class="bi bi-clock"></i> {{ trans.läuft }}...</span>
     {% else %}
       <span class="text-muted">-</span>
     {% endif %}
@@ -141,15 +139,6 @@ function setLanguage(lang) {
           <option value="{{ s.id }}" {% if t.assigned_staff_id==s.id %}selected{% endif %}>{{ s.name }}</option>
         {% endfor %}
       </select>
-    </form>
-  </td>
-  <td>
-    <form method="post" action="/admin/{{ token }}/task/lock">
-      <input type="hidden" name="task_id" value="{{ t.id }}"/>
-      <input type="hidden" name="lock" value="{{ 0 if t.locked else 1 }}"/>
-      <button class="btn btn-sm {{ 'btn-success' if t.locked else 'btn-outline-secondary' }}">
-        {% if t.locked %}<i class="bi bi-lock-fill"></i>{% else %}<i class="bi bi-unlock"></i>{% endif %}
-      </button>
     </form>
   </td>
   <td><small>#{{ t.id }}</small></td>
@@ -191,26 +180,21 @@ function applyFilter(){
   const fDate = document.getElementById('f-date').value;
   const fApt = document.getElementById('f-apt').value;
   const fStaff = document.getElementById('f-staff').value;
-  const fLock = document.getElementById('f-lock').value;
   
   rows.forEach(tr => {
     const dateTxt = tr.querySelector('[data-col="date"]').innerText;
     const aptTxt = tr.querySelector('[data-col="apt"]').innerText;
     const staffTxt = tr.querySelector('[data-col="staff"]').innerText;
     
-    let lockEl = tr.querySelector('[name="lock"]');
-    const isLocked = lockEl && lockEl.value === '1';
-    
     const ok = matchesDateFilter(dateTxt, fDate)
             && (!fApt || aptTxt.toLowerCase().includes(fApt.toLowerCase()))
-            && (!fStaff || staffTxt.toLowerCase().includes(fStaff.toLowerCase()))
-            && (!fLock || (fLock === 'locked' && isLocked) || (fLock === 'unlocked' && !isLocked));
+            && (!fStaff || staffTxt.toLowerCase().includes(fStaff.toLowerCase()));
     
     tr.style.display = ok ? '' : 'none';
   });
 }
 
-['f-date','f-apt','f-staff','f-lock'].forEach(id => {
+['f-date','f-apt','f-staff'].forEach(id => {
   document.getElementById(id).addEventListener('change', applyFilter);
 });
 </script>

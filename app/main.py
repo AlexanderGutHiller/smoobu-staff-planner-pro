@@ -47,81 +47,81 @@ def detect_language(request: Request) -> str:
 def get_translations(lang: str) -> Dict[str, str]:
     """Übersetzungen für verschiedene Sprachen"""
     translations = {
-        "de": {
-            "tasks": "Einsätze", "team": "Team", "apartments": "Apartments", "import_now": "Import jetzt",
-            "cleanup": "Bereinigen", "date": "Datum", "apartment": "Apartment", "planned": "Geplant",
-            "status": "Status", "actual": "Tatsächlich", "next_arrival": "Nächste Anreise",
-            "save": "Speichern", "today": "Heute", "week": "Diese Woche", "month": "Dieser Monat",
-            "next7": "Nächste 7 Tage", "all": "Alle", "erledigt": "Erledigt", "läuft": "Läuft", "offen": "Offen",
-            "min": "min", "noch": "noch ca.", "über_zeit": "Über Zeit", "start": "Start", "pause": "Pause",
-            "fertig": "Fertig", "wieder_öffnen": "Wieder öffnen", "notiz": "Notiz", "meine_einsätze": "Meine Einsätze",
-            "monatslimit": "Achtung: Du hast dein Monatslimit von", "std_überschritten": "Std überschritten",
-            "aktuell": "Std erfasst.", "monat_erfasst": "Aktueller Monat:",
-            "keine_einsätze": "Keine Einsätze vorhanden", "nächste_anreise": "Nächste Anreise",
-            "erw": "Erw.", "kinder": "Kinder", "verbleibend": "verbleibend:",
-            "erledigte_ausblenden": "Erledigte ausblenden", "erledigte_anzeigen": "Erledigte anzeigen",
-            "datum": "Datum", "ma": "MA", "lock": "Lock"
-        },
-        "en": {
-            "tasks": "Tasks", "team": "Team", "apartments": "Apartments", "import_now": "Import now",
-            "cleanup": "Clean up", "date": "Date", "apartment": "Apartment", "planned": "Planned",
-            "status": "Status", "actual": "Actual", "next_arrival": "Next Arrival",
-            "save": "Save", "today": "Today", "week": "This Week", "month": "This Month",
-            "next7": "Next 7 Days", "all": "All", "erledigt": "Done", "läuft": "Running", "offen": "Open",
-            "min": "min", "noch": "ca.", "über_zeit": "Over time", "start": "Start", "pause": "Pause",
-            "fertig": "Done", "wieder_öffnen": "Reopen", "notiz": "Note", "meine_einsätze": "My Tasks",
-            "monatslimit": "Warning: You have exceeded your monthly limit of", "std_überschritten": "hours",
-            "aktuell": "hours logged.", "monat_erfasst": "Current month:",
-            "keine_einsätze": "No tasks available", "nächste_anreise": "Next Arrival",
-            "erw": "Adults", "kinder": "Children", "verbleibend": "remaining:",
-            "erledigte_ausblenden": "Hide completed", "erledigte_anzeigen": "Show completed",
-            "datum": "Date", "ma": "Staff", "lock": "Lock"
-        },
-        "ro": {
-            "tasks": "Sarcini", "team": "Echipa", "apartments": "Apartamente", "import_now": "Importă acum",
-            "cleanup": "Curățare", "date": "Dată", "apartment": "Apartament", "planned": "Planificat",
-            "status": "Status", "actual": "Real", "next_arrival": "Următoarea sosire",
-            "save": "Salvează", "today": "Azi", "week": "Săptămâna aceasta", "month": "Luna aceasta",
-            "next7": "Următoarele 7 zile", "all": "Toate", "erledigt": "Finalizat", "läuft": "În curs", "offen": "Deschis",
-            "min": "min", "noch": "ca.", "über_zeit": "Peste timp", "start": "Start", "pause": "Pauză",
-            "fertig": "Finalizat", "wieder_öffnen": "Redeschide", "notiz": "Notă", "meine_einsätze": "Sarcinile mele",
-            "monatslimit": "Atenție: Ai depășit limita lunară de", "std_überschritten": "ore",
-            "aktuell": "ore înregistrate.", "monat_erfasst": "Luna curentă:",
-            "keine_einsätze": "Nu există sarcini", "nächste_anreise": "Următoarea sosire",
-            "erw": "Adulți", "kinder": "Copii", "verbleibend": "rămâne:",
-            "erledigte_ausblenden": "Ascunde finalizate", "erledigte_anzeigen": "Afișează finalizate",
-            "datum": "Dată", "ma": "Echipa", "lock": "Blocare"
-        },
-        "ru": {
-            "tasks": "Задачи", "team": "Команда", "apartments": "Апартаменты", "import_now": "Импорт сейчас",
-            "cleanup": "Очистка", "date": "Дата", "apartment": "Апартамент", "planned": "Запланировано",
-            "status": "Статус", "actual": "Фактически", "next_arrival": "Следующий приезд",
-            "save": "Сохранить", "today": "Сегодня", "week": "На этой неделе", "month": "В этом месяце",
-            "next7": "Следующие 7 дней", "all": "Все", "erledigt": "Выполнено", "läuft": "Выполняется", "offen": "Открыто",
-            "min": "мин", "noch": "около", "über_zeit": "Превышено", "start": "Старт", "pause": "Пауза",
-            "fertig": "Готово", "wieder_öffnen": "Открыть снова", "notiz": "Заметка", "meine_einsätze": "Мои задачи",
-            "monatslimit": "Внимание: Вы превысили месячный лимит", "std_überschritten": "часов",
-            "aktuell": "часов записано.", "monat_erfasst": "Текущий месяц:",
-            "keine_einsätze": "Нет задач", "nächste_anreise": "Следующий приезд",
-            "erw": "Взрослые", "kinder": "Дети", "verbleibend": "осталось:",
-            "erledigte_ausblenden": "Скрыть выполненные", "erledigte_anzeigen": "Показать выполненные",
-            "datum": "Дата", "ma": "Команда", "lock": "Заблокировано"
-        },
-        "bg": {
-            "tasks": "Задачи", "team": "Екип", "apartments": "Апартаменти", "import_now": "Импортирай сега",
-            "cleanup": "Почистване", "date": "Дата", "apartment": "Апартамент", "planned": "Планирано",
-            "status": "Статус", "actual": "Действително", "next_arrival": "Следващо пристигане",
-            "save": "Запази", "today": "Днес", "week": "Тази седмица", "month": "Този месец",
-            "next7": "Следващите 7 дни", "all": "Всички", "erledigt": "Завършено", "läuft": "В ход", "offen": "Отворено",
-            "min": "мин", "noch": "остават", "über_zeit": "Над времето", "start": "Старт", "pause": "Пауза",
-            "fertig": "Готово", "wieder_öffnen": "Отвори отново", "notiz": "Бележка", "meine_einsätze": "Моите задачи",
-            "monatslimit": "Внимание: Надхвърлихте месечния си лимит от", "std_überschritten": "часа",
-            "aktuell": "часа записани.", "monat_erfasst": "Текущ месец:",
-            "keine_einsätze": "Няма задачи", "nächste_anreise": "Следващо пристигане",
-            "erw": "Възрастни", "kinder": "Деца", "verbleibend": "остават:",
-            "erledigte_ausblenden": "Скрий завършени", "erledigte_anzeigen": "Покажи завършени",
-            "datum": "Дата", "ma": "Екип", "lock": "Заключено"
-        }
+               "de": {
+                   "tasks": "Einsätze", "team": "Team", "apartments": "Apartments", "import_now": "Import jetzt",
+                   "cleanup": "Bereinigen", "date": "Datum", "apartment": "Apartment", "planned": "Geplant",
+                   "status": "Status", "actual": "Tatsächlich", "next_arrival": "Nächste Anreise",
+                   "save": "Speichern", "today": "Heute", "week": "Diese Woche", "month": "Dieser Monat",
+                   "next7": "Nächste 7 Tage", "all": "Alle", "erledigt": "Erledigt", "läuft": "Läuft", "offen": "Offen",
+                   "min": "min", "noch": "noch ca.", "über_zeit": "Über Zeit", "start": "Start", "pause": "Pause",
+                   "fertig": "Fertig", "wieder_öffnen": "Wieder öffnen", "notiz": "Notiz", "meine_einsätze": "Meine Einsätze",
+                   "monatslimit": "Achtung: Du hast dein Monatslimit von", "std_überschritten": "Std überschritten",
+                   "aktuell": "Std erfasst.", "monat_erfasst": "Aktueller Monat:",
+                   "keine_einsätze": "Keine Einsätze vorhanden", "nächste_anreise": "Nächste Anreise",
+                   "erw": "Erw.", "kinder": "Kinder", "verbleibend": "verbleibend:",
+                   "erledigte_ausblenden": "Erledigte ausblenden", "erledigte_anzeigen": "Erledigte anzeigen",
+                   "datum": "Datum", "ma": "MA", "lock": "Lock", "zurück": "Zurück"
+               },
+               "en": {
+                   "tasks": "Tasks", "team": "Team", "apartments": "Apartments", "import_now": "Import now",
+                   "cleanup": "Clean up", "date": "Date", "apartment": "Apartment", "planned": "Planned",
+                   "status": "Status", "actual": "Actual", "next_arrival": "Next Arrival",
+                   "save": "Save", "today": "Today", "week": "This Week", "month": "This Month",
+                   "next7": "Next 7 Days", "all": "All", "erledigt": "Done", "läuft": "Running", "offen": "Open",
+                   "min": "min", "noch": "ca.", "über_zeit": "Over time", "start": "Start", "pause": "Pause",
+                   "fertig": "Done", "wieder_öffnen": "Reopen", "notiz": "Note", "meine_einsätze": "My Tasks",
+                   "monatslimit": "Warning: You have exceeded your monthly limit of", "std_überschritten": "hours",
+                   "aktuell": "hours logged.", "monat_erfasst": "Current month:",
+                   "keine_einsätze": "No tasks available", "nächste_anreise": "Next Arrival",
+                   "erw": "Adults", "kinder": "Children", "verbleibend": "remaining:",
+                   "erledigte_ausblenden": "Hide completed", "erledigte_anzeigen": "Show completed",
+                   "datum": "Date", "ma": "Staff", "lock": "Lock", "zurück": "Back"
+               },
+               "ro": {
+                   "tasks": "Sarcini", "team": "Echipa", "apartments": "Apartamente", "import_now": "Importă acum",
+                   "cleanup": "Curățare", "date": "Dată", "apartment": "Apartament", "planned": "Planificat",
+                   "status": "Status", "actual": "Real", "next_arrival": "Următoarea sosire",
+                   "save": "Salvează", "today": "Azi", "week": "Săptămâna aceasta", "month": "Luna aceasta",
+                   "next7": "Următoarele 7 zile", "all": "Toate", "erledigt": "Finalizat", "läuft": "În curs", "offen": "Deschis",
+                   "min": "min", "noch": "ca.", "über_zeit": "Peste timp", "start": "Start", "pause": "Pauză",
+                   "fertig": "Finalizat", "wieder_öffnen": "Redeschide", "notiz": "Notă", "meine_einsätze": "Sarcinile mele",
+                   "monatslimit": "Atenție: Ai depășit limita lunară de", "std_überschritten": "ore",
+                   "aktuell": "ore înregistrate.", "monat_erfasst": "Luna curentă:",
+                   "keine_einsätze": "Nu există sarcini", "nächste_anreise": "Următoarea sosire",
+                   "erw": "Adulți", "kinder": "Copii", "verbleibend": "rămâne:",
+                   "erledigte_ausblenden": "Ascunde finalizate", "erledigte_anzeigen": "Afișează finalizate",
+                   "datum": "Dată", "ma": "Echipa", "lock": "Blocare", "zurück": "Înapoi"
+               },
+               "ru": {
+                   "tasks": "Задачи", "team": "Команда", "apartments": "Апартаменты", "import_now": "Импорт сейчас",
+                   "cleanup": "Очистка", "date": "Дата", "apartment": "Апартамент", "planned": "Запланировано",
+                   "status": "Статус", "actual": "Фактически", "next_arrival": "Следующий приезд",
+                   "save": "Сохранить", "today": "Сегодня", "week": "На этой неделе", "month": "В этом месяце",
+                   "next7": "Следующие 7 дней", "all": "Все", "erledigt": "Выполнено", "läuft": "Выполняется", "offen": "Открыто",
+                   "min": "мин", "noch": "около", "über_zeit": "Превышено", "start": "Старт", "pause": "Пауза",
+                   "fertig": "Готово", "wieder_öffnen": "Открыть снова", "notiz": "Заметка", "meine_einsätze": "Мои задачи",
+                   "monatslimit": "Внимание: Вы превысили месячный лимит", "std_überschritten": "часов",
+                   "aktuell": "часов записано.", "monat_erfasst": "Текущий месяц:",
+                   "keine_einsätze": "Нет задач", "nächste_anreise": "Следующий приезд",
+                   "erw": "Взрослые", "kinder": "Дети", "verbleibend": "осталось:",
+                   "erledigte_ausblenden": "Скрыть выполненные", "erledigte_anzeigen": "Показать выполненные",
+                   "datum": "Дата", "ma": "Команда", "lock": "Заблокировано", "zurück": "Назад"
+               },
+               "bg": {
+                   "tasks": "Задачи", "team": "Екип", "apartments": "Апартаменти", "import_now": "Импортирай сега",
+                   "cleanup": "Почистване", "date": "Дата", "apartment": "Апартамент", "planned": "Планирано",
+                   "status": "Статус", "actual": "Действително", "next_arrival": "Следващо пристигане",
+                   "save": "Запази", "today": "Днес", "week": "Тази седмица", "month": "Този месец",
+                   "next7": "Следващите 7 дни", "all": "Всички", "erledigt": "Завършено", "läuft": "В ход", "offen": "Отворено",
+                   "min": "мин", "noch": "остават", "über_zeit": "Над времето", "start": "Старт", "pause": "Пауза",
+                   "fertig": "Готово", "wieder_öffnen": "Отвори отново", "notiz": "Бележка", "meine_einsätze": "Моите задачи",
+                   "monatslimit": "Внимание: Надхвърлихте месечния си лимит от", "std_überschritten": "часа",
+                   "aktuell": "часа записани.", "monat_erfasst": "Текущ месец:",
+                   "keine_einsätze": "Няма задачи", "nächste_anreise": "Следващо пристигане",
+                   "erw": "Възрастни", "kinder": "Деца", "verbleibend": "остават:",
+                   "erledigte_ausblenden": "Скрий завършени", "erledigte_anzeigen": "Покажи завършени",
+                   "datum": "Дата", "ma": "Екип", "lock": "Заключено", "zurück": "Назад"
+               }
     }
     return translations.get(lang, translations["de"])
 
@@ -435,12 +435,6 @@ async def admin_task_assign(token: str, task_id: int = Form(...), staff_id_raw: 
     db.commit()
     return RedirectResponse(url=f"/admin/{token}", status_code=303)
 
-@app.post("/admin/{token}/task/lock")
-async def admin_task_lock(token: str, task_id: int = Form(...), lock: int = Form(1), db=Depends(get_db)):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
-    t = db.get(Task, task_id); t.locked = bool(int(lock)); db.commit()
-    return RedirectResponse(url=f"/admin/{token}", status_code=303)
-
 @app.get("/admin/{token}/apartments")
 async def admin_apartments(request: Request, token: str, db=Depends(get_db)):
     if token != ADMIN_TOKEN:
@@ -469,11 +463,9 @@ async def admin_apartments_apply(token: str, apartment_id: int = Form(...), db=D
     today_iso = dt.date.today().isoformat()
     
     # Update all tasks for this apartment that are today or in the future
-    # Only update unlocked tasks
     tasks = db.query(Task).filter(
         Task.apartment_id == apartment_id,
-        Task.date >= today_iso,
-        Task.locked == False
+        Task.date >= today_iso
     ).all()
     
     updated = 0
@@ -556,7 +548,7 @@ async def admin_cleanup(token: str, db=Depends(get_db)):
     
     db.commit()
     log.info("✅ Cleanup done. Removed %d invalid tasks", removed_count)
-    return PlainTextResponse(f"Cleanup done. Removed {removed_count} invalid tasks (including locked ones). Check logs for details.")
+    return PlainTextResponse(f"Cleanup done. Removed {removed_count} invalid tasks. Check logs for details.")
 
 @app.get("/admin/{token}/export")
 async def admin_export(token: str, month: str, db=Depends(get_db)):

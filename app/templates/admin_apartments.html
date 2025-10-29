@@ -4,9 +4,9 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <title>Admin - Apartments</title></head>
 <body class="bg-light"><div class="container py-4">
-<h1 class="mb-3">Apartments</h1>
+<h1 class="mb-3">{{ trans.apartments }}</h1>
 <div class="d-flex gap-2 mb-3 align-items-center">
-  <a class="btn btn-outline-secondary" href="/admin/{{ token }}"><i class="bi bi-arrow-left"></i> Zurück</a>
+  <a class="btn btn-outline-secondary" href="/admin/{{ token }}"><i class="bi bi-arrow-left"></i> {{ trans.zurück }}</a>
   <select class="form-select form-select-sm" style="width: auto;" onchange="setLanguage(this.value)">
     <option value="de" {% if lang == 'de' %}selected{% endif %}>🇩🇪 Deutsch</option>
     <option value="en" {% if lang == 'en' %}selected{% endif %}>🇬🇧 English</option>

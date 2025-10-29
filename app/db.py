@@ -27,7 +27,6 @@ def _apply_sqlite_migrations():
                     return
                 raise
         add_col("ALTER TABLE tasks ADD COLUMN auto_generated BOOLEAN DEFAULT 1")
-        add_col("ALTER TABLE tasks ADD COLUMN locked BOOLEAN DEFAULT 0")
         add_col("ALTER TABLE tasks ADD COLUMN booking_hash VARCHAR(64)")
         add_col("ALTER TABLE tasks ADD COLUMN next_arrival VARCHAR(10)")
         add_col("ALTER TABLE tasks ADD COLUMN next_arrival_adults INTEGER")
