@@ -1123,12 +1123,40 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
     bookings = db.query(Booking).all()
     book_map = {b.id: (b.guest_name or "").strip() for b in bookings if b.guest_name}
     booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0, 'guest_name': (b.guest_name or "").strip()} for b in bookings}
-    month = dt.date.today().strftime("%Y-%m")
-    minutes = 0
+    # Stunden: vorletzter, letzter, aktueller Monat
+    today = dt.date.today()
+    current_month_str = today.strftime("%Y-%m")
+    if today.month >= 3:
+        last_month = (today.year, today.month - 1)
+        prev_last_month = (today.year, today.month - 2)
+    elif today.month == 2:
+        last_month = (today.year, 1)
+        prev_last_month = (today.year - 1, 12)
+    else:  # today.month == 1
+        last_month = (today.year - 1, 12)
+        prev_last_month = (today.year - 1, 11)
+    last_month_str = f"{last_month[0]}-{last_month[1]:02d}"
+    prev_last_month_str = f"{prev_last_month[0]}-{prev_last_month[1]:02d}"
+
     logs = db.query(TimeLog).filter(TimeLog.staff_id==s.id, TimeLog.actual_minutes!=None).all()
+    minutes_current = 0
+    minutes_last = 0
+    minutes_prev_last = 0
     for tl in logs:
-        if tl.started_at[:7]==month and tl.actual_minutes: minutes += int(tl.actual_minutes)
-    used_hours = round(minutes/60.0, 2)
+        if not tl.started_at:
+            continue
+        m = tl.started_at[:7]
+        mins = int(tl.actual_minutes or 0)
+        if m == current_month_str:
+            minutes_current += mins
+        elif m == last_month_str:
+            minutes_last += mins
+        elif m == prev_last_month_str:
+            minutes_prev_last += mins
+    hours_current = round(minutes_current/60.0, 2)
+    hours_last = round(minutes_last/60.0, 2)
+    hours_prev_last = round(minutes_prev_last/60.0, 2)
+    used_hours = hours_current
     run_map: Dict[int, str] = {}
     for t in tasks:
         tl = db.query(TimeLog).filter(TimeLog.task_id==t.id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
@@ -1147,7 +1175,7 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
             }
     lang = detect_language(request)
     trans = get_translations(lang)
-    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "run_map": run_map, "timelog_map": timelog_map, "warn_limit": warn_limit, "lang": lang, "trans": trans})
+    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "hours_prev_last": hours_prev_last, "hours_last": hours_last, "hours_current": hours_current, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "run_map": run_map, "timelog_map": timelog_map, "warn_limit": warn_limit, "lang": lang, "trans": trans})
 
 @app.post("/cleaner/{token}/start")
 async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)):
@@ -1290,6 +1318,36 @@ async def cleaner_note(token: str, task_id: int = Form(...), note: str = Form(""
     t.notes = (note or "").strip()
     db.commit()
     return JSONResponse({"ok": True, "task_id": t.id, "note": t.notes})
+
+@app.post("/cleaner/{token}/task/create")
+async def cleaner_task_create(token: str, date: str = Form(...), planned_minutes: int = Form(90), description: str = Form(""), db=Depends(get_db)):
+    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
+    if not s:
+        raise HTTPException(status_code=403)
+    # Validierung
+    if not date or not date.strip():
+        raise HTTPException(status_code=400, detail="Datum ist erforderlich")
+    try:
+        _ = dt.datetime.strptime(date[:10], "%Y-%m-%d")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ungültiges Datum")
+    pm = int(planned_minutes or 0)
+    if pm <= 0:
+        pm = 30
+    # Manuelle Aufgabe, dem Cleaner selbst zugeordnet
+    t = Task(
+        date=date[:10],
+        apartment_id=None,
+        planned_minutes=pm,
+        notes=(description[:2000] if description else None),
+        assigned_staff_id=s.id,
+        assignment_status="accepted",
+        status="open",
+        auto_generated=False
+    )
+    db.add(t)
+    db.commit()
+    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
 
 @app.get("/c/{token}/accept")
 async def cleaner_accept_get(token: str, task_id: int, db=Depends(get_db)):

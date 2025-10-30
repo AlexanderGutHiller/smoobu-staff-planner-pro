@@ -85,12 +85,21 @@
   max-width: 100%;
   box-sizing: border-box;
   flex: 0 0 100%;
+  padding-left: 0; /* gleiche Breite ohne Gutter */
+  padding-right: 0;
 }
 /* Erzwinge korrektes Umbrechen langer Inhalte, damit Karten nicht breiter werden */
 .task-card, .task-card * {
   word-wrap: break-word;
   overflow-wrap: anywhere;
+  max-width: 100%;
+  box-sizing: border-box;
 }
+.row.g-3 { --bs-gutter-x: 0; margin-left: 0 !important; margin-right: 0 !important; }
+.row.g-3 > .col-12 { margin-left: 0 !important; margin-right: 0 !important; }
+.task-card { width: 100% !important; margin-left: 0; margin-right: 0; }
+.container { overflow-x: hidden; }
+.task-card img { max-width: 100%; height: auto; }
 .timer-display {
   font-size: 2.5rem;
   font-weight: bold;
@@ -123,8 +132,10 @@
 </head>
 <body class="bg-light"><div class="container py-4">
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
-  <h1 class="mb-0" style="font-size: 1.5rem;">{{ trans.meine_einsätze }}</h1>
-  <select class="form-select form-select-sm" style="width: auto;" onchange="setLanguage(this.value)">
+  <h1 class="mb-0" style="font-size: 1.5rem;">{{ staff.name }} – {{ trans.meine_einsätze }}</h1>
+  <div class="d-flex gap-2 align-items-center">
+    <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#newTaskModal"><i class="bi bi-plus-circle"></i> <span class="d-none d-md-inline">{{ trans.neue_aufgabe }}</span></button>
+    <select class="form-select form-select-sm" style="width: auto;" onchange="setLanguage(this.value)">
     <option value="de" {% if lang == 'de' %}selected{% endif %}>🇩🇪 Deutsch</option>
     <option value="en" {% if lang == 'en' %}selected{% endif %}>🇬🇧 English</option>
     <option value="fr" {% if lang == 'fr' %}selected{% endif %}>🇫🇷 Français</option>
@@ -133,7 +144,8 @@
     <option value="ro" {% if lang == 'ro' %}selected{% endif %}>🇷🇴 Română</option>
     <option value="ru" {% if lang == 'ru' %}selected{% endif %}>🇷🇺 Русский</option>
     <option value="bg" {% if lang == 'bg' %}selected{% endif %}>🇧🇬 Български</option>
-  </select>
+    </select>
+  </div>
 </div>
 <script>
 function setLanguage(lang) {
@@ -146,6 +158,12 @@ function setLanguage(lang) {
 {% else %}
   <div class="alert alert-info alert-dismissible fade show"><i class="bi bi-info-circle"></i> {{ trans.monat_erfasst }} {{ used_hours }} {{ trans.std_überschritten }}</div>
 {% endif %}
+
+<div class="d-flex gap-2 flex-wrap mb-3">
+  <span class="badge bg-secondary">{{ trans.vorletzter_monat }}: {{ hours_prev_last }} {{ trans.stunden }}</span>
+  <span class="badge bg-secondary">{{ trans.letzter_monat }}: {{ hours_last }} {{ trans.stunden }}</span>
+  <span class="badge bg-primary">{{ trans.aktueller_monat }}: {{ hours_current }} {{ trans.stunden }}</span>
+</div>
 
 <div class="mb-3">
   {% if show_done %}
@@ -247,7 +265,7 @@ function setLanguage(lang) {
     {% if t.status=='running' %}
       <div class="text-center mb-3">
         <div class="timer-display timer-running">
-          <div id="timer-{{ t.id }}" data-started="{{ started or '' }}" data-planned="{{ t.planned_minutes }}">⏱️ 0:00</div>
+          <div id="timer-{{ t.id }}" data-started="{{ started or '' }}" data-planned="{{ t.planned_minutes }}" data-accumulated="{{ (timelog_map.get(t.id, {}).get('actual_minutes', 0) if timelog_map else 0) or 0 }}">⏱️ 0:00</div>
         </div>
         <div class="small text-muted" id="remaining-{{ t.id }}" data-lang-over="{{ trans.über_zeit }}" data-lang-min="{{ trans.min }}" data-lang-remaining="{{ trans.noch }}">{{ trans.verbleibend }} --</div>
       </div>
@@ -342,6 +360,38 @@ function setLanguage(lang) {
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
         <button type="button" class="btn btn-primary" id="saveNoteBtn"><i class="bi bi-floppy"></i> Speichern</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Neue Aufgabe (Cleaner) -->
+<div class="modal fade" id="newTaskModal" tabindex="-1" aria-labelledby="newTaskModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="newTaskModalLabel">{{ trans.neue_aufgabe }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="/cleaner/{{ staff.magic_token }}/task/create" id="newCleanerTaskForm">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="c-task-date" class="form-label">{{ trans.date }} *</label>
+            <input type="date" class="form-control" id="c-task-date" name="date" required>
+          </div>
+          <div class="mb-3">
+            <label for="c-task-duration" class="form-label">{{ trans.dauer }} *</label>
+            <input type="number" class="form-control" id="c-task-duration" name="planned_minutes" min="1" value="90" required>
+          </div>
+          <div class="mb-3">
+            <label for="c-task-description" class="form-label">{{ trans.beschreibung }}</label>
+            <textarea class="form-control" id="c-task-description" name="description" rows="3" placeholder="{{ trans.tätigkeit }}"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans.abbrechen }}</button>
+          <button type="submit" class="btn btn-primary">{{ trans.erstellen }}</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
@@ -451,6 +501,7 @@ function updateTimers(){
     const id = el.id.split('-')[1];
     const started = el.getAttribute('data-started');
     const planned = parseInt(el.getAttribute('data-planned') || '0', 10);
+    const accumulated = parseInt(el.getAttribute('data-accumulated') || '0', 10);
     
     if(!started || started === '' || started.trim() === ''){
       el.textContent = '⏱️ 0:00';
@@ -464,7 +515,7 @@ function updateTimers(){
       return;
     }
     
-    const elapsedSeconds = secondsSince(started);
+    const elapsedSeconds = secondsSince(started) + Math.max(0, accumulated) * 60;
     const elapsedMinutes = Math.floor(elapsedSeconds / 60);
     const remaining = Math.max(0, planned - elapsedMinutes);
     
@@ -486,5 +537,22 @@ function updateTimers(){
 }
 updateTimers(); // Sofort beim Laden
 setInterval(updateTimers, 1000); // Update jede Sekunde für echtes live-feeling
+
+// Heutiges Datum beim Öffnen des Modals vorbelegen
+document.addEventListener('DOMContentLoaded', function(){
+  const modal = document.getElementById('newTaskModal');
+  if (modal) {
+    modal.addEventListener('show.bs.modal', function(){
+      const dateInput = document.getElementById('c-task-date');
+      if (dateInput && !dateInput.value) {
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth()+1).padStart(2,'0');
+        const d = String(today.getDate()).padStart(2,'0');
+        dateInput.value = `${y}-${m}-${d}`;
+      }
+    });
+  }
+});
 </script>
 </div></body></html>
