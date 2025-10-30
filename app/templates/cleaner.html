@@ -337,6 +337,12 @@ function setLanguage(lang) {
         <button class="btn btn-outline-danger btn-touch-sm"><i class="bi bi-arrow-counterclockwise"></i> {{ trans.wieder_öffnen }}</button>
       </form>
       {% endif %}
+      {% if not t.auto_generated %}
+      <form method="post" action="/cleaner/{{ staff.magic_token }}/task/delete" onsubmit="return confirm('Diesen Task löschen?');" class="mt-2">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <button class="btn btn-outline-danger btn-touch-sm"><i class="bi bi-trash"></i> Löschen</button>
+      </form>
+      {% endif %}
       <button class="btn btn-outline-primary btn-touch-sm" data-bs-toggle="modal" data-bs-target="#noteModal" data-task="{{ t.id }}" data-current="{{ t.notes|e }}">
         <i class="bi bi-pencil-square"></i> {{ trans.notiz }}
       </button>

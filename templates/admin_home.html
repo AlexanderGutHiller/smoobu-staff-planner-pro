@@ -189,7 +189,7 @@ function setLanguage(lang) {
 </thead>
 <tbody>
 {% for t in tasks %}
-<tr class="{% if t.assignment_status == 'rejected' %}table-danger{% elif t.status == 'done' %}table-secondary{% elif t.status == 'running' or t.status == 'paused' %}table-info{% elif t.assigned_staff_id %}table-success{% else %}table-warning{% endif %}">
+<tr class="{% if t.assignment_status == 'rejected' %}table-danger{% elif t.status == 'done' %}table-secondary{% elif t.status == 'running' or t.status == 'paused' %}table-info{% elif t.assigned_staff_id %}table-success{% else %}table-warning{% endif %}" data-date="{{ t.date }}">
   <td data-col="date">{{ t.date | date_wd_de('short') }}</td>
   <td data-col="apt">
     <div class="fw-bold">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
@@ -230,6 +230,14 @@ function setLanguage(lang) {
     {% else %}
       <span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> {{ trans.offen }}</span>
     {% endif %}
+    <form method="post" action="/admin/{{ token }}/task/status" class="mt-1 d-inline">
+      <input type="hidden" name="task_id" value="{{ t.id }}"/>
+      <select name="status" class="form-select form-select-sm" style="width:auto;display:inline-block" onchange="this.form.submit()">
+        <option value="open" {% if t.status=='open' %}selected{% endif %}>{{ trans.offen }}</option>
+        <option value="paused" {% if t.status=='paused' %}selected{% endif %}>{{ trans.pausiert }}</option>
+        <option value="done" {% if t.status=='done' %}selected{% endif %}>{{ trans.erledigt }}</option>
+      </select>
+    </form>
   </td>
   <td>
     {% set tl = timelog_map.get(t.id, {}) %}
@@ -273,6 +281,12 @@ function setLanguage(lang) {
         {% endfor %}
       </select>
     </form>
+    {% if not t.auto_generated %}
+      <form method="post" action="/admin/{{ token }}/task/delete" onsubmit="return confirm('Diesen manuellen Task löschen?');" class="mt-1">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+      </form>
+    {% endif %}
     {% if t.assigned_staff_id %}
       {% if t.assignment_status == 'pending' %}
         <small class="text-warning d-block mt-1"><i class="bi bi-hourglass-split"></i> {{ trans.pending }}</small>
@@ -412,10 +426,24 @@ function setLanguage(lang) {
 const rows = Array.from(document.querySelectorAll("#task-table tbody tr"));
 const today = new Date().toISOString().split('T')[0];
 
-function matchesDateFilter(taskDate, filter) {
+function parseDateToIso(input) {
+  if (!input) return '';
+  // ISO (yyyy-mm-dd)
+  if (input.includes('-')) {
+    return input.slice(0,10);
+  }
+  // Versuche dd.mm.yyyy irgendwo im Text zu finden (z.B. "Mo, 30.10.2025")
+  const m = input.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+  if (m) {
+    const [, dd, mm, yyyy] = m;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return '';
+}
+
+function matchesDateFilter(taskDateDisplay, filter, taskDateIsoAttr) {
   if (!filter) return true;
-  const [day, month, year] = taskDate.split('.');
-  const taskDateIso = `${year}-${month}-${day}`;
+  const taskDateIso = taskDateIsoAttr || parseDateToIso(taskDateDisplay);
   const todayObj = new Date(today);
   
   switch(filter) {
@@ -446,10 +474,11 @@ function applyFilter(){
   
   rows.forEach(tr => {
     const dateTxt = tr.querySelector('[data-col="date"]').innerText;
+    const dateIsoAttr = tr.getAttribute('data-date') || '';
     const aptTxt = tr.querySelector('[data-col="apt"]').innerText;
     const staffTxt = tr.querySelector('[data-col="staff"]').innerText;
     
-    const ok = matchesDateFilter(dateTxt, fDate)
+    const ok = matchesDateFilter(dateTxt, fDate, dateIsoAttr)
             && (!fApt || aptTxt.toLowerCase().includes(fApt.toLowerCase()))
             && (!fStaff || staffTxt.toLowerCase().includes(fStaff.toLowerCase()));
     

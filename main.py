@@ -854,6 +854,24 @@ async def admin_staff_update(
     db.commit()
     return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
 
+@app.post("/admin/{token}/staff/delete")
+async def admin_staff_delete(token: str, staff_id: int = Form(...), db=Depends(get_db)):
+    if token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403)
+    s = db.get(Staff, staff_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Staff nicht gefunden")
+    # Entkopple Aufgaben
+    for t in db.query(Task).filter(Task.assigned_staff_id==s.id).all():
+        t.assigned_staff_id = None
+        t.assignment_status = None
+    # Lösche TimeLogs des Mitarbeiters
+    for tl in db.query(TimeLog).filter(TimeLog.staff_id==s.id).all():
+        db.delete(tl)
+    db.delete(s)
+    db.commit()
+    return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
+
 @app.post("/admin/{token}/task/assign")
 async def admin_task_assign(token: str, task_id: int = Form(...), staff_id_raw: str = Form(""), db=Depends(get_db)):
     if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
@@ -929,6 +947,49 @@ async def admin_task_create(token: str, date: str = Form(...), apartment_id_raw:
     db.commit()
     
     log.info("✅ Manuell erstellte Aufgabe: %s für %s am %s", new_task.id, apt_name, date)
+    return RedirectResponse(url=f"/admin/{token}", status_code=303)
+
+@app.post("/admin/{token}/task/delete")
+async def admin_task_delete(token: str, task_id: int = Form(...), db=Depends(get_db)):
+    if token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403)
+    t = db.get(Task, task_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Task nicht gefunden")
+    if t.auto_generated:
+        raise HTTPException(status_code=400, detail="Automatisch erzeugte Aufgaben können hier nicht gelöscht werden")
+    for tl in db.query(TimeLog).filter(TimeLog.task_id==t.id).all():
+        db.delete(tl)
+    db.delete(t)
+    db.commit()
+    return RedirectResponse(url=f"/admin/{token}", status_code=303)
+
+@app.post("/admin/{token}/task/status")
+async def admin_task_status(token: str, task_id: int = Form(...), status: str = Form(...), db=Depends(get_db)):
+    if token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403)
+    allowed = {"open", "paused", "done"}
+    status = (status or "").strip().lower()
+    if status not in allowed:
+        raise HTTPException(status_code=400, detail="Ungültiger Status")
+    t = db.get(Task, task_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Task nicht gefunden")
+    # TimeLogs behandeln: offene Logs schließen, wenn nicht 'running'
+    tl = db.query(TimeLog).filter(TimeLog.task_id==t.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
+    if tl:
+        from datetime import datetime
+        fmt = "%Y-%m-%d %H:%M:%S"
+        tl.ended_at = now_iso()
+        try:
+            start = datetime.strptime(tl.started_at, fmt)
+            end = datetime.strptime(tl.ended_at, fmt)
+            elapsed = int((end-start).total_seconds()//60)
+            tl.actual_minutes = int(tl.actual_minutes or 0) + max(0, elapsed)
+        except Exception:
+            pass
+    t.status = status
+    db.commit()
     return RedirectResponse(url=f"/admin/{token}", status_code=303)
 
 @app.get("/admin/{token}/apartments")
@@ -1347,6 +1408,23 @@ async def cleaner_task_create(token: str, date: str = Form(...), planned_minutes
         auto_generated=False
     )
     db.add(t)
+    db.commit()
+    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+
+@app.post("/cleaner/{token}/task/delete")
+async def cleaner_task_delete(token: str, task_id: int = Form(...), db=Depends(get_db)):
+    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
+    if not s:
+        raise HTTPException(status_code=403)
+    t = db.get(Task, task_id)
+    if not t or t.assigned_staff_id != s.id:
+        raise HTTPException(status_code=404, detail="Task nicht gefunden oder nicht zugewiesen")
+    if t.auto_generated:
+        raise HTTPException(status_code=400, detail="Automatisch erzeugte Aufgaben können hier nicht gelöscht werden")
+    # Timelogs für diesen Task entfernen
+    for tl in db.query(TimeLog).filter(TimeLog.task_id==t.id).all():
+        db.delete(tl)
+    db.delete(t)
     db.commit()
     return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
 
