@@ -418,15 +418,42 @@ def _daterange(days=60):
 
 def _best_guest_name(it: dict) -> str:
     guest = it.get("guest") or {}
-    full = guest.get("fullName") or ""
-    if full:
-        return full
-    fn = guest.get("firstName", "") or it.get("firstName", "")
-    ln = guest.get("lastName", "") or it.get("lastName", "")
-    name = (fn + " " + ln).strip()
-    if name:
-        return name
-    return it.get("name") or it.get("contactName") or ""
+    # Häufige Felder
+    candidates = [
+        guest.get("fullName"),
+        (f"{guest.get('firstName','')} {guest.get('lastName','')}".strip() or None),
+        (f"{it.get('firstName','')} {it.get('lastName','')}".strip() or None),
+        it.get("guestName"),
+        it.get("mainGuestName"),
+        it.get("contactName"),
+        it.get("name"),
+        (it.get("contact") or {}).get("name"),
+    ]
+    for c in candidates:
+        if c and isinstance(c, str) and c.strip():
+            return c.strip()
+    return ""
+
+def _guest_count_label(it: dict) -> str:
+    try:
+        adults = it.get("adults")
+        children = it.get("children")
+        # Alternativ-Felder absichern
+        if adults is None:
+            adults = it.get("numAdults") or it.get("guests") or 0
+        if children is None:
+            children = it.get("numChildren") or 0
+        adults = int(adults or 0)
+        children = int(children or 0)
+        total = adults + children
+        if total <= 0 and (adults > 0 or children > 0):
+            total = adults + children
+        if total > 0:
+            # Einfache deutsche Bezeichnung
+            return f"{total} Gäste"
+    except Exception:
+        pass
+    return ""
 
 async def refresh_bookings_job():
     client = SmoobuClient()
@@ -445,6 +472,19 @@ async def refresh_bookings_job():
             guest_name = _best_guest_name(it)
             if guest_name:
                 log.debug("📝 Guest name for booking %d: '%s'", b_id, guest_name)
+            else:
+                # Breiteres Logging zur Diagnose, wenn kein Name geliefert wird
+                try:
+                    log.warning("⚠️ No guest name in booking %d. Available keys: %s", b_id, list(it.keys()))
+                    if it.get("guest"):
+                        log.warning("⚠️ guest keys: %s", list((it.get("guest") or {}).keys()))
+                    if it.get("contact"):
+                        log.warning("⚠️ contact keys: %s", list((it.get("contact") or {}).keys()))
+                    log.warning("⚠️ adults=%s children=%s guests=%s", it.get("adults"), it.get("children"), it.get("guests"))
+                except Exception:
+                    pass
+                # Fallback: Gästeanzahl
+                guest_name = _guest_count_label(it) or ""
             arrival = (it.get("arrival") or "")[:10]
             departure = (it.get("departure") or "")[:10]
 
