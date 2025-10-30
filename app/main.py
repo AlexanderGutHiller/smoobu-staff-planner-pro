@@ -513,11 +513,73 @@ async def refresh_bookings_job():
             
             if should_skip:
                 log.info("⛔ SKIP %s booking %d (%s) - arrival: %s, departure: %s", reason, b_id, apt_name, arrival, departure)
+                # Sofort-Benachrichtigung an zugewiesene Cleaner über Storno + zugehörige Tasks löschen
+                try:
+                    # Sammle betroffene Tasks
+                    tasks = db.query(Task).filter(Task.booking_id==b_id).all()
+                    by_staff: Dict[int, list] = {}
+                    for t in tasks:
+                        if t.assigned_staff_id and t.assignment_status != "rejected":
+                            by_staff.setdefault(t.assigned_staff_id, []).append(t)
+                    for sid, tlist in by_staff.items():
+                        staff = db.get(Staff, sid)
+                        if not staff or not (staff.email or "").strip():
+                            continue
+                        lang = staff.language or "de"
+                        trans = get_translations(lang)
+                        # E-Mail-Inhalte pro Staff
+                        items = []
+                        for t in tlist:
+                            token = staff.magic_token
+                            items.append({
+                                'date': t.date,
+                                'apt': apt_name or "",
+                                'desc': (t.notes or "").strip() or trans.get('tätigkeit','Tätigkeit'),
+                                'link': f"{BASE_URL.rstrip('/')}/cleaner/{token}",
+                            })
+                        subject = f"{trans.get('cleanup','Bereinigen')}: {trans.get('zuweisung','Zuweisung')} storniert"
+                        # Text
+                        lines = [f"{trans.get('zuweisung','Zuweisung')} storniert:"]
+                        for it in items:
+                            lines.append(f"- {it['date']} · {it['apt']} · {it['desc']}")
+                        lines.append("")
+                        lines.append(items[0]['link'])
+                        body_text = "\n".join(lines)
+                        # HTML
+                        cards = []
+                        for it in items:
+                            cards.append(f"""
+                            <div style='border:1px solid #f1b0b7;border-radius:8px;padding:12px;margin:10px 0;background:#fff5f5;'>
+                              <div style='display:flex;justify-content:space-between;align-items:center;'>
+                                <div style='font-weight:700;font-size:16px'>{it['date']} · {it['apt']}</div>
+                                <span style='background:#dc3545;color:#fff;border-radius:12px;padding:4px 8px;font-size:12px;'>Storniert</span>
+                              </div>
+                              <div style='margin-top:6px;font-size:14px;'>{it['desc']}</div>
+                            </div>
+                            """)
+                        body_html = f"""
+                        <div style='font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f8f9fa;padding:16px;'>
+                          <div style='max-width:680px;margin:0 auto;'>
+                            <h2 style='margin:0 0 12px 0;font-size:20px;'>Storno: Aufgaben entfallen</h2>
+                            {''.join(cards)}
+                            <div style='margin-top:12px;'>
+                              <a href='{items[0]['link']}' style='text-decoration:none;background:#0d6efd;color:#fff;padding:8px 10px;border-radius:6px;font-weight:600;'>Zur Übersicht</a>
+                            </div>
+                          </div>
+                        </div>
+                        """
+                        _send_email(staff.email, subject, body_text, body_html)
+                except Exception as e:
+                    log.error("Error sending cancellation notifications for booking %d: %s", b_id, e)
                 # Delete existing booking if it exists
                 b_existing = db.get(Booking, b_id)
                 if b_existing:
                     db.delete(b_existing)
                     log.info("🗑️ Deleted existing booking %d from database", b_id)
+                # Lösche zugehörige Tasks direkt
+                for t in db.query(Task).filter(Task.booking_id==b_id).all():
+                    db.delete(t)
+                db.commit()
                 continue
             
             # Only log valid bookings
@@ -756,14 +818,23 @@ async def admin_staff_update(
 async def admin_task_assign(token: str, task_id: int = Form(...), staff_id_raw: str = Form(""), db=Depends(get_db)):
     if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
+    prev_staff_id = t.assigned_staff_id
     staff_id: Optional[int] = int(staff_id_raw) if staff_id_raw.strip() else None
     t.assigned_staff_id = staff_id
     # Setze assignment_status auf "pending" wenn ein MA zugewiesen wird, sonst None
     if staff_id:
         t.assignment_status = "pending"
+        # Markiere für Benachrichtigung
+        t.assign_notified_at = None
     else:
         t.assignment_status = None
     db.commit()
+    # Sofortige Mail bei neuer/ändernder Zuweisung
+    try:
+        if staff_id and staff_id != prev_staff_id:
+            send_assignment_emails_job()
+    except Exception as e:
+        log.error("Immediate notify failed for task %s: %s", t.id, e)
     return RedirectResponse(url=f"/admin/{token}", status_code=303)
 
 @app.post("/admin/{token}/task/create")
@@ -856,6 +927,9 @@ async def admin_apartments_apply(token: str, apartment_id: int = Form(...), db=D
     updated = 0
     for t in tasks:
         t.planned_minutes = a.planned_minutes
+        # Benachrichtigung bei geänderter Dauer für zugewiesene (bündeln via Scheduler)
+        if t.assigned_staff_id and t.assignment_status != "rejected":
+            t.assign_notified_at = None
         updated += 1
     
     db.commit()

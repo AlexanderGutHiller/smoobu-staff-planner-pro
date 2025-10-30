@@ -194,7 +194,7 @@ function setLanguage(lang) {
   <td data-col="apt">
     <div class="fw-bold">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
     {% if t.booking_id %}
-      {% set guest_name = book_map.get(t.booking_id) or booking_details_map.get(t.booking_id, {}).get('guest_name', '') %}
+      {% set guest_name = (book_map.get(t.booking_id) or booking_details_map.get(t.booking_id, {}).get('guest_name', '') or t.next_arrival_guest_name or '') %}
       {% if guest_name and guest_name.strip() %}
         <div class="small text-primary mb-1" style="font-size: 0.95rem;"><i class="bi bi-person"></i> <strong>{{ guest_name }}</strong></div>
       {% endif %}

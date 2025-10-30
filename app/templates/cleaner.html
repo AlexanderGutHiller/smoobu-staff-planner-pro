@@ -15,6 +15,8 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  display: block;
+  overflow: hidden;
 }
 .task-card:hover {
   border-color: #0d6efd;
@@ -34,6 +36,21 @@
   border-color: #0dcaf0;
   border-width: 3px;
   background-color: #e7f8ff;
+}
+.task-card.assign-accepted {
+  border-color: #198754;
+  border-width: 3px;
+  background-color: #e9f7ef;
+}
+.task-card.assign-pending {
+  border-color: #ffc107;
+  border-width: 3px;
+  background-color: #fff8e1;
+}
+.task-card.assign-rejected {
+  border-color: #dc3545;
+  border-width: 3px;
+  background-color: #fdecee;
 }
 .task-card-header {
   display: flex;
@@ -67,6 +84,12 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  flex: 0 0 100%;
+}
+/* Erzwinge korrektes Umbrechen langer Inhalte, damit Karten nicht breiter werden */
+.task-card, .task-card * {
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 .timer-display {
   font-size: 2.5rem;
@@ -143,7 +166,7 @@ function setLanguage(lang) {
 {% set started = run_map.get(t.id) %}
 {% set is_disabled = running_task_id and running_task_id != t.id and t.status != 'running' and t.status != 'done' %}
 {% set tl = timelog_map.get(t.id, {}) if timelog_map else {} %}
-<div class="col-12 task-card {% if t.status=='done' %}done{% elif is_disabled %}disabled{% elif t.status=='paused' %}paused{% endif %}">
+<div class="col-12 task-card {% if t.status=='done' %}done{% elif is_disabled %}disabled{% elif t.status=='paused' %}paused{% endif %} {% if t.assignment_status=='accepted' %}assign-accepted{% elif t.assignment_status=='pending' %}assign-pending{% elif t.assignment_status=='rejected' %}assign-rejected{% endif %}">
   <div class="task-card-header">
     <div>
       <strong style="font-size: 1.1rem;">{{ t.date | date_wd_de('short') }}</strong>
