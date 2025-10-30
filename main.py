@@ -260,7 +260,7 @@ def date_wd_de(s: str, style: str = "short") -> str:
 templates.env.filters["date_de"] = date_de
 templates.env.filters["date_wd_de"] = date_wd_de
 
-def _send_email(to_email: str, subject: str, body: str):
+def _send_email(to_email: str, subject: str, body_text: str, body_html: str | None = None):
     if not (SMTP_HOST and SMTP_FROM):
         log.warning("SMTP not configured, skipping email to %s", to_email)
         return
@@ -270,7 +270,9 @@ def _send_email(to_email: str, subject: str, body: str):
     msg["From"] = SMTP_FROM
     msg["To"] = to_email
     msg["Subject"] = subject
-    msg.set_content(body)
+    msg.set_content(body_text)
+    if body_html:
+        msg.add_alternative(body_html, subtype="html")
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as s:
             s.starttls()
@@ -281,32 +283,58 @@ def _send_email(to_email: str, subject: str, body: str):
     except Exception as e:
         log.error("Email send failed to %s: %s", to_email, e)
 
-def build_assignment_email(lang: str, staff_name: str, tasks: list, base_url: str) -> tuple[str, str]:
+def build_assignment_email(lang: str, staff_name: str, items: list, base_url: str) -> tuple[str, str, str]:
     trans = get_translations(lang)
-    subject = f"{trans.get('zuweisung','Zuweisung')}: {len(tasks)} {trans.get('tasks','Tasks')}"
-    lines = []
-    lines.append(f"{trans.get('team','Team')}: {staff_name}")
-    lines.append("")
-    for t in tasks:
-        date_str = t.date
-        desc = (t.notes or "").strip() or trans.get('tätigkeit','Tätigkeit')
-        token = getattr(t, "_token", "")
-        accept_link = f"{base_url}/c/{token}/accept?task_id={t.id}"
-        reject_link = f"{base_url}/c/{token}/reject?task_id={t.id}"
-        lines.append(f"- {date_str}: {desc}")
-        lines.append(f"  {trans.get('annehmen','Annehmen')}: {accept_link}")
-        lines.append(f"  {trans.get('ablehnen','Ablehnen')}: {reject_link}")
-        lines.append("")
-    body = "\n".join(lines).strip()
-    return subject, body
+    subject = f"{trans.get('zuweisung','Zuweisung')}: {len(items)} {trans.get('tasks','Tasks')}"
+    # Text-Version
+    tlines = [f"{trans.get('team','Team')}: {staff_name}", ""]
+    for it in items:
+        tlines.append(f"- {it['date']}: {it['desc']} ({it['apt']})")
+        if it.get('guest'):
+            tlines.append(f"  {it['guest']}")
+        tlines.append(f"  {trans.get('annehmen','Annehmen')}: {it['accept']}")
+        tlines.append(f"  {trans.get('ablehnen','Ablehnen')}: {it['reject']}")
+        tlines.append("")
+    body_text = "\n".join(tlines).strip()
+    # HTML-Version (Inline-Styles für breite Kompatibilität)
+    cards = []
+    for it in items:
+        guest_html = f"<div style='color:#6c757d;font-size:13px;margin-top:4px;'>{it['guest']}</div>" if it.get('guest') else ""
+        cards.append(f"""
+        <div style='border:1px solid #dee2e6;border-radius:8px;padding:12px;margin:10px 0;background:#ffffff;'>
+          <div style='display:flex;justify-content:space-between;align-items:center;'>
+            <div style='font-weight:700;font-size:16px'>{it['date']} · {it['apt']}</div>
+            <span style='background:#0d6efd;color:#fff;border-radius:12px;padding:4px 8px;font-size:12px;'>{trans.get('zuweisung','Zuweisung')}</span>
+          </div>
+          <div style='margin-top:6px;font-size:14px;'>{it['desc']}</div>
+          {guest_html}
+          <div style='display:flex;gap:8px;margin-top:12px;'>
+            <a href='{it['accept']}' style='text-decoration:none;background:#198754;color:#fff;padding:8px 10px;border-radius:6px;font-weight:600;'>{trans.get('annehmen','Annehmen')}</a>
+            <a href='{it['reject']}' style='text-decoration:none;background:#dc3545;color:#fff;padding:8px 10px;border-radius:6px;font-weight:600;'>{trans.get('ablehnen','Ablehnen')}</a>
+          </div>
+        </div>
+        """)
+    body_html = f"""
+    <div style='font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f8f9fa;padding:16px;'>
+      <div style='max-width:680px;margin:0 auto;'>
+        <h2 style='margin:0 0 12px 0;font-size:20px;'>{trans.get('zuweisung','Zuweisung')} · {staff_name}</h2>
+        {''.join(cards)}
+        <div style='color:#6c757d;font-size:12px;margin-top:12px;'>
+          {trans.get('hinweis','Hinweis') if 'hinweis' in trans else 'Hinweis'}: Diese E-Mail fasst Aufgaben der letzten 30 Minuten zusammen.
+        </div>
+      </div>
+    </div>
+    """
+    return subject, body_text, body_html
 
 def send_assignment_emails_job():
     base_url = BASE_URL.rstrip("/") or ""
     with SessionLocal() as db:
         pending = db.query(Task).filter(Task.assignment_status=="pending", Task.assigned_staff_id!=None, Task.assign_notified_at==None).all()
         if not pending:
-            return
+            return []
         staff_ids = {t.assigned_staff_id for t in pending if t.assigned_staff_id}
+        report = []
         for sid in staff_ids:
             staff = db.get(Staff, sid)
             if not staff or not (staff.email or "").strip():
@@ -314,14 +342,52 @@ def send_assignment_emails_job():
             lang = (staff.language or "de")
             token = staff.magic_token
             tasks_for_staff = [t for t in pending if t.assigned_staff_id==sid]
+            items = []
+            trans = get_translations(lang)
             for t in tasks_for_staff:
-                setattr(t, "_token", token)
-            subject, body = build_assignment_email(lang, staff.name, tasks_for_staff, base_url)
-            _send_email(staff.email, subject, body)
+                apt_name = ""
+                if t.apartment_id:
+                    apt = db.get(Apartment, t.apartment_id)
+                    apt_name = apt.name if apt else ""
+                guest_str = ""
+                if t.booking_id:
+                    b = db.get(Booking, t.booking_id)
+                    if b:
+                        gname = (b.guest_name or "").strip()
+                        if gname:
+                            guest_str = f"{gname}"
+                        else:
+                            # Adults/children fallback
+                            ac = []
+                            if b.adults:
+                                ac.append(f"{trans.get('erw','Erw.')} {b.adults}")
+                            if b.children:
+                                ac.append(f"{trans.get('kinder','Kinder')} {b.children}")
+                            guest_str = ", ".join(ac)
+                desc = (t.notes or "").strip() or get_translations(lang).get('tätigkeit','Tätigkeit')
+                accept_link = f"{base_url}/c/{token}/accept?task_id={t.id}"
+                reject_link = f"{base_url}/c/{token}/reject?task_id={t.id}"
+                items.append({
+                    'date': t.date,
+                    'apt': apt_name,
+                    'desc': desc,
+                    'guest': guest_str,
+                    'accept': accept_link,
+                    'reject': reject_link,
+                })
+            subject, body_text, body_html = build_assignment_email(lang, staff.name, items, base_url)
+            _send_email(staff.email, subject, body_text, body_html)
             now = now_iso()
             for t in tasks_for_staff:
                 t.assign_notified_at = now
+            report.append({
+                'staff_name': staff.name,
+                'email': staff.email,
+                'count': len(items),
+                'items': items,
+            })
         db.commit()
+        return report
 
 def get_db():
     db = SessionLocal()
@@ -807,8 +873,18 @@ async def admin_notify_assignments(token: str):
     if token != ADMIN_TOKEN:
         raise HTTPException(status_code=403)
     try:
-        send_assignment_emails_job()
-        return PlainTextResponse("Assignment notification job executed.")
+        report = send_assignment_emails_job()
+        if not report:
+            return PlainTextResponse("Keine offenen Zuweisungen zum Versenden.")
+        # Baue menschenlesbaren Report
+        lines = ["Benachrichtigungen gesendet:", ""]
+        for r in report:
+            lines.append(f"- {r['staff_name']} <{r['email']}>: {r['count']} Aufgaben")
+            for it in r['items']:
+                guest = f" · {it['guest']}" if it.get('guest') else ""
+                lines.append(f"  • {it['date']} · {it['apt']} · {it['desc']}{guest}")
+            lines.append("")
+        return PlainTextResponse("\n".join(lines).strip())
     except Exception as e:
         log.exception("Manual notify failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
