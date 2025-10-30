@@ -16,6 +16,17 @@
     .desktop-view { display: none; }
     .mobile-view { display: block; }
     .filter-input { width: 100%; margin-bottom: 0.5rem; }
+    /* Bessere Bedienbarkeit auf iOS/iPhone */
+    .mobile-filter-section select.form-select {
+      min-height: 44px; /* Touch-Zielgröße */
+      font-size: 16px;  /* verhindert iOS-Zoom beim Fokussieren */
+      -webkit-appearance: menulist;
+      appearance: menulist;
+      line-height: 1.2;
+      pointer-events: auto;
+    }
+    .mobile-filter-section label { font-size: 0.95rem; font-weight: 600; }
+    .mobile-filter-section { position: relative; z-index: 2; }
     
     .task-card-mobile {
       border: 2px solid #dee2e6;
@@ -147,6 +158,10 @@ function setLanguage(lang) {
       <option value="{{ s.name }}">{{ s.name }}</option>
     {% endfor %}
   </select>
+
+  <div class="d-flex gap-2 mt-3">
+    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="resetMobileFilters()"><i class="bi bi-x-circle"></i> Reset</button>
+  </div>
 </div>
 
 <!-- Desktop View -->
@@ -518,6 +533,14 @@ function applyFilter(){
     });
   });
 });
+
+function resetMobileFilters(){
+  const ids = ['f-date','f-apt','f-staff','f-date-mobile','f-apt-mobile','f-staff-mobile'];
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.value=''; });
+  applyFilter();
+  const mobileCards = document.querySelectorAll('.task-card-mobile');
+  mobileCards.forEach(card => card.style.display='');
+}
 </script>
 
 <!-- Modal für neue Aufgabe -->

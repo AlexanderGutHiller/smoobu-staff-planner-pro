@@ -169,6 +169,10 @@ function setLanguage(lang) {
       </button>
     </form>
     <button class="btn btn-sm btn-outline-secondary ms-1" type="button" onclick="toggleEdit({{ s.id }})"><i class="bi bi-pencil"></i> Bearbeiten</button>
+    <form method="post" action="/admin/{{ token }}/staff/delete" class="d-inline ms-1" onsubmit="return confirm('Diesen Mitarbeiter wirklich löschen? Zugeordnete Aufgaben werden entkoppelt.');">
+      <input type="hidden" name="staff_id" value="{{ s.id }}"/>
+      <button class="btn btn-sm btn-outline-danger" title="Löschen"><i class="bi bi-trash"></i></button>
+    </form>
   </td>
 </tr>
 <tr id="edit-row-{{ s.id }}" style="display:none;">
@@ -320,12 +324,17 @@ function setLanguage(lang) {
 
 <script>
 function toggleEdit(id){
-  const row = document.getElementById(typeof id === 'string' && id.startsWith('m') ? `edit-card-${id}` : `edit-row-${id}`);
+  const isMobile = (typeof id === 'string' && id.startsWith('m'));
+  const targetId = isMobile ? `edit-card-${id}` : `edit-row-${id}`;
+  const row = document.getElementById(targetId);
   if (!row) return;
-  row.style.display = (row.style.display === 'none' || row.style.display === '') ? 'table-row' : 'none';
-  if (typeof id === 'string' && id.startsWith('m')) {
-    // mobile card uses block display
-    row.style.display = (row.style.display === 'none' || row.style.display === '') ? 'block' : 'none';
+  // Nutze computed style, falls kein inline-style gesetzt ist
+  const current = window.getComputedStyle(row).display;
+  if (current === 'none') {
+    row.style.display = isMobile ? 'block' : 'table-row';
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else {
+    row.style.display = 'none';
   }
 }
 </script>
