@@ -3,18 +3,28 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
-# Verwende persistentes Volume auf Fly.io, falls vorhanden, sonst lokales Verzeichnis
-# Versuche zuerst das Volume-Verzeichnis, dann lokales Verzeichnis
-if os.path.isdir("/app/data"):
-    DATA_DIR = "/app/data"
-elif os.path.exists("/app/data"):
-    # Falls /app/data eine Datei ist (nicht Verzeichnis), verwende lokales Verzeichnis
-    DATA_DIR = "."
+# Datenbankpfad-Priorität:
+# 1) Explizit via ENV DB_PATH (z. B. "/var/data/data.db" auf Render Disk)
+# 2) Verzeichnis via ENV DATA_DIR (z. B. "/var/data" oder "/app/data")
+# 3) Fly.io Volume "/app/data" falls vorhanden
+# 4) Render Disk "/var/data" falls vorhanden
+# 5) Fallback: aktuelles Verzeichnis
+env_db_path = (os.getenv("DB_PATH") or "").strip()
+if env_db_path:
+    db_path = env_db_path
 else:
-    DATA_DIR = "."
+    env_data_dir = (os.getenv("DATA_DIR") or "").strip()
+    if env_data_dir:
+        data_dir = env_data_dir
+    elif os.path.isdir("/app/data"):
+        data_dir = "/app/data"
+    elif os.path.isdir("/var/data"):
+        data_dir = "/var/data"
+    else:
+        data_dir = "."
+    db_path = os.path.join(data_dir, "data.db")
 
-DB_PATH = os.path.join(DATA_DIR, "data.db")
-DB_URL = f"sqlite:///{DB_PATH}"
+DB_URL = f"sqlite:///{db_path}"
 
 engine = create_engine(DB_URL, echo=False, future=True)
 
