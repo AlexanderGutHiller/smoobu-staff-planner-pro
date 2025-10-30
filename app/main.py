@@ -1162,6 +1162,7 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
         tl = db.query(TimeLog).filter(TimeLog.task_id==t.id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
         if tl:
             run_map[t.id] = tl.started_at
+    has_running = any(t.status == 'running' for t in tasks)
     warn_limit = used_hours > float(s.max_hours_per_month or 0)
     # Timelog-Daten für jedes Task (für pausierte Aufgaben)
     timelog_map = {}
@@ -1175,7 +1176,7 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
             }
     lang = detect_language(request)
     trans = get_translations(lang)
-    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "hours_prev_last": hours_prev_last, "hours_last": hours_last, "hours_current": hours_current, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "run_map": run_map, "timelog_map": timelog_map, "warn_limit": warn_limit, "lang": lang, "trans": trans})
+    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "hours_prev_last": hours_prev_last, "hours_last": hours_last, "hours_current": hours_current, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "run_map": run_map, "timelog_map": timelog_map, "warn_limit": warn_limit, "lang": lang, "trans": trans, "has_running": has_running})
 
 @app.post("/cleaner/{token}/start")
 async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)):
