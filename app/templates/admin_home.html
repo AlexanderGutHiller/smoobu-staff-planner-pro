@@ -24,6 +24,9 @@
       appearance: menulist;
       line-height: 1.2;
       pointer-events: auto;
+      /* Verhindert doppelte Pfeile (iOS nativer Pfeil + Bootstrap-Hintergrundbild) */
+      background-image: none !important;
+      padding-right: 0.75rem;
     }
     .mobile-filter-section label { font-size: 0.95rem; font-weight: 600; }
     .mobile-filter-section { position: relative; z-index: 2; }
@@ -531,6 +534,9 @@ function applyFilter(){
       
       card.style.display = ok ? '' : 'none';
     });
+
+    // iOS Workaround: Select nach Änderung ent-fokussieren, damit eine zweite Auswahl möglich ist
+    try { this.blur(); } catch(e) {}
   });
 });
 
