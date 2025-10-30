@@ -290,8 +290,9 @@ def build_assignment_email(lang: str, staff_name: str, tasks: list, base_url: st
     for t in tasks:
         date_str = t.date
         desc = (t.notes or "").strip() or trans.get('tätigkeit','Tätigkeit')
-        accept_link = f"{base_url}/c/{t['_token']}/accept?task_id={t.id}"
-        reject_link = f"{base_url}/c/{t['_token']}/reject?task_id={t.id}"
+        token = getattr(t, "_token", "")
+        accept_link = f"{base_url}/c/{token}/accept?task_id={t.id}"
+        reject_link = f"{base_url}/c/{token}/reject?task_id={t.id}"
         lines.append(f"- {date_str}: {desc}")
         lines.append(f"  {trans.get('annehmen','Annehmen')}: {accept_link}")
         lines.append(f"  {trans.get('ablehnen','Ablehnen')}: {reject_link}")
@@ -538,13 +539,6 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
         raise HTTPException(status_code=403)
     
     lang = detect_language(request)
-    try:
-        cookie_lang = request.cookies.get("lang", "")
-    except Exception:
-        cookie_lang = ""
-    if not cookie_lang:
-        if getattr(s, "language", None) in ["de","en","fr","it","es","ro","ru","bg"]:
-            lang = s.language
     trans = get_translations(lang)
     
     q = db.query(Task)
@@ -807,6 +801,17 @@ async def admin_import(token: str, db=Depends(get_db)):
     if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
     await refresh_bookings_job()
     return PlainTextResponse("Import done.")
+
+@app.get("/admin/{token}/notify_assignments")
+async def admin_notify_assignments(token: str):
+    if token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403)
+    try:
+        send_assignment_emails_job()
+        return PlainTextResponse("Assignment notification job executed.")
+    except Exception as e:
+        log.exception("Manual notify failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/admin/{token}/cleanup_tasks")
 async def admin_cleanup_tasks(token: str, date: str, db=Depends(get_db)):

@@ -77,6 +77,7 @@
     <option value="ru" {% if lang == 'ru' %}selected{% endif %}>🇷🇺 Русский</option>
     <option value="bg" {% if lang == 'bg' %}selected{% endif %}>🇧🇬 Български</option>
   </select>
+  <a class="btn btn-outline-warning btn-sm" href="/admin/{{ token }}/notify_assignments" title="Zuweisungs-Mails jetzt senden"><i class="bi bi-send"></i> Zuweisungs-Mails senden</a>
 </div>
 <script>
 function setLanguage(lang) {
