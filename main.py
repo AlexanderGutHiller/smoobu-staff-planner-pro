@@ -663,6 +663,35 @@ async def admin_staff_toggle(token: str, staff_id: int = Form(...), db=Depends(g
     s = db.get(Staff, staff_id); s.active = not s.active; db.commit()
     return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
 
+@app.post("/admin/{token}/staff/update")
+async def admin_staff_update(
+    token: str,
+    staff_id: int = Form(...),
+    name: str = Form(...),
+    email: str = Form(...),
+    hourly_rate: float = Form(0.0),
+    max_hours_per_month: int = Form(160),
+    language: str = Form("de"),
+    db=Depends(get_db)
+):
+    if token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403)
+    s = db.get(Staff, staff_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Staff nicht gefunden")
+    email = (email or "").strip()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Ungültige E-Mail")
+    if language not in ["de","en","fr","it","es","ro","ru","bg"]:
+        language = "de"
+    s.name = name
+    s.email = email
+    s.hourly_rate = float(hourly_rate or 0)
+    s.max_hours_per_month = int(max_hours_per_month or 0)
+    s.language = language
+    db.commit()
+    return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
+
 @app.post("/admin/{token}/task/assign")
 async def admin_task_assign(token: str, task_id: int = Form(...), staff_id_raw: str = Form(""), db=Depends(get_db)):
     if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
