@@ -222,6 +222,11 @@ ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 TIMEZONE = os.getenv("TIMEZONE", "Europe/Berlin")
 REFRESH_INTERVAL_MINUTES = int(os.getenv("REFRESH_INTERVAL_MINUTES", "60"))
 BASE_URL = os.getenv("BASE_URL", "")
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM = os.getenv("SMTP_FROM", "")
 
 log = logging.getLogger("smoobu")
 logging.basicConfig(level=logging.INFO)
@@ -255,6 +260,68 @@ def date_wd_de(s: str, style: str = "short") -> str:
 templates.env.filters["date_de"] = date_de
 templates.env.filters["date_wd_de"] = date_wd_de
 
+def _send_email(to_email: str, subject: str, body: str):
+    if not (SMTP_HOST and SMTP_FROM):
+        log.warning("SMTP not configured, skipping email to %s", to_email)
+        return
+    import smtplib
+    from email.message import EmailMessage
+    msg = EmailMessage()
+    msg["From"] = SMTP_FROM
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.set_content(body)
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as s:
+            s.starttls()
+            if SMTP_USER:
+                s.login(SMTP_USER, SMTP_PASSWORD)
+            s.send_message(msg)
+        log.info("📧 Sent email to %s", to_email)
+    except Exception as e:
+        log.error("Email send failed to %s: %s", to_email, e)
+
+def build_assignment_email(lang: str, staff_name: str, tasks: list, base_url: str) -> tuple[str, str]:
+    trans = get_translations(lang)
+    subject = f"{trans.get('zuweisung','Zuweisung')}: {len(tasks)} {trans.get('tasks','Tasks')}"
+    lines = []
+    lines.append(f"{trans.get('team','Team')}: {staff_name}")
+    lines.append("")
+    for t in tasks:
+        date_str = t.date
+        desc = (t.notes or "").strip() or trans.get('tätigkeit','Tätigkeit')
+        accept_link = f"{base_url}/c/{t['_token']}/accept?task_id={t.id}"
+        reject_link = f"{base_url}/c/{t['_token']}/reject?task_id={t.id}"
+        lines.append(f"- {date_str}: {desc}")
+        lines.append(f"  {trans.get('annehmen','Annehmen')}: {accept_link}")
+        lines.append(f"  {trans.get('ablehnen','Ablehnen')}: {reject_link}")
+        lines.append("")
+    body = "\n".join(lines).strip()
+    return subject, body
+
+def send_assignment_emails_job():
+    base_url = BASE_URL.rstrip("/") or ""
+    with SessionLocal() as db:
+        pending = db.query(Task).filter(Task.assignment_status=="pending", Task.assigned_staff_id!=None, Task.assign_notified_at==None).all()
+        if not pending:
+            return
+        staff_ids = {t.assigned_staff_id for t in pending if t.assigned_staff_id}
+        for sid in staff_ids:
+            staff = db.get(Staff, sid)
+            if not staff or not (staff.email or "").strip():
+                continue
+            lang = (staff.language or "de")
+            token = staff.magic_token
+            tasks_for_staff = [t for t in pending if t.assigned_staff_id==sid]
+            for t in tasks_for_staff:
+                setattr(t, "_token", token)
+            subject, body = build_assignment_email(lang, staff.name, tasks_for_staff, base_url)
+            _send_email(staff.email, subject, body)
+            now = now_iso()
+            for t in tasks_for_staff:
+                t.assign_notified_at = now
+        db.commit()
+
 def get_db():
     db = SessionLocal()
     try:
@@ -273,6 +340,8 @@ async def startup_event():
         log.exception("Initial import failed: %s", e)
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
     scheduler.add_job(refresh_bookings_job, IntervalTrigger(minutes=REFRESH_INTERVAL_MINUTES))
+    # Bündel-E-Mails für Zuweisungen alle 30 Minuten
+    scheduler.add_job(send_assignment_emails_job, IntervalTrigger(minutes=30))
     scheduler.start()
 
 def _daterange(days=60):
@@ -469,6 +538,13 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
         raise HTTPException(status_code=403)
     
     lang = detect_language(request)
+    try:
+        cookie_lang = request.cookies.get("lang", "")
+    except Exception:
+        cookie_lang = ""
+    if not cookie_lang:
+        if getattr(s, "language", None) in ["de","en","fr","it","es","ro","ru","bg"]:
+            lang = s.language
     trans = get_translations(lang)
     
     q = db.query(Task)
@@ -570,9 +646,14 @@ async def admin_staff(request: Request, token: str, db=Depends(get_db)):
     return templates.TemplateResponse("admin_staff.html", {"request": request, "token": token, "staff": staff, "staff_hours": staff_hours, "current_month": current_month, "last_month": last_month_str, "prev_last_month": prev_last_month_str, "base_url": base_url, "lang": lang, "trans": trans})
 
 @app.post("/admin/{token}/staff/add")
-async def admin_staff_add(token: str, name: str = Form(...), hourly_rate: float = Form(0.0), max_hours_per_month: int = Form(160), db=Depends(get_db)):
+async def admin_staff_add(token: str, name: str = Form(...), email: str = Form(...), hourly_rate: float = Form(0.0), max_hours_per_month: int = Form(160), language: str = Form("de"), db=Depends(get_db)):
     if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
-    s = Staff(name=name, hourly_rate=hourly_rate, max_hours_per_month=max_hours_per_month, magic_token=new_token(16), active=True)
+    email = (email or "").strip()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="E-Mail ist erforderlich")
+    if language not in ["de","en","fr","it","es","ro","ru","bg"]:
+        language = "de"
+    s = Staff(name=name, email=email, hourly_rate=hourly_rate, max_hours_per_month=max_hours_per_month, magic_token=new_token(16), active=True, language=language)
     db.add(s); db.commit()
     return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
 
@@ -985,3 +1066,25 @@ async def cleaner_note(token: str, task_id: int = Form(...), note: str = Form(""
     t.notes = (note or "").strip()
     db.commit()
     return JSONResponse({"ok": True, "task_id": t.id, "note": t.notes})
+
+@app.get("/c/{token}/accept")
+async def cleaner_accept_get(token: str, task_id: int, db=Depends(get_db)):
+    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
+    if not s: raise HTTPException(status_code=403)
+    t = db.get(Task, task_id)
+    if not t or t.assigned_staff_id != s.id:
+        raise HTTPException(status_code=404, detail="Task nicht gefunden oder nicht zugewiesen")
+    t.assignment_status = "accepted"
+    db.commit()
+    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+
+@app.get("/c/{token}/reject")
+async def cleaner_reject_get(token: str, task_id: int, db=Depends(get_db)):
+    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
+    if not s: raise HTTPException(status_code=403)
+    t = db.get(Task, task_id)
+    if not t or t.assigned_staff_id != s.id:
+        raise HTTPException(status_code=404, detail="Task nicht gefunden oder nicht zugewiesen")
+    t.assignment_status = "rejected"
+    db.commit()
+    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)

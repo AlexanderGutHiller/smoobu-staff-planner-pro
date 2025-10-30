@@ -27,10 +27,12 @@ class Staff(Base):
     __tablename__ = "staff"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255))
+    email: Mapped[str] = mapped_column(String(255), default="")
     hourly_rate: Mapped[float] = mapped_column(Float, default=0.0)
     max_hours_per_month: Mapped[int] = mapped_column(Integer, default=160)
     magic_token: Mapped[str] = mapped_column(String(32), unique=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    language: Mapped[str] = mapped_column(String(8), default="de")
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -45,6 +47,7 @@ class Task(Base):
     assigned_staff_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("staff.id"))
     assignment_status: Mapped[str | None] = mapped_column(String(16), nullable=True)  # pending|accepted|rejected
     status: Mapped[str] = mapped_column(String(16), default="open")  # open|running|done
+    assign_notified_at: Mapped[str | None] = mapped_column(String(19), nullable=True)  # yyyy-mm-dd HH:MM:SS
 
     auto_generated: Mapped[bool] = mapped_column(Boolean, default=True)
     booking_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)

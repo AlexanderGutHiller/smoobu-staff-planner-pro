@@ -92,6 +92,10 @@ function setLanguage(lang) {
     <input class="form-control" name="name" placeholder="Name" required>
   </div>
   <div class="col-12 col-md-auto">
+    <label class="form-label small text-muted d-block">E-Mail</label>
+    <input class="form-control" name="email" type="email" placeholder="mail@example.com" required>
+  </div>
+  <div class="col-12 col-md-auto">
     <label class="form-label small text-muted d-block">Stundensatz</label>
     <div class="input-group">
       <span class="input-group-text">€/h</span>
@@ -101,6 +105,19 @@ function setLanguage(lang) {
   <div class="col-12 col-md-auto">
     <label class="form-label small text-muted d-block">Max. Std/Monat</label>
     <input class="form-control" name="max_hours_per_month" type="number" step="1" value="160" placeholder="160">
+  </div>
+  <div class="col-12 col-md-auto">
+    <label class="form-label small text-muted d-block">Sprache</label>
+    <select class="form-select" name="language">
+      <option value="de">🇩🇪 Deutsch</option>
+      <option value="en">🇬🇧 English</option>
+      <option value="fr">🇫🇷 Français</option>
+      <option value="it">🇮🇹 Italiano</option>
+      <option value="es">🇪🇸 Español</option>
+      <option value="ro">🇷🇴 Română</option>
+      <option value="ru">🇷🇺 Русский</option>
+      <option value="bg">🇧🇬 Български</option>
+    </select>
   </div>
   <div class="col-12 col-md-auto"><button class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i> Anlegen</button></div>
 </form>

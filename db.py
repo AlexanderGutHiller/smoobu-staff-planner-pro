@@ -59,4 +59,7 @@ def _apply_sqlite_migrations():
         add_col("ALTER TABLE tasks ADD COLUMN next_arrival_guest_name VARCHAR(255)")
         add_col("ALTER TABLE bookings ADD COLUMN guest_name VARCHAR(255)")
         add_col("ALTER TABLE staff ADD COLUMN max_hours_per_month INTEGER DEFAULT 160")
+        add_col("ALTER TABLE staff ADD COLUMN email VARCHAR(255)")
         add_col("ALTER TABLE tasks ADD COLUMN assignment_status VARCHAR(16)")
+        add_col("ALTER TABLE staff ADD COLUMN language VARCHAR(8) DEFAULT 'de'")
+        add_col("ALTER TABLE tasks ADD COLUMN assign_notified_at VARCHAR(19)")
