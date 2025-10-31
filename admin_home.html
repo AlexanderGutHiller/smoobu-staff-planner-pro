@@ -23,14 +23,14 @@
       -webkit-appearance: menulist;
       appearance: menulist;
       line-height: 1.2;
-      pointer-events: auto;
+      pointer-events: auto !important;
       /* Verhindert doppelte Pfeile (iOS nativer Pfeil + Bootstrap-Hintergrundbild) */
       background-image: none !important;
       padding-right: 0.75rem;
       /* iOS: Stelle sicher dass Selects immer klickbar sind */
       -webkit-touch-callout: none;
       touch-action: manipulation;
-      user-select: none;
+      /* user-select entfernt, da es die Interaktion blockieren kann */
     }
     .mobile-filter-section label { font-size: 0.95rem; font-weight: 600; }
     .mobile-filter-section { position: relative; z-index: 2; }
@@ -539,17 +539,36 @@ function applyFilter(){
       card.style.display = ok ? '' : 'none';
     });
 
-    // iOS Workaround: Select nach Änderung mit Verzögerung ent-fokussieren
-    // damit eine zweite Auswahl möglich ist
+    // iOS Workaround: Stelle sicher, dass Select nach Change wieder interaktiv ist
     const selectEl = this;
+    // Wichtig: pointer-events explizit wieder aktivieren
+    selectEl.style.pointerEvents = 'auto';
+    
     setTimeout(function() {
       try {
-        // Nur wenn das Select nicht mehr fokussiert ist (User hat Auswahl getroffen)
+        // Entfokussiere nur wenn User nicht mehr am Select arbeitet
         if (document.activeElement !== selectEl) {
           selectEl.blur();
         }
+        // Stelle sicher, dass das Select weiterhin interaktiv ist
+        selectEl.style.pointerEvents = 'auto';
+        selectEl.style.touchAction = 'manipulation';
       } catch(e) {}
-    }, 500);
+    }, 300);
+  });
+});
+
+// Zusätzlicher Handler für iOS: Stelle sicher dass Selects immer klickbar sind
+document.addEventListener('DOMContentLoaded', function() {
+  const mobileSelects = document.querySelectorAll('.mobile-filter-section select');
+  mobileSelects.forEach(function(sel) {
+    // Bei jedem Click/Touch: Stelle sicher dass Select interaktiv ist
+    sel.addEventListener('click', function() {
+      this.style.pointerEvents = 'auto';
+    }, true);
+    sel.addEventListener('focus', function() {
+      this.style.pointerEvents = 'auto';
+    });
   });
 });
 
