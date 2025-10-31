@@ -540,32 +540,16 @@ function applyFilter(){
     });
 
     // iOS Workaround: Select nach Änderung mit Verzögerung ent-fokussieren
-    // und sicherstellen, dass es wieder interaktiv ist
+    // damit eine zweite Auswahl möglich ist
     const selectEl = this;
     setTimeout(function() {
       try {
-        selectEl.blur();
-        // Stelle sicher, dass das Element wieder interaktiv ist
-        selectEl.style.pointerEvents = 'auto';
+        // Nur wenn das Select nicht mehr fokussiert ist (User hat Auswahl getroffen)
+        if (document.activeElement !== selectEl) {
+          selectEl.blur();
+        }
       } catch(e) {}
-    }, 150);
-  });
-});
-
-// Zusätzlich: Touch-Handler für iOS-Selects, um Interaktivität zu erhalten
-document.addEventListener('DOMContentLoaded', function() {
-  const mobileSelects = document.querySelectorAll('.mobile-filter-section select');
-  mobileSelects.forEach(function(sel) {
-    // Stelle sicher, dass Touch-Events nicht blockiert werden
-    sel.addEventListener('touchstart', function(e) {
-      this.style.pointerEvents = 'auto';
-    }, { passive: true });
-    // Nach Selection das Select ent-fokussieren
-    sel.addEventListener('touchend', function(e) {
-      setTimeout(function() { 
-        try { sel.blur(); } catch(e) {} 
-      }, 300);
-    }, { passive: true });
+    }, 500);
   });
 });
 
