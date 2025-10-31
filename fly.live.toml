@@ -30,6 +30,6 @@ primary_region = "fra"
   memory_mb = 512
 
 [[mounts]]
-  source = "staffplanner_live_data"
+  source = "data"
   destination = "/app/data"
-  initial_size = "3gb"
+  initial_size = "1gb"

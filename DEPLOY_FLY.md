@@ -48,10 +48,12 @@ fly deploy -a smoobu-staff-planner-pro-ibg5yw
 
 ### 1) Volume anlegen
 ```bash
-fly volumes create staffplanner_live_data \
+# Volume bereits angelegt: "data" (1 GB, fra)
+# Falls neu anlegen:
+fly volumes create data \
   -a staffplanner-live \
   --region fra \
-  --size 3
+  --size 1
 ```
 
 ### 2) Secrets setzen
@@ -114,12 +116,12 @@ fly volumes list -a staffplanner-live
 |---------|----------|----------|
 | App-Name | `smoobu-staff-planner-pro-ibg5yw` | `staffplanner-live` |
 | Config-Datei | `fly.toml` | `fly.live.toml` |
-| Volume | `smoobu_data` | `staffplanner_live_data` |
+| Volume | `smoobu_data` | `data` |
 | Deploy | Automatisch (wenn konfiguriert) | Nur manuell |
 | URL | `https://smoobu-staff-planner-pro-ibg5yw.fly.dev` | `https://staffplanner-live.fly.dev` |
 
 ## Rollouts ohne Datenverlust
-- Die Daten liegen auf den Volumes (`smoobu_data` bzw. `staffplanner_live_data`)
+- Die Daten liegen auf den Volumes (`smoobu_data` für Test, `data` für Live)
 - Bei Neu-Deployments bleiben die Volumes bestehen
 - **Wichtig**: Startet nicht mehrere Maschinen in derselben Region, die dasselbe Volume benötigen
 
