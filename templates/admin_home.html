@@ -27,6 +27,10 @@
       /* Verhindert doppelte Pfeile (iOS nativer Pfeil + Bootstrap-Hintergrundbild) */
       background-image: none !important;
       padding-right: 0.75rem;
+      /* iOS: Stelle sicher dass Selects immer klickbar sind */
+      -webkit-touch-callout: none;
+      touch-action: manipulation;
+      user-select: none;
     }
     .mobile-filter-section label { font-size: 0.95rem; font-weight: 600; }
     .mobile-filter-section { position: relative; z-index: 2; }
@@ -535,8 +539,33 @@ function applyFilter(){
       card.style.display = ok ? '' : 'none';
     });
 
-    // iOS Workaround: Select nach Änderung ent-fokussieren, damit eine zweite Auswahl möglich ist
-    try { this.blur(); } catch(e) {}
+    // iOS Workaround: Select nach Änderung mit Verzögerung ent-fokussieren
+    // und sicherstellen, dass es wieder interaktiv ist
+    const selectEl = this;
+    setTimeout(function() {
+      try {
+        selectEl.blur();
+        // Stelle sicher, dass das Element wieder interaktiv ist
+        selectEl.style.pointerEvents = 'auto';
+      } catch(e) {}
+    }, 150);
+  });
+});
+
+// Zusätzlich: Touch-Handler für iOS-Selects, um Interaktivität zu erhalten
+document.addEventListener('DOMContentLoaded', function() {
+  const mobileSelects = document.querySelectorAll('.mobile-filter-section select');
+  mobileSelects.forEach(function(sel) {
+    // Stelle sicher, dass Touch-Events nicht blockiert werden
+    sel.addEventListener('touchstart', function(e) {
+      this.style.pointerEvents = 'auto';
+    }, { passive: true });
+    // Nach Selection das Select ent-fokussieren
+    sel.addEventListener('touchend', function(e) {
+      setTimeout(function() { 
+        try { sel.blur(); } catch(e) {} 
+      }, 300);
+    }, { passive: true });
   });
 });
 
