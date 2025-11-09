@@ -66,7 +66,10 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "stunden": "Stunden", "vorletzter_monat": "Vorletzter Monat", "letzter_monat": "Letzter Monat", "aktueller_monat": "Aktueller Monat",
                    "geleistete_stunden": "Geleistete Stunden", "manuelle_aufgabe": "Manuelle Aufgabe",
                    "pending": "Ausstehend", "accepted": "Angenommen", "rejected": "Abgelehnt",
-                   "annehmen": "Annehmen", "ablehnen": "Ablehnen", "zuweisung": "Zuweisung"
+                   "annehmen": "Annehmen", "ablehnen": "Ablehnen", "zuweisung": "Zuweisung",
+                   "checklist": "Checkliste", "kurtaxe_registriert": "Kurtaxe registriert",
+                   "kurtaxe_bestaetigt": "Kurtaxe bestätigt", "checkin_vorbereitet": "Check-in vorbereitet",
+                   "kurtaxe_bezahlt": "Kurtaxe bezahlt"
                },
                "en": {
                    "tasks": "Tasks", "team": "Team", "apartments": "Apartments", "import_now": "Import now",
@@ -87,7 +90,10 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "stunden": "Hours", "vorletzter_monat": "2 Months Ago", "letzter_monat": "Last Month", "aktueller_monat": "Current Month",
                    "geleistete_stunden": "Hours Worked", "manuelle_aufgabe": "Manual Task",
                    "pending": "Pending", "accepted": "Accepted", "rejected": "Rejected",
-                   "annehmen": "Accept", "ablehnen": "Reject", "zuweisung": "Assignment"
+                   "annehmen": "Accept", "ablehnen": "Reject", "zuweisung": "Assignment",
+                   "checklist": "Checklist", "kurtaxe_registriert": "Tourist tax registered",
+                   "kurtaxe_bestaetigt": "Tourist tax confirmed", "checkin_vorbereitet": "Check-in prepared",
+                   "kurtaxe_bezahlt": "Tourist tax paid"
                },
                "fr": {
                    "tasks": "Tâches", "team": "Équipe", "apartments": "Appartements", "import_now": "Importer maintenant",
@@ -108,7 +114,10 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "stunden": "Heures", "vorletzter_monat": "Il y a 2 mois", "letzter_monat": "Mois dernier", "aktueller_monat": "Mois actuel",
                    "geleistete_stunden": "Heures travaillées", "manuelle_aufgabe": "Tâche manuelle",
                    "pending": "En attente", "accepted": "Accepté", "rejected": "Refusé",
-                   "annehmen": "Accepter", "ablehnen": "Refuser", "zuweisung": "Affectation"
+                   "annehmen": "Accepter", "ablehnen": "Refuser", "zuweisung": "Affectation",
+                   "checklist": "Liste de contrôle", "kurtaxe_registriert": "Taxe de séjour enregistrée",
+                   "kurtaxe_bestaetigt": "Taxe de séjour confirmée", "checkin_vorbereitet": "Check-in préparé",
+                   "kurtaxe_bezahlt": "Taxe de séjour payée"
                },
                "it": {
                    "tasks": "Compiti", "team": "Squadra", "apartments": "Appartamenti", "import_now": "Importa ora",
@@ -129,7 +138,10 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "stunden": "Ore", "vorletzter_monat": "2 mesi fa", "letzter_monat": "Mese scorso", "aktueller_monat": "Mese corrente",
                    "geleistete_stunden": "Ore lavorate", "manuelle_aufgabe": "Compito manuale",
                    "pending": "In attesa", "accepted": "Accettato", "rejected": "Rifiutato",
-                   "annehmen": "Accetta", "ablehnen": "Rifiuta", "zuweisung": "Assegnazione"
+                   "annehmen": "Accetta", "ablehnen": "Rifiuta", "zuweisung": "Assegnazione",
+                   "checklist": "Lista di controllo", "kurtaxe_registriert": "Tassa di soggiorno registrata",
+                   "kurtaxe_bestaetigt": "Tassa di soggiorno confermata", "checkin_vorbereitet": "Check-in preparato",
+                   "kurtaxe_bezahlt": "Tassa di soggiorno pagata"
                },
                "es": {
                    "tasks": "Tareas", "team": "Equipo", "apartments": "Apartamentos", "import_now": "Importar ahora",
@@ -150,7 +162,10 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "stunden": "Horas", "vorletzter_monat": "Hace 2 meses", "letzter_monat": "Mes pasado", "aktueller_monat": "Mes actual",
                    "geleistete_stunden": "Horas trabajadas", "manuelle_aufgabe": "Tarea manual",
                    "pending": "Pendiente", "accepted": "Aceptado", "rejected": "Rechazado",
-                   "annehmen": "Aceptar", "ablehnen": "Rechazar", "zuweisung": "Asignación"
+                   "annehmen": "Aceptar", "ablehnen": "Rechazar", "zuweisung": "Asignación",
+                   "checklist": "Lista de verificación", "kurtaxe_registriert": "Tasa turística registrada",
+                   "kurtaxe_bestaetigt": "Tasa turística confirmada", "checkin_vorbereitet": "Check-in preparado",
+                   "kurtaxe_bezahlt": "Tasa turística pagada"
                },
                "ro": {
                    "tasks": "Sarcini", "team": "Echipa", "apartments": "Apartamente", "import_now": "Importă acum",
@@ -171,7 +186,10 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "stunden": "Ore", "vorletzter_monat": "Acum 2 luni", "letzter_monat": "Luna trecută", "aktueller_monat": "Luna curentă",
                    "geleistete_stunden": "Ore lucrate", "manuelle_aufgabe": "Sarcină manuală",
                    "pending": "În așteptare", "accepted": "Acceptat", "rejected": "Refuzat",
-                   "annehmen": "Acceptă", "ablehnen": "Refuză", "zuweisung": "Atribuire"
+                   "annehmen": "Acceptă", "ablehnen": "Refuză", "zuweisung": "Atribuire",
+                   "checklist": "Listă de verificare", "kurtaxe_registriert": "Taxa de turism înregistrată",
+                   "kurtaxe_bestaetigt": "Taxa de turism confirmată", "checkin_vorbereitet": "Check-in pregătit",
+                   "kurtaxe_bezahlt": "Taxa de turism plătită"
                },
                "ru": {
                    "tasks": "Задачи", "team": "Команда", "apartments": "Апартаменты", "import_now": "Импорт сейчас",
@@ -192,7 +210,10 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "stunden": "Часы", "vorletzter_monat": "2 месяца назад", "letzter_monat": "Прошлый месяц", "aktueller_monat": "Текущий месяц",
                    "geleistete_stunden": "Отработанные часы", "manuelle_aufgabe": "Ручная задача",
                    "pending": "Ожидание", "accepted": "Принято", "rejected": "Отклонено",
-                   "annehmen": "Принять", "ablehnen": "Отклонить", "zuweisung": "Назначение"
+                   "annehmen": "Принять", "ablehnen": "Отклонить", "zuweisung": "Назначение",
+                   "checklist": "Чек-лист", "kurtaxe_registriert": "Туристический налог зарегистрирован",
+                   "kurtaxe_bestaetigt": "Туристический налог подтверждён", "checkin_vorbereitet": "Заселение подготовлено",
+                   "kurtaxe_bezahlt": "Туристический налог оплачен"
                },
                "bg": {
                    "tasks": "Задачи", "team": "Екип", "apartments": "Апартаменти", "import_now": "Импортирай сега",
@@ -213,7 +234,10 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "stunden": "Часове", "vorletzter_monat": "Преди 2 месеца", "letzter_monat": "Миналия месец", "aktueller_monat": "Текущ месец",
                    "geleistete_stunden": "Отработени часове", "manuelle_aufgabe": "Ръчна задача",
                    "pending": "В очакване", "accepted": "Прието", "rejected": "Отхвърлено",
-                   "annehmen": "Приеми", "ablehnen": "Отхвърли", "zuweisung": "Назначаване"
+                   "annehmen": "Приеми", "ablehnen": "Отхвърли", "zuweisung": "Назначаване",
+                   "checklist": "Контролен списък", "kurtaxe_registriert": "Курортна такса регистрирана",
+                   "kurtaxe_bestaetigt": "Курортна такса потвърдена", "checkin_vorbereitet": "Чек-ин подготвен",
+                   "kurtaxe_bezahlt": "Курортна такса платена"
                }
     }
     return translations.get(lang, translations["de"])
@@ -723,8 +747,9 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0, 'guest_name': (b.guest_name or "").strip()} for b in bookings}
     log.debug("📊 Created book_map with %d entries, %d have guest names", len(bookings), len([b for b in bookings if b.guest_name and b.guest_name.strip()]))
     
-    # Timelog-Daten für jedes Task
+    # Timelog-Daten und Zusatzinformationen für jedes Task
     timelog_map = {}
+    extras_map: Dict[int, Dict[str, bool]] = {}
     for t in tasks:
         tl = db.query(TimeLog).filter(TimeLog.task_id==t.id).order_by(TimeLog.id.desc()).first()
         if tl:
@@ -733,11 +758,15 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
                 'started_at': tl.started_at,
                 'ended_at': tl.ended_at
             }
+        try:
+            extras_map[t.id] = json.loads(t.extras_json or "{}") or {}
+        except Exception:
+            extras_map[t.id] = {}
     
     base_url = BASE_URL.rstrip("/")
     if not base_url:
         base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
-    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "base_url": base_url, "lang": lang, "trans": trans})
+    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "extras_map": extras_map, "base_url": base_url, "lang": lang, "trans": trans})
 
 @app.get("/admin/{token}/staff")
 async def admin_staff(request: Request, token: str, db=Depends(get_db)):
@@ -991,6 +1020,37 @@ async def admin_task_status(token: str, task_id: int = Form(...), status: str = 
     t.status = status
     db.commit()
     return RedirectResponse(url=f"/admin/{token}", status_code=303)
+
+
+@app.post("/admin/{token}/task/extras")
+async def admin_task_extras(
+    request: Request,
+    token: str,
+    task_id: int = Form(...),
+    field: str = Form(...),
+    value: str = Form("0"),
+    redirect: str = Form(""),
+    db=Depends(get_db),
+):
+    if token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403)
+    allowed_fields = {"kurtaxe_registriert", "kurtaxe_bestaetigt", "checkin_vorbereitet", "kurtaxe_bezahlt"}
+    field = (field or "").strip()
+    if field not in allowed_fields:
+        raise HTTPException(status_code=400, detail="Ungültiges Feld")
+    t = db.get(Task, task_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Task nicht gefunden")
+    try:
+        extras = json.loads(t.extras_json or "{}") or {}
+    except Exception:
+        extras = {}
+    value_str = (value or "").strip().lower()
+    extras[field] = value_str in {"1", "true", "yes", "on"}
+    t.extras_json = json.dumps(extras)
+    db.commit()
+    target = redirect or request.headers.get("referer") or f"/admin/{token}"
+    return RedirectResponse(url=target, status_code=303)
 
 @app.get("/admin/{token}/apartments")
 async def admin_apartments(request: Request, token: str, db=Depends(get_db)):

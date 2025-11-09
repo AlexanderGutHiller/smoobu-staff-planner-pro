@@ -7,6 +7,9 @@
   .filter-input { width: 160px; }
   thead input, thead select { font-size: .875rem; padding: .25rem .5rem; }
   .small-muted { color:#6c757d; font-style: italic; font-size: .9em; }
+  .extras-form { margin: 0; }
+  .extras-form .form-check-label { font-size: 0.8rem; }
+  .extras-container { display: flex; flex-direction: column; gap: 0.35rem; }
   
   /* Mobile Optimierungen */
   @media (max-width: 768px) {
@@ -70,6 +73,8 @@
       border-width: 2px;
       background-color: #fff3cd;
     }
+    .extras-container { gap: 0.5rem; }
+    .extras-form .form-check-label { font-size: 0.95rem; }
     
     .task-card-header {
       display: flex;
@@ -109,6 +114,13 @@
 </style>
 </head>
 <body class="bg-light"><div class="container py-4">
+{% set current_url = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
+{% set checklist_fields = [
+  ('kurtaxe_registriert', trans.kurtaxe_registriert),
+  ('kurtaxe_bestaetigt', trans.kurtaxe_bestaetigt),
+  ('checkin_vorbereitet', trans.checkin_vorbereitet),
+  ('kurtaxe_bezahlt', trans.kurtaxe_bezahlt)
+] %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
   <h1 class="mb-0" style="font-size: 1.5rem;">{{ trans.tasks }}</h1>
   <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#newTaskModal">
@@ -196,6 +208,7 @@ function setLanguage(lang) {
     </th>
     <th>{{ trans.planned }}</th>
     <th>{{ trans.status }}</th>
+    <th>{{ trans.checklist }}</th>
     <th>{{ trans.actual }}</th>
     <th>{{ trans.next_arrival }}</th>
     <th>{{ trans.ma }}<br>
@@ -211,6 +224,7 @@ function setLanguage(lang) {
 </thead>
 <tbody>
 {% for t in tasks %}
+{% set extras = extras_map.get(t.id, {}) %}
 <tr class="{% if t.assignment_status == 'rejected' %}table-danger{% elif t.status == 'done' %}table-secondary{% elif t.status == 'running' or t.status == 'paused' %}table-info{% elif t.assigned_staff_id %}table-success{% else %}table-warning{% endif %}" data-date="{{ t.date }}">
   <td data-col="date">{{ t.date | date_wd_de('short') }}</td>
   <td data-col="apt">
@@ -260,6 +274,22 @@ function setLanguage(lang) {
         <option value="done" {% if t.status=='done' %}selected{% endif %}>{{ trans.erledigt }}</option>
       </select>
     </form>
+  </td>
+  <td data-col="checklist">
+    <div class="extras-container">
+      {% for field, label in checklist_fields %}
+      <form method="post" action="/admin/{{ token }}/task/extras" class="extras-form">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <input type="hidden" name="field" value="{{ field }}"/>
+        <input type="hidden" name="value" value="{{ 1 if extras.get(field) else 0 }}"/>
+        <input type="hidden" name="redirect" value="{{ current_url }}"/>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="{{ field }}-{{ t.id }}" {% if extras.get(field) %}checked{% endif %} onchange="handleExtraToggle(this)">
+          <label class="form-check-label" for="{{ field }}-{{ t.id }}">{{ label }}</label>
+        </div>
+      </form>
+      {% endfor %}
+    </div>
   </td>
   <td>
     {% set tl = timelog_map.get(t.id, {}) %}
@@ -329,6 +359,7 @@ function setLanguage(lang) {
 <div class="mobile-view">
 {% for t in tasks %}
 {% set tl = timelog_map.get(t.id, {}) %}
+{% set extras = extras_map.get(t.id, {}) %}
 <div class="task-card-mobile {% if t.assignment_status=='rejected' %}rejected{% elif t.status=='done' %}done{% elif t.status=='running' or t.status=='paused' %}running{% elif t.assigned_staff_id %}assigned{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id==t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
   <div class="task-card-header">
     <div>
@@ -360,6 +391,24 @@ function setLanguage(lang) {
         </select>
       </form>
     </span>
+  </div>
+  
+  <div class="mt-2">
+    <div class="task-info-label mb-1">{{ trans.checklist }}:</div>
+    <div class="extras-container">
+      {% for field, label in checklist_fields %}
+      <form method="post" action="/admin/{{ token }}/task/extras" class="extras-form">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <input type="hidden" name="field" value="{{ field }}"/>
+        <input type="hidden" name="value" value="{{ 1 if extras.get(field) else 0 }}"/>
+        <input type="hidden" name="redirect" value="{{ current_url }}"/>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="{{ field }}-mobile-{{ t.id }}" {% if extras.get(field) %}checked{% endif %} onchange="handleExtraToggle(this)">
+          <label class="form-check-label" for="{{ field }}-mobile-{{ t.id }}">{{ label }}</label>
+        </div>
+      </form>
+      {% endfor %}
+    </div>
   </div>
   
   <div class="task-info-row">
@@ -592,6 +641,14 @@ function resetMobileFilters(){
   applyFilter();
   const mobileCards = document.querySelectorAll('.task-card-mobile');
   mobileCards.forEach(card => card.style.display='');
+}
+
+function handleExtraToggle(checkbox){
+  const form = checkbox.closest('form');
+  if (!form) return;
+  const hidden = form.querySelector('input[name="value"]');
+  if (hidden) hidden.value = checkbox.checked ? '1' : '0';
+  form.submit();
 }
 </script>
 
