@@ -349,6 +349,20 @@ function setLanguage(lang) {
   </div>
   
   <div class="task-info-row">
+    <span class="task-info-label">{{ trans.status }}:</span>
+    <span>
+      <form method="post" action="/admin/{{ token }}/task/status" class="d-inline">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="open" {% if t.status=='open' %}selected{% endif %}>{{ trans.offen }}</option>
+          <option value="paused" {% if t.status=='paused' %}selected{% endif %}>{{ trans.pausiert }}</option>
+          <option value="done" {% if t.status=='done' %}selected{% endif %}>{{ trans.erledigt }}</option>
+        </select>
+      </form>
+    </span>
+  </div>
+  
+  <div class="task-info-row">
     <span class="task-info-label">{{ trans.planned }}:</span>
     <span class="fw-bold">{{ t.planned_minutes }} {{ trans.min }}</span>
   </div>
