@@ -54,6 +54,9 @@
 </style>
 </head>
 <body class="bg-light"><div class="container py-4">
+<div class="d-flex justify-content-end mb-2">
+  <small class="text-muted" style="font-size:0.75rem;">{{ APP_VERSION_DISPLAY }}</small>
+</div>
 <h1 class="mb-3">{{ trans.apartments }}</h1>
 <div class="d-flex gap-2 mb-3 align-items-center flex-wrap">
   <a class="btn btn-outline-secondary" href="/admin/{{ token }}"><i class="bi bi-arrow-left"></i> {{ trans.zurück }}</a>

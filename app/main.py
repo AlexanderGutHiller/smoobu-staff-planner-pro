@@ -251,6 +251,8 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM = os.getenv("SMTP_FROM", "")
+APP_VERSION = os.getenv("APP_VERSION", "v6.3")
+APP_BUILD_DATE = os.getenv("APP_BUILD_DATE", dt.date.today().strftime("%Y-%m-%d"))
 
 log = logging.getLogger("smoobu")
 logging.basicConfig(level=logging.INFO)
@@ -261,6 +263,11 @@ if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals.update({
+    "APP_VERSION": APP_VERSION,
+    "APP_BUILD_DATE": APP_BUILD_DATE,
+    "APP_VERSION_DISPLAY": f"Version {APP_VERSION} · {APP_BUILD_DATE}",
+})
 
 def _parse_iso_date(s: str):
     try:

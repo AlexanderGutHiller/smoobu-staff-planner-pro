@@ -114,6 +114,9 @@
 </style>
 </head>
 <body class="bg-light"><div class="container py-4">
+<div class="d-flex justify-content-end mb-2">
+  <small class="text-muted" style="font-size:0.75rem;">{{ APP_VERSION_DISPLAY }}</small>
+</div>
 {% set current_url = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
 {% set checklist_fields = [
   ('kurtaxe_registriert', trans.kurtaxe_registriert),
