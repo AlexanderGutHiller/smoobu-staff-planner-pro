@@ -69,7 +69,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "annehmen": "Annehmen", "ablehnen": "Ablehnen", "zuweisung": "Zuweisung",
                    "checklist": "Checkliste", "kurtaxe_registriert": "Kurtaxe registriert",
                    "kurtaxe_bestaetigt": "Kurtaxe bestätigt", "checkin_vorbereitet": "Check-in vorbereitet",
-                   "kurtaxe_bezahlt": "Kurtaxe bezahlt"
+                   "kurtaxe_bezahlt": "Kurtaxe bezahlt", "babybetten": "Babybetten"
                },
                "en": {
                    "tasks": "Tasks", "team": "Team", "apartments": "Apartments", "import_now": "Import now",
@@ -93,7 +93,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "annehmen": "Accept", "ablehnen": "Reject", "zuweisung": "Assignment",
                    "checklist": "Checklist", "kurtaxe_registriert": "Tourist tax registered",
                    "kurtaxe_bestaetigt": "Tourist tax confirmed", "checkin_vorbereitet": "Check-in prepared",
-                   "kurtaxe_bezahlt": "Tourist tax paid"
+                   "kurtaxe_bezahlt": "Tourist tax paid", "babybetten": "Baby cots"
                },
                "fr": {
                    "tasks": "Tâches", "team": "Équipe", "apartments": "Appartements", "import_now": "Importer maintenant",
@@ -117,7 +117,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "annehmen": "Accepter", "ablehnen": "Refuser", "zuweisung": "Affectation",
                    "checklist": "Liste de contrôle", "kurtaxe_registriert": "Taxe de séjour enregistrée",
                    "kurtaxe_bestaetigt": "Taxe de séjour confirmée", "checkin_vorbereitet": "Check-in préparé",
-                   "kurtaxe_bezahlt": "Taxe de séjour payée"
+                   "kurtaxe_bezahlt": "Taxe de séjour payée", "babybetten": "Lits bébé"
                },
                "it": {
                    "tasks": "Compiti", "team": "Squadra", "apartments": "Appartamenti", "import_now": "Importa ora",
@@ -141,7 +141,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "annehmen": "Accetta", "ablehnen": "Rifiuta", "zuweisung": "Assegnazione",
                    "checklist": "Lista di controllo", "kurtaxe_registriert": "Tassa di soggiorno registrata",
                    "kurtaxe_bestaetigt": "Tassa di soggiorno confermata", "checkin_vorbereitet": "Check-in preparato",
-                   "kurtaxe_bezahlt": "Tassa di soggiorno pagata"
+                   "kurtaxe_bezahlt": "Tassa di soggiorno pagata", "babybetten": "Culle per bebè"
                },
                "es": {
                    "tasks": "Tareas", "team": "Equipo", "apartments": "Apartamentos", "import_now": "Importar ahora",
@@ -165,7 +165,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "annehmen": "Aceptar", "ablehnen": "Rechazar", "zuweisung": "Asignación",
                    "checklist": "Lista de verificación", "kurtaxe_registriert": "Tasa turística registrada",
                    "kurtaxe_bestaetigt": "Tasa turística confirmada", "checkin_vorbereitet": "Check-in preparado",
-                   "kurtaxe_bezahlt": "Tasa turística pagada"
+                   "kurtaxe_bezahlt": "Tasa turística pagada", "babybetten": "Cunas para bebé"
                },
                "ro": {
                    "tasks": "Sarcini", "team": "Echipa", "apartments": "Apartamente", "import_now": "Importă acum",
@@ -189,7 +189,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "annehmen": "Acceptă", "ablehnen": "Refuză", "zuweisung": "Atribuire",
                    "checklist": "Listă de verificare", "kurtaxe_registriert": "Taxa de turism înregistrată",
                    "kurtaxe_bestaetigt": "Taxa de turism confirmată", "checkin_vorbereitet": "Check-in pregătit",
-                   "kurtaxe_bezahlt": "Taxa de turism plătită"
+                   "kurtaxe_bezahlt": "Taxa de turism plătită", "babybetten": "Pătuțuri pentru bebeluși"
                },
                "ru": {
                    "tasks": "Задачи", "team": "Команда", "apartments": "Апартаменты", "import_now": "Импорт сейчас",
@@ -213,7 +213,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "annehmen": "Принять", "ablehnen": "Отклонить", "zuweisung": "Назначение",
                    "checklist": "Чек-лист", "kurtaxe_registriert": "Туристический налог зарегистрирован",
                    "kurtaxe_bestaetigt": "Туристический налог подтверждён", "checkin_vorbereitet": "Заселение подготовлено",
-                   "kurtaxe_bezahlt": "Туристический налог оплачен"
+                   "kurtaxe_bezahlt": "Туристический налог оплачен", "babybetten": "Детские кроватки"
                },
                "bg": {
                    "tasks": "Задачи", "team": "Екип", "apartments": "Апартаменти", "import_now": "Импортирай сега",
@@ -237,7 +237,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "annehmen": "Приеми", "ablehnen": "Отхвърли", "zuweisung": "Назначаване",
                    "checklist": "Контролен списък", "kurtaxe_registriert": "Курортна такса регистрирана",
                    "kurtaxe_bestaetigt": "Курортна такса потвърдена", "checkin_vorbereitet": "Чек-ин подготвен",
-                   "kurtaxe_bezahlt": "Курортна такса платена"
+                   "kurtaxe_bezahlt": "Курортна такса платена", "babybetten": "Бебешки легла"
                }
     }
     return translations.get(lang, translations["de"])
@@ -1034,7 +1034,7 @@ async def admin_task_extras(
 ):
     if token != ADMIN_TOKEN:
         raise HTTPException(status_code=403)
-    allowed_fields = {"kurtaxe_registriert", "kurtaxe_bestaetigt", "checkin_vorbereitet", "kurtaxe_bezahlt"}
+    allowed_fields = {"kurtaxe_registriert", "kurtaxe_bestaetigt", "checkin_vorbereitet", "kurtaxe_bezahlt", "baby_beds"}
     field = (field or "").strip()
     if field not in allowed_fields:
         raise HTTPException(status_code=400, detail="Ungültiges Feld")
@@ -1046,9 +1046,22 @@ async def admin_task_extras(
     except Exception:
         extras = {}
     value_str = (value or "").strip().lower()
-    extras[field] = value_str in {"1", "true", "yes", "on"}
+    if field == "baby_beds":
+        try:
+            beds = int(value_str)
+        except ValueError:
+            beds = 0
+        beds = max(0, min(2, beds))
+        extras[field] = beds
+        response_value = beds
+    else:
+        flag = value_str in {"1", "true", "yes", "on"}
+        extras[field] = flag
+        response_value = flag
     t.extras_json = json.dumps(extras)
     db.commit()
+    if (request.headers.get("x-requested-with") or "").lower() == "fetch":
+        return JSONResponse({"ok": True, "task_id": t.id, "field": field, "value": response_value})
     target = redirect or request.headers.get("referer") or f"/admin/{token}"
     return RedirectResponse(url=target, status_code=303)
 
@@ -1295,9 +1308,15 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
                 'started_at': tl.started_at,
                 'ended_at': tl.ended_at
             }
+    extras_map: Dict[int, Dict[str, object]] = {}
+    for t in tasks:
+        try:
+            extras_map[t.id] = json.loads(t.extras_json or "{}") or {}
+        except Exception:
+            extras_map[t.id] = {}
     lang = detect_language(request)
     trans = get_translations(lang)
-    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "hours_prev_last": hours_prev_last, "hours_last": hours_last, "hours_current": hours_current, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "run_map": run_map, "timelog_map": timelog_map, "warn_limit": warn_limit, "lang": lang, "trans": trans, "has_running": has_running})
+    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "hours_prev_last": hours_prev_last, "hours_last": hours_last, "hours_current": hours_current, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "run_map": run_map, "timelog_map": timelog_map, "extras_map": extras_map, "warn_limit": warn_limit, "lang": lang, "trans": trans, "has_running": has_running})
 
 @app.post("/cleaner/{token}/start")
 async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)):
