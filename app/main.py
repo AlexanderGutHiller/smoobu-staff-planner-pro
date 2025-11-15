@@ -741,7 +741,7 @@ async def set_language(lang: str, redirect: str = "/"):
 
 # -------------------- Admin UI --------------------
 @app.get("/admin/{token}")
-async def admin_home(request: Request, token: str, date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None), staff_id: Optional[int] = Query(None), apartment_id: Optional[int] = Query(None), db=Depends(get_db)):
+async def admin_home(request: Request, token: str, date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None), staff_id: Optional[int] = Query(None), apartment_id: Optional[int] = Query(None), show_done: int = 1, show_open: int = 1, db=Depends(get_db)):
     if token != ADMIN_TOKEN:
         raise HTTPException(status_code=403)
     
@@ -753,6 +753,18 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     if date_to: q = q.filter(Task.date <= date_to)
     if staff_id: q = q.filter(Task.assigned_staff_id == staff_id)
     if apartment_id: q = q.filter(Task.apartment_id == apartment_id)
+    # Filter nach Status: erledigte und/oder offene Aufgaben
+    from sqlalchemy import or_
+    status_filters = []
+    if show_done:
+        status_filters.append(Task.status == "done")
+    if show_open:
+        status_filters.append(Task.status != "done")
+    if status_filters:
+        q = q.filter(or_(*status_filters))
+    else:
+        # Wenn beide Filter deaktiviert sind, zeige nichts
+        q = q.filter(Task.id == -1)  # Unmögliche Bedingung
     tasks = q.order_by(Task.date, Task.id).all()
     staff = db.query(Staff).filter(Staff.active==True).all()
     apts = db.query(Apartment).filter(Apartment.active==True).all()
@@ -766,12 +778,22 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     timelog_map = {}
     extras_map: Dict[int, Dict[str, bool]] = {}
     for t in tasks:
-        tl = db.query(TimeLog).filter(TimeLog.task_id==t.id).order_by(TimeLog.id.desc()).first()
-        if tl:
+        # Summiere alle TimeLogs für diesen Task (nicht nur den letzten)
+        all_tls = db.query(TimeLog).filter(TimeLog.task_id==t.id).all()
+        total_minutes = 0
+        latest_tl = None
+        for tl in all_tls:
+            if tl.actual_minutes:
+                total_minutes += tl.actual_minutes
+            # Finde den neuesten TimeLog für started_at/ended_at
+            if not latest_tl or (tl.id and latest_tl.id and tl.id > latest_tl.id):
+                latest_tl = tl
+        
+        if latest_tl or total_minutes > 0:
             timelog_map[t.id] = {
-                'actual_minutes': tl.actual_minutes,
-                'started_at': tl.started_at,
-                'ended_at': tl.ended_at
+                'actual_minutes': total_minutes if total_minutes > 0 else (latest_tl.actual_minutes if latest_tl and latest_tl.actual_minutes else None),
+                'started_at': latest_tl.started_at if latest_tl else None,
+                'ended_at': latest_tl.ended_at if latest_tl else None
             }
         try:
             extras_map[t.id] = json.loads(t.extras_json or "{}") or {}
@@ -781,7 +803,7 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     base_url = BASE_URL.rstrip("/")
     if not base_url:
         base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
-    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "extras_map": extras_map, "base_url": base_url, "lang": lang, "trans": trans})
+    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "extras_map": extras_map, "base_url": base_url, "lang": lang, "trans": trans, "show_done": show_done, "show_open": show_open})
 
 @app.get("/admin/{token}/staff")
 async def admin_staff(request: Request, token: str, db=Depends(get_db)):
