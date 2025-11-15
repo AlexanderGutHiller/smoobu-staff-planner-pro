@@ -1033,9 +1033,11 @@ async def admin_staff_delete(token: str, staff_id: int = Form(...), db=Depends(g
     return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
 
 @app.post("/admin/{token}/task/assign")
-async def admin_task_assign(token: str, task_id: int = Form(...), staff_id_raw: str = Form(""), db=Depends(get_db)):
+async def admin_task_assign(request: Request, token: str, task_id: int = Form(...), staff_id_raw: str = Form(""), db=Depends(get_db)):
     if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Task nicht gefunden")
     prev_staff_id = t.assigned_staff_id
     staff_id: Optional[int] = int(staff_id_raw) if staff_id_raw.strip() else None
     t.assigned_staff_id = staff_id
@@ -1053,6 +1055,22 @@ async def admin_task_assign(token: str, task_id: int = Form(...), staff_id_raw: 
             send_assignment_emails_job()
     except Exception as e:
         log.error("Immediate notify failed for task %s: %s", t.id, e)
+    # Behalte Filter-Parameter bei
+    referer = request.headers.get("referer", "")
+    if referer:
+        try:
+            from urllib.parse import urlparse, parse_qs, urlencode
+            parsed = urlparse(referer)
+            params = parse_qs(parsed.query)
+            query_parts = []
+            if params.get("show_done"):
+                query_parts.append(f"show_done={params['show_done'][0]}")
+            if params.get("show_open"):
+                query_parts.append(f"show_open={params['show_open'][0]}")
+            if query_parts:
+                return RedirectResponse(url=f"/admin/{token}?{'&'.join(query_parts)}", status_code=303)
+        except Exception:
+            pass
     return RedirectResponse(url=f"/admin/{token}", status_code=303)
 
 @app.post("/admin/{token}/task/create")
