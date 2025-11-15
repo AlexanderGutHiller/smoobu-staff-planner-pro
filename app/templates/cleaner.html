@@ -178,11 +178,18 @@ function setLanguage(lang) {
 </div>
 
 <div class="mb-3">
-  {% if show_done %}
-    <a class="btn btn-outline-secondary btn-touch-sm" href="/cleaner/{{ staff.magic_token }}"><i class="bi bi-eye-slash"></i> {{ trans.erledigte_ausblenden }}</a>
-  {% else %}
-    <a class="btn btn-outline-secondary btn-touch-sm" href="/cleaner/{{ staff.magic_token }}?show_done=1"><i class="bi bi-eye"></i> {{ trans.erledigte_anzeigen }}</a>
-  {% endif %}
+  <div class="form-check form-check-inline">
+    <input class="form-check-input" type="checkbox" id="filterShowDone" {% if show_done %}checked{% endif %}>
+    <label class="form-check-label" for="filterShowDone">
+      {{ trans.erledigte_aufgaben }}
+    </label>
+  </div>
+  <div class="form-check form-check-inline">
+    <input class="form-check-input" type="checkbox" id="filterShowOpen" {% if show_open %}checked{% endif %}>
+    <label class="form-check-label" for="filterShowOpen">
+      {{ trans.offene_aufgaben }}
+    </label>
+  </div>
 </div>
 
 <div class="row g-3">
@@ -577,6 +584,32 @@ document.addEventListener('DOMContentLoaded', function(){
         dateInput.value = `${y}-${m}-${d}`;
       }
     });
+  }
+  
+  // Filter-Checkboxen: URL aktualisieren bei Änderung
+  const filterShowDone = document.getElementById('filterShowDone');
+  const filterShowOpen = document.getElementById('filterShowOpen');
+  
+  function updateFilters() {
+    const showDone = filterShowDone.checked ? '1' : '0';
+    const showOpen = filterShowOpen.checked ? '1' : '0';
+    const baseUrl = '/cleaner/{{ staff.magic_token }}';
+    const params = new URLSearchParams();
+    if (showDone === '1' && showOpen === '1') {
+      // Beide aktiviert - Standard, keine Parameter nötig
+      window.location.href = baseUrl;
+    } else {
+      params.set('show_done', showDone);
+      params.set('show_open', showOpen);
+      window.location.href = baseUrl + '?' + params.toString();
+    }
+  }
+  
+  if (filterShowDone) {
+    filterShowDone.addEventListener('change', updateFilters);
+  }
+  if (filterShowOpen) {
+    filterShowOpen.addEventListener('change', updateFilters);
   }
 });
 </script>

@@ -60,6 +60,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "Keine Einsätze vorhanden", "nächste_anreise": "Nächste Anreise",
                    "erw": "Erw.", "kinder": "Kinder", "verbleibend": "verbleibend:",
                    "erledigte_ausblenden": "Erledigte ausblenden", "erledigte_anzeigen": "Erledigte anzeigen",
+                   "erledigte_aufgaben": "Erledigte Aufgaben", "offene_aufgaben": "Offene Aufgaben",
                    "datum": "Datum", "ma": "MA", "lock": "Lock", "zurück": "Zurück",
                    "neue_aufgabe": "Neue Aufgabe", "tätigkeit": "Tätigkeit", "dauer": "Dauer (Min)", "beschreibung": "Beschreibung",
                    "erstellen": "Erstellen", "abbrechen": "Abbrechen",
@@ -84,6 +85,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "No tasks available", "nächste_anreise": "Next Arrival",
                    "erw": "Adults", "kinder": "Children", "verbleibend": "remaining:",
                    "erledigte_ausblenden": "Hide completed", "erledigte_anzeigen": "Show completed",
+                   "erledigte_aufgaben": "Completed Tasks", "offene_aufgaben": "Open Tasks",
                    "datum": "Date", "ma": "Staff", "lock": "Lock", "zurück": "Back",
                    "neue_aufgabe": "New Task", "tätigkeit": "Activity", "dauer": "Duration (Min)", "beschreibung": "Description",
                    "erstellen": "Create", "abbrechen": "Cancel",
@@ -108,6 +110,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "Aucune tâche disponible", "nächste_anreise": "Prochaine arrivée",
                    "erw": "Adultes", "kinder": "Enfants", "verbleibend": "restant:",
                    "erledigte_ausblenden": "Masquer terminées", "erledigte_anzeigen": "Afficher terminées",
+                   "erledigte_aufgaben": "Tâches terminées", "offene_aufgaben": "Tâches ouvertes",
                    "datum": "Date", "ma": "Équipe", "lock": "Verrouillé", "zurück": "Retour",
                    "neue_aufgabe": "Nouvelle tâche", "tätigkeit": "Activité", "dauer": "Durée (Min)", "beschreibung": "Description",
                    "erstellen": "Créer", "abbrechen": "Annuler",
@@ -132,6 +135,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "Nessun compito disponibile", "nächste_anreise": "Prossimo arrivo",
                    "erw": "Adulti", "kinder": "Bambini", "verbleibend": "rimanenti:",
                    "erledigte_ausblenden": "Nascondi completati", "erledigte_anzeigen": "Mostra completati",
+                   "erledigte_aufgaben": "Compiti completati", "offene_aufgaben": "Compiti aperti",
                    "datum": "Data", "ma": "Squadra", "lock": "Bloccato", "zurück": "Indietro",
                    "neue_aufgabe": "Nuovo compito", "tätigkeit": "Attività", "dauer": "Durata (Min)", "beschreibung": "Descrizione",
                    "erstellen": "Crea", "abbrechen": "Annulla",
@@ -156,6 +160,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "No hay tareas disponibles", "nächste_anreise": "Próxima llegada",
                    "erw": "Adultos", "kinder": "Niños", "verbleibend": "restantes:",
                    "erledigte_ausblenden": "Ocultar completadas", "erledigte_anzeigen": "Mostrar completadas",
+                   "erledigte_aufgaben": "Tareas completadas", "offene_aufgaben": "Tareas abiertas",
                    "datum": "Fecha", "ma": "Equipo", "lock": "Bloqueado", "zurück": "Atrás",
                    "neue_aufgabe": "Nueva tarea", "tätigkeit": "Actividad", "dauer": "Duración (Min)", "beschreibung": "Descripción",
                    "erstellen": "Crear", "abbrechen": "Cancelar",
@@ -180,6 +185,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "Nu există sarcini", "nächste_anreise": "Următoarea sosire",
                    "erw": "Adulți", "kinder": "Copii", "verbleibend": "rămâne:",
                    "erledigte_ausblenden": "Ascunde finalizate", "erledigte_anzeigen": "Afișează finalizate",
+                   "erledigte_aufgaben": "Sarcini finalizate", "offene_aufgaben": "Sarcini deschise",
                    "datum": "Dată", "ma": "Echipa", "lock": "Blocare", "zurück": "Înapoi",
                    "neue_aufgabe": "Sarcină nouă", "tätigkeit": "Activitate", "dauer": "Durată (Min)", "beschreibung": "Descriere",
                    "erstellen": "Creează", "abbrechen": "Anulează",
@@ -204,6 +210,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "Нет задач", "nächste_anreise": "Следующий приезд",
                    "erw": "Взрослые", "kinder": "Дети", "verbleibend": "осталось:",
                    "erledigte_ausblenden": "Скрыть выполненные", "erledigte_anzeigen": "Показать выполненные",
+                   "erledigte_aufgaben": "Выполненные задачи", "offene_aufgaben": "Открытые задачи",
                    "datum": "Дата", "ma": "Команда", "lock": "Заблокировано", "zurück": "Назад",
                    "neue_aufgabe": "Новая задача", "tätigkeit": "Деятельность", "dauer": "Длительность (Мин)", "beschreibung": "Описание",
                    "erstellen": "Создать", "abbrechen": "Отмена",
@@ -228,6 +235,7 @@ def get_translations(lang: str) -> Dict[str, str]:
                    "keine_einsätze": "Няма задачи", "nächste_anreise": "Следващо пристигане",
                    "erw": "Възрастни", "kinder": "Деца", "verbleibend": "остават:",
                    "erledigte_ausblenden": "Скрий завършени", "erledigte_anzeigen": "Покажи завършени",
+                   "erledigte_aufgaben": "Завършени задачи", "offene_aufgaben": "Отворени задачи",
                    "datum": "Дата", "ma": "Екип", "lock": "Заключено", "zurück": "Назад",
                    "neue_aufgabe": "Нова задача", "tätigkeit": "Дейност", "dauer": "Продължителност (Мин)", "beschreibung": "Описание",
                    "erstellen": "Създай", "abbrechen": "Отказ",
@@ -1249,15 +1257,24 @@ async def admin_export(token: str, month: str, db=Depends(get_db)):
 
 # -------------------- Cleaner --------------------
 @app.get("/cleaner/{token}")
-async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depends(get_db)):
+async def cleaner_home(request: Request, token: str, show_done: int = 1, show_open: int = 1, db=Depends(get_db)):
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403)
     q = db.query(Task).filter(Task.assigned_staff_id==s.id)
     # Abgelehnte Tasks ausblenden - zeige nur Tasks die nicht rejected sind
     from sqlalchemy import or_
     q = q.filter(or_(Task.assignment_status != "rejected", Task.assignment_status.is_(None)))
-    if not show_done:
-        q = q.filter(Task.status != "done")
+    # Filter nach Status: erledigte und/oder offene Aufgaben
+    status_filters = []
+    if show_done:
+        status_filters.append(Task.status == "done")
+    if show_open:
+        status_filters.append(Task.status != "done")
+    if status_filters:
+        q = q.filter(or_(*status_filters))
+    else:
+        # Wenn beide Filter deaktiviert sind, zeige nichts
+        q = q.filter(Task.id == -1)  # Unmögliche Bedingung
     tasks = q.order_by(Task.date, Task.id).all()
     apts = db.query(Apartment).all()
     apt_map = {a.id: a.name for a in apts}
@@ -1323,7 +1340,7 @@ async def cleaner_home(request: Request, token: str, show_done: int = 0, db=Depe
             extras_map[t.id] = {}
     lang = detect_language(request)
     trans = get_translations(lang)
-    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "hours_prev_last": hours_prev_last, "hours_last": hours_last, "hours_current": hours_current, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "run_map": run_map, "timelog_map": timelog_map, "extras_map": extras_map, "warn_limit": warn_limit, "lang": lang, "trans": trans, "has_running": has_running})
+    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "hours_prev_last": hours_prev_last, "hours_last": hours_last, "hours_current": hours_current, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "show_open": show_open, "run_map": run_map, "timelog_map": timelog_map, "extras_map": extras_map, "warn_limit": warn_limit, "lang": lang, "trans": trans, "has_running": has_running})
 
 @app.post("/cleaner/{token}/start")
 async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)):
