@@ -263,6 +263,7 @@ SMTP_FROM = os.getenv("SMTP_FROM", "")
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
 TWILIO_WHATSAPP_FROM = os.getenv("TWILIO_WHATSAPP_FROM", "")  # Format: whatsapp:+14155238886
+TWILIO_WHATSAPP_CONTENT_SID = os.getenv("TWILIO_WHATSAPP_CONTENT_SID", "")  # Content SID für WhatsApp-Vorlage
 APP_VERSION = os.getenv("APP_VERSION", "v6.3")
 APP_BUILD_DATE = os.getenv("APP_BUILD_DATE", dt.date.today().strftime("%Y-%m-%d"))
 
@@ -368,12 +369,26 @@ def _send_whatsapp(to_phone: str, message: str):
         if BASE_URL:
             status_callback_url = f"{BASE_URL.rstrip('/')}/webhook/twilio/status"
         
-        message_obj = client.messages.create(
-            body=message,
-            from_=TWILIO_WHATSAPP_FROM,
-            to=whatsapp_to,
-            status_callback=status_callback_url  # Webhook für Status-Updates
-        )
+        # Verwende WhatsApp-Vorlage (Content SID) wenn konfiguriert, sonst freie Nachricht
+        if TWILIO_WHATSAPP_CONTENT_SID:
+            # Verwende Content SID mit Content Variables
+            # Die Nachricht wird als Variable übergeben (normalerweise {{1}} in der Vorlage)
+            message_obj = client.messages.create(
+                content_sid=TWILIO_WHATSAPP_CONTENT_SID,
+                content_variables=json.dumps({"1": message}),  # Variable 1 enthält die Nachricht
+                from_=TWILIO_WHATSAPP_FROM,
+                to=whatsapp_to,
+                status_callback=status_callback_url
+            )
+            log.info("📱 Using WhatsApp template (Content SID: %s)", TWILIO_WHATSAPP_CONTENT_SID)
+        else:
+            # Freie Nachricht (nur innerhalb 24h-Fenster möglich)
+            message_obj = client.messages.create(
+                body=message,
+                from_=TWILIO_WHATSAPP_FROM,
+                to=whatsapp_to,
+                status_callback=status_callback_url
+            )
         status = getattr(message_obj, 'status', 'unknown')
         error_code = getattr(message_obj, 'error_code', None)
         error_message = getattr(message_obj, 'error_message', None)
@@ -1475,8 +1490,24 @@ async def twilio_status_webhook(request: Request):
             log.error("❌ WhatsApp FAILED: SID=%s, To=%s, From=%s, ErrorCode=%s, ErrorMessage=%s", 
                      message_sid, to_clean, from_clean, error_code, error_message)
         elif message_status == "undelivered":
-            log.warning("⚠️ WhatsApp UNDELIVERED: SID=%s, To=%s, From=%s, ErrorCode=%s, ErrorMessage=%s", 
-                       message_sid, to_clean, from_clean, error_code, error_message)
+            # Spezifische Fehlermeldungen für bekannte Error Codes
+            error_details = ""
+            if error_code == "63016":
+                error_details = " (24h-Fenster abgelaufen - Vorlage erforderlich oder Sandbox-Nummer nicht verifiziert)"
+            elif error_code == "63007":
+                error_details = " (Ungültige Telefonnummer)"
+            elif error_code == "63014":
+                error_details = " (Nachricht zu lang)"
+            elif error_code:
+                error_details = f" (Code: {error_code})"
+            
+            log.warning("⚠️ WhatsApp UNDELIVERED: SID=%s, To=%s, From=%s, ErrorCode=%s, ErrorMessage=%s%s", 
+                       message_sid, to_clean, from_clean, error_code, error_message or "(keine Details)", error_details)
+            
+            # Zusätzliche Warnung für 63016 mit Lösungshinweis
+            if error_code == "63016":
+                log.warning("💡 Lösung für 63016: 1) Im Sandbox-Modus: Nummer verifizieren (Join-Code senden) "
+                           "2) Im Production: WhatsApp-Vorlage verwenden für erste Nachricht")
         else:
             log.info("📱 WhatsApp Status Update: SID=%s, Status=%s, To=%s, From=%s", 
                     message_sid, message_status, to_clean, from_clean)
