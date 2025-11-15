@@ -259,6 +259,10 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM = os.getenv("SMTP_FROM", "")
+# WhatsApp/Twilio Configuration
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
+TWILIO_WHATSAPP_FROM = os.getenv("TWILIO_WHATSAPP_FROM", "")  # Format: whatsapp:+14155238886
 APP_VERSION = os.getenv("APP_VERSION", "v6.3")
 APP_BUILD_DATE = os.getenv("APP_BUILD_DATE", dt.date.today().strftime("%Y-%m-%d"))
 
@@ -331,6 +335,57 @@ def _send_email(to_email: str, subject: str, body_text: str, body_html: str | No
         log.info("📧 Sent email to %s", to_email)
     except Exception as e:
         log.error("Email send failed to %s: %s", to_email, e)
+
+def _send_whatsapp(to_phone: str, message: str):
+    """Sende WhatsApp-Nachricht über Twilio"""
+    if not (TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_WHATSAPP_FROM):
+        log.warning("Twilio not configured, skipping WhatsApp to %s", to_phone)
+        return False
+    
+    if not to_phone or not to_phone.strip():
+        log.warning("No phone number provided for WhatsApp")
+        return False
+    
+    try:
+        from twilio.rest import Client
+        
+        # Normalisiere Telefonnummer (entferne Leerzeichen, füge + hinzu falls nötig)
+        phone = to_phone.strip().replace(" ", "").replace("-", "")
+        if not phone.startswith("+"):
+            # Wenn keine Ländervorwahl, füge +49 für Deutschland hinzu (oder konfigurierbar)
+            if phone.startswith("0"):
+                phone = "+49" + phone[1:]  # 0171... -> +49171...
+            else:
+                phone = "+49" + phone  # 171... -> +49171...
+        whatsapp_to = f"whatsapp:{phone}"
+        
+        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        message_obj = client.messages.create(
+            body=message,
+            from_=TWILIO_WHATSAPP_FROM,
+            to=whatsapp_to
+        )
+        log.info("📱 Sent WhatsApp to %s (SID: %s)", phone, message_obj.sid)
+        return True
+    except ImportError:
+        log.error("Twilio library not installed. Install with: pip install twilio")
+        return False
+    except Exception as e:
+        log.error("WhatsApp send failed to %s: %s", to_phone, e)
+        return False
+
+def build_assignment_whatsapp_message(lang: str, staff_name: str, items: list, base_url: str) -> str:
+    """Erstelle WhatsApp-Nachricht für Zuweisungen"""
+    trans = get_translations(lang)
+    msg = f"*{trans.get('zuweisung', 'Zuweisung')} · {staff_name}*\n\n"
+    for i, it in enumerate(items, 1):
+        msg += f"*{i}. {it['apt']}* - {it['date']}\n"
+        if it['guest']:
+            msg += f"👤 {it['guest']}\n"
+        msg += f"📝 {it['desc']}\n"
+        msg += f"✅ {it['accept']}\n"
+        msg += f"❌ {it['reject']}\n\n"
+    return msg
 
 def build_assignment_email(lang: str, staff_name: str, items: list, base_url: str) -> tuple[str, str, str]:
     trans = get_translations(lang)
@@ -426,12 +481,19 @@ def send_assignment_emails_job():
                 })
             subject, body_text, body_html = build_assignment_email(lang, staff.name, items, base_url)
             _send_email(staff.email, subject, body_text, body_html)
+            
+            # WhatsApp-Benachrichtigung senden (falls Telefonnummer vorhanden)
+            if staff.phone and staff.phone.strip():
+                whatsapp_msg = build_assignment_whatsapp_message(lang, staff.name, items, base_url)
+                _send_whatsapp(staff.phone, whatsapp_msg)
+            
             now = now_iso()
             for t in tasks_for_staff:
                 t.assign_notified_at = now
             report.append({
                 'staff_name': staff.name,
                 'email': staff.email,
+                'phone': staff.phone or "",
                 'count': len(items),
                 'items': items,
             })
@@ -884,14 +946,15 @@ async def admin_staff(request: Request, token: str, db=Depends(get_db)):
     return templates.TemplateResponse("admin_staff.html", {"request": request, "token": token, "staff": staff, "staff_hours": staff_hours, "current_month": current_month, "last_month": last_month_str, "prev_last_month": prev_last_month_str, "base_url": base_url, "lang": lang, "trans": trans})
 
 @app.post("/admin/{token}/staff/add")
-async def admin_staff_add(token: str, name: str = Form(...), email: str = Form(...), hourly_rate: float = Form(0.0), max_hours_per_month: int = Form(160), language: str = Form("de"), db=Depends(get_db)):
+async def admin_staff_add(token: str, name: str = Form(...), email: str = Form(...), phone: str = Form(""), hourly_rate: float = Form(0.0), max_hours_per_month: int = Form(160), language: str = Form("de"), db=Depends(get_db)):
     if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
     email = (email or "").strip()
     if not email or "@" not in email:
         raise HTTPException(status_code=400, detail="E-Mail ist erforderlich")
     if language not in ["de","en","fr","it","es","ro","ru","bg"]:
         language = "de"
-    s = Staff(name=name, email=email, hourly_rate=hourly_rate, max_hours_per_month=max_hours_per_month, magic_token=new_token(16), active=True, language=language)
+    phone = (phone or "").strip()
+    s = Staff(name=name, email=email, phone=phone, hourly_rate=hourly_rate, max_hours_per_month=max_hours_per_month, magic_token=new_token(16), active=True, language=language)
     db.add(s); db.commit()
     return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
 
@@ -907,6 +970,7 @@ async def admin_staff_update(
     staff_id: int = Form(...),
     name: str = Form(...),
     email: str = Form(...),
+    phone: str = Form(""),
     hourly_rate: float = Form(0.0),
     max_hours_per_month: int = Form(160),
     language: str = Form("de"),
@@ -922,8 +986,10 @@ async def admin_staff_update(
         raise HTTPException(status_code=400, detail="Ungültige E-Mail")
     if language not in ["de","en","fr","it","es","ro","ru","bg"]:
         language = "de"
+    phone = (phone or "").strip()
     s.name = name
     s.email = email
+    s.phone = phone
     s.hourly_rate = float(hourly_rate or 0)
     s.max_hours_per_month = int(max_hours_per_month or 0)
     s.language = language

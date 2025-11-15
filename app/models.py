@@ -28,6 +28,7 @@ class Staff(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255))
     email: Mapped[str] = mapped_column(String(255), default="")
+    phone: Mapped[str] = mapped_column(String(20), default="")  # WhatsApp/Telefonnummer
     hourly_rate: Mapped[float] = mapped_column(Float, default=0.0)
     max_hours_per_month: Mapped[int] = mapped_column(Integer, default=160)
     magic_token: Mapped[str] = mapped_column(String(32), unique=True)
