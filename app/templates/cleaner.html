@@ -274,8 +274,8 @@ function setLanguage(lang) {
   <div class="col-4">
     <div class="stats-card">
       <i class="bi bi-clock text-info" style="font-size: 1.5rem;"></i>
-      <div class="stats-card-value">{{ tasks|sum(attribute='planned_minutes') }}</div>
-      <div class="stats-card-label">Minuten</div>
+      <div class="stats-card-value">{{ tasks|sum(attribute='planned_minutes') | minutes_to_hhmm }}</div>
+      <div class="stats-card-label">Zeit</div>
     </div>
   </div>
 </div>
@@ -344,7 +344,7 @@ function setLanguage(lang) {
   
   <div class="task-info-row">
     <span class="task-info-label">{{ trans.planned }}:</span>
-    <span class="fw-bold">{{ t.planned_minutes }} {{ trans.min }}</span>
+    <span class="fw-bold">{{ t.planned_minutes | minutes_to_hhmm }}</span>
   </div>
 
   <div class="task-info-row">
@@ -357,10 +357,10 @@ function setLanguage(lang) {
     <span>
       {% if tl.get('actual_minutes') %}
         <span class="fw-bold {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">
-          {{ tl.actual_minutes }} {{ trans.min }}
+          {{ tl.actual_minutes | minutes_to_hhmm }}
         </span>
         {% if tl.actual_minutes > t.planned_minutes %}
-          <small class="text-danger d-block">+{{ tl.actual_minutes - t.planned_minutes }} {{ trans.min }}</small>
+          <small class="text-danger d-block">+{{ (tl.actual_minutes - t.planned_minutes) | minutes_to_hhmm }}</small>
         {% endif %}
       {% else %}
         <span class="text-muted">-</span>
@@ -427,7 +427,7 @@ function setLanguage(lang) {
     {% elif t.status=='paused' and tl.get('actual_minutes') %}
       <div class="text-center mb-3">
         <div class="timer-display" style="color: #0dcaf0;">
-          <div><i class="bi bi-pause-circle-fill"></i> {{ tl.actual_minutes }} {{ trans.min }}</div>
+          <div><i class="bi bi-pause-circle-fill"></i> {{ tl.actual_minutes | minutes_to_hhmm }}</div>
         </div>
         <div class="small text-muted">{{ trans.pausiert }}</div>
       </div>
@@ -540,7 +540,7 @@ function setLanguage(lang) {
   
   <div class="task-info-row">
     <span class="task-info-label">{{ trans.planned }}:</span>
-    <span class="fw-bold">{{ t.planned_minutes }} {{ trans.min }}</span>
+    <span class="fw-bold">{{ t.planned_minutes | minutes_to_hhmm }}</span>
   </div>
 
   <div class="task-info-row">
@@ -553,10 +553,10 @@ function setLanguage(lang) {
     <span>
       {% if tl.get('actual_minutes') %}
         <span class="fw-bold {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">
-          {{ tl.actual_minutes }} {{ trans.min }}
+          {{ tl.actual_minutes | minutes_to_hhmm }}
         </span>
         {% if tl.actual_minutes > t.planned_minutes %}
-          <small class="text-danger d-block">+{{ tl.actual_minutes - t.planned_minutes }} {{ trans.min }}</small>
+          <small class="text-danger d-block">+{{ (tl.actual_minutes - t.planned_minutes) | minutes_to_hhmm }}</small>
         {% endif %}
       {% else %}
         <span class="text-muted">-</span>
@@ -591,7 +591,7 @@ function setLanguage(lang) {
     {% elif t.status=='paused' and tl.get('actual_minutes') %}
       <div class="text-center mb-3">
         <div class="timer-display" style="color: #0dcaf0;">
-          <div><i class="bi bi-pause-circle-fill"></i> {{ tl.actual_minutes }} {{ trans.min }}</div>
+          <div><i class="bi bi-pause-circle-fill"></i> {{ tl.actual_minutes | minutes_to_hhmm }}</div>
         </div>
         <div class="small text-muted">{{ trans.pausiert }}</div>
       </div>
@@ -695,7 +695,7 @@ function setLanguage(lang) {
   
   <div class="task-info-row">
     <span class="task-info-label">{{ trans.planned }}:</span>
-    <span class="fw-bold">{{ t.planned_minutes }} {{ trans.min }}</span>
+    <span class="fw-bold">{{ t.planned_minutes | minutes_to_hhmm }}</span>
   </div>
 
   <div class="task-info-row">
@@ -708,10 +708,10 @@ function setLanguage(lang) {
     <span>
       {% if tl.get('actual_minutes') %}
         <span class="fw-bold {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">
-          {{ tl.actual_minutes }} {{ trans.min }}
+          {{ tl.actual_minutes | minutes_to_hhmm }}
         </span>
         {% if tl.actual_minutes > t.planned_minutes %}
-          <small class="text-danger d-block">+{{ tl.actual_minutes - t.planned_minutes }} {{ trans.min }}</small>
+          <small class="text-danger d-block">+{{ (tl.actual_minutes - t.planned_minutes) | minutes_to_hhmm }}</small>
         {% endif %}
       {% else %}
         <span class="text-muted">-</span>
@@ -978,6 +978,30 @@ document.addEventListener('DOMContentLoaded', function(){
       }
     });
   }
+  
+  // Filter-Parameter automatisch zu allen Formularen hinzufügen
+  const urlParams = new URLSearchParams(window.location.search);
+  const showDone = urlParams.get('show_done') || '{{ show_done }}';
+  const showOpen = urlParams.get('show_open') || '{{ show_open }}';
+  
+  const allForms = document.querySelectorAll('form[method="post"]');
+  allForms.forEach(form => {
+    // Prüfe ob bereits hidden inputs vorhanden sind
+    if (!form.querySelector('input[name="show_done"]')) {
+      const inputDone = document.createElement('input');
+      inputDone.type = 'hidden';
+      inputDone.name = 'show_done';
+      inputDone.value = showDone;
+      form.appendChild(inputDone);
+    }
+    if (!form.querySelector('input[name="show_open"]')) {
+      const inputOpen = document.createElement('input');
+      inputOpen.type = 'hidden';
+      inputOpen.name = 'show_open';
+      inputOpen.value = showOpen;
+      form.appendChild(inputOpen);
+    }
+  });
   
   // Tab-Navigation: URL aktualisieren bei Tab-Wechsel (optional, für bessere UX)
   const tabButtons = document.querySelectorAll('[data-bs-toggle="tab"]');

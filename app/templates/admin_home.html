@@ -324,7 +324,7 @@
 
 <!-- Status Filter (Desktop) -->
 <div class="desktop-view mb-3">
-  <div class="d-flex gap-3 align-items-center">
+  <div class="d-flex gap-3 align-items-center flex-wrap">
     <div class="form-check">
       <input class="form-check-input" type="checkbox" id="filterShowDone" {% if show_done %}checked{% endif %}>
       <label class="form-check-label" for="filterShowDone">
@@ -336,6 +336,35 @@
       <label class="form-check-label" for="filterShowOpen">
         {{ trans.offene_aufgaben }}
       </label>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <label class="mb-0 small text-muted">{{ trans.date }}:</label>
+      <select id="f-date-desktop" class="form-select form-select-sm" style="width: auto;">
+        <option value="">{{ trans.all }}</option>
+        <option value="today">{{ trans.today }}</option>
+        <option value="week">{{ trans.week }}</option>
+        <option value="month">{{ trans.month }}</option>
+        <option value="next7">{{ trans.next7 }}</option>
+      </select>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <label class="mb-0 small text-muted">{{ trans.apartment }}:</label>
+      <select id="f-apt-desktop" class="form-select form-select-sm" style="width: auto;">
+        <option value="">{{ trans.all }}</option>
+        <option value="{{ trans.manuelle_aufgabe }}">{{ trans.manuelle_aufgabe }}</option>
+        {% for apt in apartments %}
+          <option value="{{ apt.name }}">{{ apt.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <label class="mb-0 small text-muted">{{ trans.ma }}:</label>
+      <select id="f-staff-desktop" class="form-select form-select-sm" style="width: auto;">
+        <option value="">{{ trans.all }}</option>
+        {% for s in staff %}
+          <option value="{{ s.name }}">{{ s.name }}</option>
+        {% endfor %}
+      </select>
     </div>
   </div>
 </div>
@@ -486,12 +515,12 @@ function setLanguage(lang) {
       </div>
       <div class="task-meta-item">
         <i class="bi bi-clock"></i>
-        <span>{{ t.planned_minutes }} {{ trans.min }}</span>
+        <span>{{ t.planned_minutes | minutes_to_hhmm }}</span>
       </div>
       {% if tl.actual_minutes %}
       <div class="task-meta-item">
         <i class="bi bi-stopwatch {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}"></i>
-        <span class="{% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">{{ tl.actual_minutes }} {{ trans.min }}</span>
+        <span class="{% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">{{ tl.actual_minutes | minutes_to_hhmm }}</span>
       </div>
       {% endif %}
       {% if t.assigned_staff_id %}
@@ -651,7 +680,7 @@ function setLanguage(lang) {
     {% endif %}
     {% if t.notes %}<div class="task-guest-info"><i class="bi bi-sticky"></i> {{ t.notes[:40] }}{% if t.notes|length > 40 %}...{% endif %}</div>{% endif %}
   </td>
-  <td data-col="planned"><span class="time-planned">{{ t.planned_minutes }} {{ trans.min }}</span></td>
+  <td data-col="planned"><span class="time-planned">{{ t.planned_minutes | minutes_to_hhmm }}</span></td>
   <td class="status-cell">
     <div class="status-badge-wrapper">
       {% if t.status == 'done' %}
@@ -707,10 +736,10 @@ function setLanguage(lang) {
     <div class="task-time-comparison">
       {% if tl.actual_minutes %}
         <span class="time-actual {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">
-          {{ tl.actual_minutes }} {{ trans.min }}
+          {{ tl.actual_minutes | minutes_to_hhmm }}
         </span>
         {% if tl.actual_minutes > t.planned_minutes %}
-          <span class="time-over">+{{ tl.actual_minutes - t.planned_minutes }} {{ trans.min }}</span>
+          <span class="time-over">+{{ (tl.actual_minutes - t.planned_minutes) | minutes_to_hhmm }}</span>
         {% endif %}
       {% elif tl.started_at and not tl.ended_at %}
         <span class="badge bg-warning text-dark" style="font-size: 0.7rem;"><i class="bi bi-clock"></i> {{ trans.läuft }}</span>
@@ -847,7 +876,7 @@ function setLanguage(lang) {
   
   <div class="task-info-row">
     <span class="task-info-label">{{ trans.planned }}:</span>
-    <span class="fw-bold">{{ t.planned_minutes }} {{ trans.min }}</span>
+    <span class="fw-bold">{{ t.planned_minutes | minutes_to_hhmm }}</span>
   </div>
   
   <div class="task-info-row">
@@ -855,10 +884,10 @@ function setLanguage(lang) {
     <span>
       {% if tl.actual_minutes %}
         <span class="fw-bold {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">
-          {{ tl.actual_minutes }} {{ trans.min }}
+          {{ tl.actual_minutes | minutes_to_hhmm }}
         </span>
         {% if tl.actual_minutes > t.planned_minutes %}
-          <small class="text-danger d-block">+{{ tl.actual_minutes - t.planned_minutes }} {{ trans.min }}</small>
+          <small class="text-danger d-block">+{{ (tl.actual_minutes - t.planned_minutes) | minutes_to_hhmm }}</small>
         {% endif %}
       {% elif tl.started_at and not tl.ended_at %}
         <span class="badge bg-warning text-dark"><i class="bi bi-clock"></i> {{ trans.läuft }}...</span>
@@ -1005,35 +1034,77 @@ function applyFilter(){
   });
 }
 
+// Filter-Funktion für Cards (Desktop und Mobile)
+function applyCardFilter() {
+  const fDate = document.getElementById('f-date-desktop')?.value || 
+                document.getElementById('f-date')?.value || 
+                document.getElementById('f-date-mobile')?.value || '';
+  const fApt = document.getElementById('f-apt-desktop')?.value || 
+               document.getElementById('f-apt')?.value || 
+               document.getElementById('f-apt-mobile')?.value || '';
+  const fStaff = document.getElementById('f-staff-desktop')?.value || 
+                 document.getElementById('f-staff')?.value || 
+                 document.getElementById('f-staff-mobile')?.value || '';
+  
+  // Desktop Cards filtern
+  const desktopCards = document.querySelectorAll('#task-cards-view .task-card');
+  desktopCards.forEach(card => {
+    const dateIso = card.getAttribute('data-date') || '';
+    const aptTxt = card.getAttribute('data-apt') || '';
+    const staffTxt = card.getAttribute('data-staff') || '';
+    
+    const ok = matchesDateFilter('', fDate, dateIso)
+            && (!fApt || aptTxt.toLowerCase().includes(fApt.toLowerCase()))
+            && (!fStaff || staffTxt.toLowerCase().includes(fStaff.toLowerCase()));
+    
+    card.closest('.col-md-6, .col-lg-4').style.display = ok ? '' : 'none';
+  });
+  
+  // Mobile Cards filtern
+  const mobileCards = document.querySelectorAll('.task-card-mobile');
+  mobileCards.forEach(card => {
+    const dateTxt = card.getAttribute('data-date') || '';
+    const aptTxt = card.getAttribute('data-apt') || '';
+    const staffTxt = card.getAttribute('data-staff') || '';
+    
+    const ok = matchesDateFilter(dateTxt, fDate)
+            && (!fApt || aptTxt.toLowerCase().includes(fApt.toLowerCase()))
+            && (!fStaff || staffTxt.toLowerCase().includes(fStaff.toLowerCase()));
+    
+    card.style.display = ok ? '' : 'none';
+  });
+}
+
 // Mobile-Filter auch hinzufügen
-['f-date','f-apt','f-staff','f-date-mobile','f-apt-mobile','f-staff-mobile'].forEach(id => {
+['f-date','f-apt','f-staff','f-date-mobile','f-apt-mobile','f-staff-mobile','f-date-desktop','f-apt-desktop','f-staff-desktop'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('change', function() {
     applyFilter();
-    // Mobile Cards filtern
-    const fDate = document.getElementById('f-date')?.value || document.getElementById('f-date-mobile')?.value || '';
-    const fApt = document.getElementById('f-apt')?.value || document.getElementById('f-apt-mobile')?.value || '';
-    const fStaff = document.getElementById('f-staff')?.value || document.getElementById('f-staff-mobile')?.value || '';
+    applyCardFilter();
     
-    // Synchronisiere Filter
-    if (document.getElementById('f-date')) document.getElementById('f-date').value = fDate;
-    if (document.getElementById('f-date-mobile')) document.getElementById('f-date-mobile').value = fDate;
-    if (document.getElementById('f-apt')) document.getElementById('f-apt').value = fApt;
-    if (document.getElementById('f-apt-mobile')) document.getElementById('f-apt-mobile').value = fApt;
-    if (document.getElementById('f-staff')) document.getElementById('f-staff').value = fStaff;
-    if (document.getElementById('f-staff-mobile')) document.getElementById('f-staff-mobile').value = fStaff;
+    // Synchronisiere alle Filter
+    const fDate = document.getElementById('f-date-desktop')?.value || 
+                  document.getElementById('f-date')?.value || 
+                  document.getElementById('f-date-mobile')?.value || '';
+    const fApt = document.getElementById('f-apt-desktop')?.value || 
+                 document.getElementById('f-apt')?.value || 
+                 document.getElementById('f-apt-mobile')?.value || '';
+    const fStaff = document.getElementById('f-staff-desktop')?.value || 
+                   document.getElementById('f-staff')?.value || 
+                   document.getElementById('f-staff-mobile')?.value || '';
     
-    const mobileCards = document.querySelectorAll('.task-card-mobile');
-    mobileCards.forEach(card => {
-      const dateTxt = card.getAttribute('data-date') || '';
-      const aptTxt = card.getAttribute('data-apt') || '';
-      const staffTxt = card.getAttribute('data-staff') || '';
-      
-      const ok = matchesDateFilter(dateTxt, fDate)
-              && (!fApt || aptTxt.toLowerCase().includes(fApt.toLowerCase()))
-              && (!fStaff || staffTxt.toLowerCase().includes(fStaff.toLowerCase()));
-      
-      card.style.display = ok ? '' : 'none';
+    // Synchronisiere Filter zwischen Desktop, Mobile und Table
+    ['f-date', 'f-date-mobile', 'f-date-desktop'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = fDate;
+    });
+    ['f-apt', 'f-apt-mobile', 'f-apt-desktop'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = fApt;
+    });
+    ['f-staff', 'f-staff-mobile', 'f-staff-desktop'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = fStaff;
     });
 
     // iOS Workaround: Stelle sicher, dass Select nach Change wieder interaktiv ist
@@ -1070,11 +1141,10 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function resetMobileFilters(){
-  const ids = ['f-date','f-apt','f-staff','f-date-mobile','f-apt-mobile','f-staff-mobile'];
+  const ids = ['f-date','f-apt','f-staff','f-date-mobile','f-apt-mobile','f-staff-mobile','f-date-desktop','f-apt-desktop','f-staff-desktop'];
   ids.forEach(id => { const el = document.getElementById(id); if (el) el.value=''; });
   applyFilter();
-  const mobileCards = document.querySelectorAll('.task-card-mobile');
-  mobileCards.forEach(card => card.style.display='');
+  applyCardFilter();
 }
 
 function handleExtraToggle(checkbox){

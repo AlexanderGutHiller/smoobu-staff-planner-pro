@@ -297,8 +297,17 @@ def date_wd_de(s: str, style: str = "short") -> str:
     name = wd_long[d.weekday()] if style == "long" else wd_short[d.weekday()]
     return f"{name}, {d.strftime('%d.%m.%Y')}"
 
+def minutes_to_hhmm(minutes: Optional[int]) -> str:
+    """Konvertiere Minuten in hh:mm Format"""
+    if minutes is None:
+        return "--:--"
+    hours = minutes // 60
+    mins = minutes % 60
+    return f"{hours:02d}:{mins:02d}"
+
 templates.env.filters["date_de"] = date_de
 templates.env.filters["date_wd_de"] = date_wd_de
+templates.env.filters["minutes_to_hhmm"] = minutes_to_hhmm
 
 def _send_email(to_email: str, subject: str, body_text: str, body_html: str | None = None):
     if not (SMTP_HOST and SMTP_FROM):
@@ -1366,7 +1375,7 @@ async def cleaner_home(request: Request, token: str, show_done: int = 1, show_op
     return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "hours_prev_last": hours_prev_last, "hours_last": hours_last, "hours_current": hours_current, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "show_open": show_open, "run_map": run_map, "timelog_map": timelog_map, "extras_map": extras_map, "warn_limit": warn_limit, "lang": lang, "trans": trans, "has_running": has_running})
 
 @app.post("/cleaner/{token}/start")
-async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)):
+async def cleaner_start(token: str, task_id: int = Form(...), show_done: Optional[int] = Form(None), show_open: Optional[int] = Form(None), db=Depends(get_db)):
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
@@ -1405,10 +1414,20 @@ async def cleaner_start(token: str, task_id: int = Form(...), db=Depends(get_db)
     
     t.status = "running"
     db.commit()
-    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+    # Behalte Filter-Parameter bei
+    query_string = ""
+    if show_done is not None or show_open is not None:
+        query_parts = []
+        if show_done is not None:
+            query_parts.append(f"show_done={show_done}")
+        if show_open is not None:
+            query_parts.append(f"show_open={show_open}")
+        if query_parts:
+            query_string = "?" + "&".join(query_parts)
+    return RedirectResponse(url=f"/cleaner/{token}{query_string}", status_code=303)
 
 @app.post("/cleaner/{token}/stop")
-async def cleaner_stop(token: str, task_id: int = Form(...), db=Depends(get_db)):
+async def cleaner_stop(token: str, task_id: int = Form(...), show_done: Optional[int] = Form(None), show_open: Optional[int] = Form(None), db=Depends(get_db)):
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
@@ -1438,10 +1457,20 @@ async def cleaner_stop(token: str, task_id: int = Form(...), db=Depends(get_db))
     
     t.status = "paused"  # Status auf "paused" setzen statt "open"
     db.commit()
-    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+    # Behalte Filter-Parameter bei
+    query_string = ""
+    if show_done is not None or show_open is not None:
+        query_parts = []
+        if show_done is not None:
+            query_parts.append(f"show_done={show_done}")
+        if show_open is not None:
+            query_parts.append(f"show_open={show_open}")
+        if query_parts:
+            query_string = "?" + "&".join(query_parts)
+    return RedirectResponse(url=f"/cleaner/{token}{query_string}", status_code=303)
 
 @app.post("/cleaner/{token}/done")
-async def cleaner_done(token: str, task_id: int = Form(...), db=Depends(get_db)):
+async def cleaner_done(token: str, task_id: int = Form(...), show_done: Optional[int] = Form(None), show_open: Optional[int] = Form(None), db=Depends(get_db)):
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
@@ -1462,10 +1491,20 @@ async def cleaner_done(token: str, task_id: int = Form(...), db=Depends(get_db))
     
     t.status = "done"
     db.commit()
-    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+    # Behalte Filter-Parameter bei
+    query_string = ""
+    if show_done is not None or show_open is not None:
+        query_parts = []
+        if show_done is not None:
+            query_parts.append(f"show_done={show_done}")
+        if show_open is not None:
+            query_parts.append(f"show_open={show_open}")
+        if query_parts:
+            query_string = "?" + "&".join(query_parts)
+    return RedirectResponse(url=f"/cleaner/{token}{query_string}", status_code=303)
 
 @app.post("/cleaner/{token}/accept")
-async def cleaner_accept(token: str, task_id: int = Form(...), db=Depends(get_db)):
+async def cleaner_accept(token: str, task_id: int = Form(...), show_done: Optional[int] = Form(None), show_open: Optional[int] = Form(None), db=Depends(get_db)):
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
@@ -1473,10 +1512,20 @@ async def cleaner_accept(token: str, task_id: int = Form(...), db=Depends(get_db
         raise HTTPException(status_code=404, detail="Task nicht gefunden oder nicht zugewiesen")
     t.assignment_status = "accepted"
     db.commit()
-    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+    # Behalte Filter-Parameter bei
+    query_string = ""
+    if show_done is not None or show_open is not None:
+        query_parts = []
+        if show_done is not None:
+            query_parts.append(f"show_done={show_done}")
+        if show_open is not None:
+            query_parts.append(f"show_open={show_open}")
+        if query_parts:
+            query_string = "?" + "&".join(query_parts)
+    return RedirectResponse(url=f"/cleaner/{token}{query_string}", status_code=303)
 
 @app.post("/cleaner/{token}/reject")
-async def cleaner_reject(token: str, task_id: int = Form(...), db=Depends(get_db)):
+async def cleaner_reject(token: str, task_id: int = Form(...), show_done: Optional[int] = Form(None), show_open: Optional[int] = Form(None), db=Depends(get_db)):
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
@@ -1484,7 +1533,17 @@ async def cleaner_reject(token: str, task_id: int = Form(...), db=Depends(get_db
         raise HTTPException(status_code=404, detail="Task nicht gefunden oder nicht zugewiesen")
     t.assignment_status = "rejected"
     db.commit()
-    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+    # Behalte Filter-Parameter bei
+    query_string = ""
+    if show_done is not None or show_open is not None:
+        query_parts = []
+        if show_done is not None:
+            query_parts.append(f"show_done={show_done}")
+        if show_open is not None:
+            query_parts.append(f"show_open={show_open}")
+        if query_parts:
+            query_string = "?" + "&".join(query_parts)
+    return RedirectResponse(url=f"/cleaner/{token}{query_string}", status_code=303)
 
 @app.post("/cleaner/{token}/reopen")
 async def cleaner_reopen(token: str, task_id: int = Form(...), db=Depends(get_db)):
