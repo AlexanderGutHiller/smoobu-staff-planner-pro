@@ -362,10 +362,17 @@ def _send_whatsapp(to_phone: str, message: str):
         client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
         log.info("📱 Sending WhatsApp: from=%s, to=%s, message_length=%d", 
                  TWILIO_WHATSAPP_FROM, whatsapp_to, len(message))
+        
+        # Status-Callback-URL für Delivery-Updates
+        status_callback_url = None
+        if BASE_URL:
+            status_callback_url = f"{BASE_URL.rstrip('/')}/webhook/twilio/status"
+        
         message_obj = client.messages.create(
             body=message,
             from_=TWILIO_WHATSAPP_FROM,
-            to=whatsapp_to
+            to=whatsapp_to,
+            status_callback=status_callback_url  # Webhook für Status-Updates
         )
         status = getattr(message_obj, 'status', 'unknown')
         error_code = getattr(message_obj, 'error_code', None)
@@ -502,13 +509,13 @@ def send_assignment_emails_job():
             try:
                 phone = getattr(staff, 'phone', None) or ""
                 if phone and phone.strip():
-                    log.info("📱 Attempting WhatsApp to %s for staff %s", phone, staff.name)
+                    log.info("📱 Sending WhatsApp to %s for staff %s (%d tasks)", phone, staff.name, len(items))
                     whatsapp_msg = build_assignment_whatsapp_message(lang, staff.name, items, base_url)
                     result = _send_whatsapp(phone, whatsapp_msg)
                     if result:
-                        log.info("✅ WhatsApp sent successfully to %s", phone)
+                        log.info("✅ WhatsApp queued/sent to %s (staff: %s) - Delivery status will be logged via webhook", phone, staff.name)
                     else:
-                        log.warning("❌ WhatsApp send failed to %s (check logs above)", phone)
+                        log.warning("❌ WhatsApp send failed to %s (staff: %s) - check logs above for details", phone, staff.name)
                 else:
                     log.debug("No phone number for staff %s, skipping WhatsApp", staff.name)
             except Exception as e:
@@ -1358,6 +1365,46 @@ async def admin_test_whatsapp(token: str, phone: str = Query(...), db=Depends(ge
     )
     
     return PlainTextResponse(response_text)
+
+@app.post("/webhook/twilio/status")
+async def twilio_status_webhook(request: Request):
+    """Webhook-Endpoint für Twilio Message-Status-Updates"""
+    try:
+        form_data = await request.form()
+        # Twilio sendet Status-Updates als Form-Data
+        message_sid = form_data.get("MessageSid", "")
+        message_status = form_data.get("MessageStatus", "")
+        to_number = form_data.get("To", "")
+        from_number = form_data.get("From", "")
+        error_code = form_data.get("ErrorCode", "")
+        error_message = form_data.get("ErrorMessage", "")
+        
+        # Entferne "whatsapp:" Präfix für bessere Lesbarkeit
+        to_clean = to_number.replace("whatsapp:", "") if to_number.startswith("whatsapp:") else to_number
+        from_clean = from_number.replace("whatsapp:", "") if from_number.startswith("whatsapp:") else from_number
+        
+        # Logge den Status-Update
+        if message_status == "delivered":
+            log.info("✅ WhatsApp DELIVERED: SID=%s, To=%s, From=%s", 
+                    message_sid, to_clean, from_clean)
+        elif message_status == "sent":
+            log.info("📤 WhatsApp SENT: SID=%s, To=%s, From=%s", 
+                    message_sid, to_clean, from_clean)
+        elif message_status == "failed":
+            log.error("❌ WhatsApp FAILED: SID=%s, To=%s, From=%s, ErrorCode=%s, ErrorMessage=%s", 
+                     message_sid, to_clean, from_clean, error_code, error_message)
+        elif message_status == "undelivered":
+            log.warning("⚠️ WhatsApp UNDELIVERED: SID=%s, To=%s, From=%s, ErrorCode=%s, ErrorMessage=%s", 
+                       message_sid, to_clean, from_clean, error_code, error_message)
+        else:
+            log.info("📱 WhatsApp Status Update: SID=%s, Status=%s, To=%s, From=%s", 
+                    message_sid, message_status, to_clean, from_clean)
+        
+        # Return 200 OK für Twilio
+        return Response(status_code=200)
+    except Exception as e:
+        log.error("Error processing Twilio webhook: %s", e, exc_info=True)
+        return Response(status_code=500)
 
 @app.get("/admin/{token}/notify_assignments")
 async def admin_notify_assignments(token: str):
