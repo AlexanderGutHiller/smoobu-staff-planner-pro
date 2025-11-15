@@ -538,6 +538,87 @@ def send_assignment_emails_job():
         db.commit()
         return report
 
+def send_whatsapp_for_existing_assignments():
+    """Sende nur WhatsApp-Benachrichtigungen für bestehende Zuweisungen (auch wenn bereits per Email benachrichtigt)"""
+    base_url = BASE_URL.rstrip("/") or ""
+    with SessionLocal() as db:
+        # Hole alle pending Tasks mit zugewiesenem Staff (auch wenn bereits benachrichtigt)
+        pending = db.query(Task).filter(
+            Task.assignment_status=="pending", 
+            Task.assigned_staff_id!=None
+        ).all()
+        if not pending:
+            return []
+        staff_ids = {t.assigned_staff_id for t in pending if t.assigned_staff_id}
+        report = []
+        for sid in staff_ids:
+            staff = db.get(Staff, sid)
+            if not staff:
+                continue
+            # Prüfe ob Telefonnummer vorhanden ist
+            phone = getattr(staff, 'phone', None) or ""
+            if not phone or not phone.strip():
+                log.debug("No phone number for staff %s, skipping WhatsApp", staff.name)
+                continue
+            
+            lang = (staff.language or "de")
+            token = staff.magic_token
+            tasks_for_staff = [t for t in pending if t.assigned_staff_id==sid]
+            items = []
+            trans = get_translations(lang)
+            for t in tasks_for_staff:
+                apt_name = ""
+                if t.apartment_id:
+                    apt = db.get(Apartment, t.apartment_id)
+                    apt_name = apt.name if apt else ""
+                guest_str = ""
+                if t.booking_id:
+                    b = db.get(Booking, t.booking_id)
+                    if b:
+                        gname = (b.guest_name or "").strip()
+                        if gname:
+                            guest_str = f"{gname}"
+                        else:
+                            # Adults/children fallback
+                            ac = []
+                            if b.adults:
+                                ac.append(f"{trans.get('erw','Erw.')} {b.adults}")
+                            if b.children:
+                                ac.append(f"{trans.get('kinder','Kinder')} {b.children}")
+                            guest_str = ", ".join(ac)
+                desc = (t.notes or "").strip() or get_translations(lang).get('tätigkeit','Tätigkeit')
+                accept_link = f"{base_url}/c/{token}/accept?task_id={t.id}"
+                reject_link = f"{base_url}/c/{token}/reject?task_id={t.id}"
+                items.append({
+                    'date': t.date,
+                    'apt': apt_name,
+                    'desc': desc,
+                    'guest': guest_str,
+                    'accept': accept_link,
+                    'reject': reject_link,
+                })
+            
+            # Nur WhatsApp senden (keine Email)
+            try:
+                log.info("📱 Sending WhatsApp to %s for staff %s (%d existing tasks)", phone, staff.name, len(items))
+                whatsapp_msg = build_assignment_whatsapp_message(lang, staff.name, items, base_url)
+                result = _send_whatsapp(phone, whatsapp_msg)
+                if result:
+                    log.info("✅ WhatsApp queued/sent to %s (staff: %s) - Delivery status will be logged via webhook", phone, staff.name)
+                else:
+                    log.warning("❌ WhatsApp send failed to %s (staff: %s) - check logs above for details", phone, staff.name)
+            except Exception as e:
+                log.error("WhatsApp notification error for staff %s: %s", staff.name, e, exc_info=True)
+            
+            report.append({
+                'staff_name': staff.name,
+                'phone': phone,
+                'count': len(items),
+                'items': items,
+            })
+        db.commit()
+        return report
+
 def get_db():
     db = SessionLocal()
     try:
@@ -1425,6 +1506,28 @@ async def admin_notify_assignments(token: str):
         return PlainTextResponse("\n".join(lines).strip())
     except Exception as e:
         log.exception("Manual notify failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/{token}/notify_whatsapp_existing")
+async def admin_notify_whatsapp_existing(token: str):
+    """Sende WhatsApp-Benachrichtigungen für bestehende Zuweisungen (auch wenn bereits per Email benachrichtigt)"""
+    if token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403)
+    try:
+        report = send_whatsapp_for_existing_assignments()
+        if not report:
+            return PlainTextResponse("Keine bestehenden Zuweisungen mit Telefonnummern gefunden.")
+        # Baue menschenlesbaren Report
+        lines = ["WhatsApp-Benachrichtigungen für bestehende Zuweisungen:", ""]
+        for r in report:
+            lines.append(f"- {r['staff_name']} ({r['phone']}): {r['count']} Aufgaben")
+            for it in r['items']:
+                guest = f" · {it['guest']}" if it.get('guest') else ""
+                lines.append(f"  • {it['date']} · {it['apt']} · {it['desc']}{guest}")
+            lines.append("")
+        return PlainTextResponse("\n".join(lines).strip())
+    except Exception as e:
+        log.exception("WhatsApp notify existing failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/admin/{token}/cleanup_tasks")
