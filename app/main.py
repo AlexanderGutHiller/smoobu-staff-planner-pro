@@ -360,16 +360,29 @@ def _send_whatsapp(to_phone: str, message: str):
         whatsapp_to = f"whatsapp:{phone}"
         
         client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-        log.debug("Sending WhatsApp: from=%s, to=%s, message_length=%d", 
+        log.info("📱 Sending WhatsApp: from=%s, to=%s, message_length=%d", 
                  TWILIO_WHATSAPP_FROM, whatsapp_to, len(message))
         message_obj = client.messages.create(
             body=message,
             from_=TWILIO_WHATSAPP_FROM,
             to=whatsapp_to
         )
-        log.info("📱 Sent WhatsApp to %s (SID: %s, Status: %s)", 
-                phone, message_obj.sid, getattr(message_obj, 'status', 'unknown'))
-        return True
+        status = getattr(message_obj, 'status', 'unknown')
+        error_code = getattr(message_obj, 'error_code', None)
+        error_message = getattr(message_obj, 'error_message', None)
+        
+        log.info("📱 WhatsApp API Response: SID=%s, Status=%s, ErrorCode=%s, ErrorMessage=%s", 
+                message_obj.sid, status, error_code, error_message)
+        
+        if status in ['queued', 'sent', 'delivered']:
+            log.info("✅ WhatsApp sent successfully to %s (Status: %s)", phone, status)
+            return True
+        elif status == 'failed':
+            log.error("❌ WhatsApp failed to %s: %s (Code: %s)", phone, error_message, error_code)
+            return False
+        else:
+            log.warning("⚠️ WhatsApp status unclear for %s: %s", phone, status)
+            return True  # Return True anyway, as message was accepted by Twilio
     except ImportError:
         log.error("Twilio library not installed. Install with: pip install twilio")
         return False
@@ -1272,7 +1285,6 @@ async def admin_test_whatsapp(token: str, phone: str = Query(...), db=Depends(ge
         raise HTTPException(status_code=403)
     
     test_msg = "🧪 Test-Nachricht von Staff Planner"
-    result = _send_whatsapp(phone, test_msg)
     
     config_status = {
         "TWILIO_ACCOUNT_SID": "✅ gesetzt" if TWILIO_ACCOUNT_SID else "❌ nicht gesetzt",
@@ -1285,19 +1297,67 @@ async def admin_test_whatsapp(token: str, phone: str = Query(...), db=Depends(ge
         twilio_installed = "✅ installiert"
     except ImportError:
         twilio_installed = "❌ nicht installiert"
+        return PlainTextResponse(f"❌ Twilio Library nicht installiert")
     
-    return PlainTextResponse(
+    # Versuche Nachricht zu senden und hole Details
+    result = False
+    message_details = {}
+    normalized_phone = phone
+    whatsapp_to = ""
+    try:
+        # Normalisiere Telefonnummer wie in _send_whatsapp
+        normalized_phone = phone.strip().replace(" ", "").replace("-", "")
+        if not normalized_phone.startswith("+"):
+            if normalized_phone.startswith("0"):
+                normalized_phone = "+49" + normalized_phone[1:]
+            else:
+                normalized_phone = "+49" + normalized_phone
+        whatsapp_to = f"whatsapp:{normalized_phone}"
+        
+        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        message_obj = client.messages.create(
+            body=test_msg,
+            from_=TWILIO_WHATSAPP_FROM,
+            to=whatsapp_to
+        )
+        message_details = {
+            "sid": message_obj.sid,
+            "status": getattr(message_obj, 'status', 'unknown'),
+            "error_code": getattr(message_obj, 'error_code', None),
+            "error_message": getattr(message_obj, 'error_message', None),
+            "price": getattr(message_obj, 'price', None),
+            "price_unit": getattr(message_obj, 'price_unit', None),
+        }
+        result = message_details['status'] in ['queued', 'sent', 'delivered']
+    except Exception as e:
+        message_details = {"error": str(e)}
+    
+    response_text = (
         f"WhatsApp Test\n"
         f"=============\n\n"
-        f"Telefonnummer: {phone}\n"
+        f"Telefonnummer (Eingabe): {phone}\n"
+        f"Telefonnummer (normalisiert): {normalized_phone}\n"
+        f"WhatsApp To: {whatsapp_to}\n\n"
         f"Ergebnis: {'✅ Erfolgreich' if result else '❌ Fehlgeschlagen'}\n\n"
+        f"Message Details:\n"
+        f"- SID: {message_details.get('sid', 'N/A')}\n"
+        f"- Status: {message_details.get('status', 'N/A')}\n"
+        f"- Error Code: {message_details.get('error_code', 'N/A')}\n"
+        f"- Error Message: {message_details.get('error_message', 'N/A')}\n"
+        f"- Price: {message_details.get('price', 'N/A')} {message_details.get('price_unit', '')}\n\n"
         f"Konfiguration:\n"
         f"- Twilio Library: {twilio_installed}\n"
         f"- Account SID: {config_status['TWILIO_ACCOUNT_SID']}\n"
         f"- Auth Token: {config_status['TWILIO_AUTH_TOKEN']}\n"
         f"- WhatsApp From: {config_status['TWILIO_WHATSAPP_FROM']}\n\n"
-        f"Prüfe die Logs für Details."
+        f"Hinweis: Wenn Status 'queued' ist, wurde die Nachricht an Twilio gesendet.\n"
+        f"Falls keine Nachricht ankommt, prüfe:\n"
+        f"1. Ist die Nummer bei Twilio WhatsApp Sandbox verifiziert?\n"
+        f"2. Ist TWILIO_WHATSAPP_FROM korrekt formatiert (whatsapp:+14155238886)?\n"
+        f"3. Prüfe Twilio Console für Delivery-Status: https://console.twilio.com/\n"
     )
+    
+    return PlainTextResponse(response_text)
 
 @app.get("/admin/{token}/notify_assignments")
 async def admin_notify_assignments(token: str):
