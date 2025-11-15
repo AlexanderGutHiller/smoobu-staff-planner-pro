@@ -337,8 +337,14 @@ def _send_email(to_email: str, subject: str, body_text: str, body_html: str | No
     except Exception as e:
         log.error("Email send failed to %s: %s", to_email, e)
 
-def _send_whatsapp(to_phone: str, message: str):
-    """Sende WhatsApp-Nachricht über Twilio"""
+def _send_whatsapp(to_phone: str, message: str, use_template: bool = False):
+    """Sende WhatsApp-Nachricht über Twilio
+    
+    Args:
+        to_phone: Telefonnummer
+        message: Nachrichtentext
+        use_template: Wenn True, verwende Content SID (Opt-In-Vorlage), sonst freie Nachricht
+    """
     if not (TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_WHATSAPP_FROM):
         log.warning("Twilio not configured, skipping WhatsApp to %s", to_phone)
         return False
@@ -361,17 +367,17 @@ def _send_whatsapp(to_phone: str, message: str):
         whatsapp_to = f"whatsapp:{phone}"
         
         client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-        log.info("📱 Sending WhatsApp: from=%s, to=%s, message_length=%d", 
-                 TWILIO_WHATSAPP_FROM, whatsapp_to, len(message))
+        log.info("📱 Sending WhatsApp: from=%s, to=%s, message_length=%d, use_template=%s", 
+                 TWILIO_WHATSAPP_FROM, whatsapp_to, len(message), use_template)
         
         # Status-Callback-URL für Delivery-Updates
         status_callback_url = None
         if BASE_URL:
             status_callback_url = f"{BASE_URL.rstrip('/')}/webhook/twilio/status"
         
-        # Verwende WhatsApp-Vorlage (Content SID) wenn konfiguriert, sonst freie Nachricht
-        if TWILIO_WHATSAPP_CONTENT_SID:
-            # Verwende Content SID mit Content Variables
+        # Verwende WhatsApp-Vorlage (Content SID) wenn gewünscht und konfiguriert
+        if use_template and TWILIO_WHATSAPP_CONTENT_SID:
+            # Verwende Content SID mit Content Variables (Opt-In-Vorlage)
             # Die Nachricht wird als Variable übergeben (normalerweise {{1}} in der Vorlage)
             message_obj = client.messages.create(
                 content_sid=TWILIO_WHATSAPP_CONTENT_SID,
@@ -411,6 +417,38 @@ def _send_whatsapp(to_phone: str, message: str):
     except Exception as e:
         log.error("WhatsApp send failed to %s: %s", to_phone, e, exc_info=True)
         return False
+
+def _send_whatsapp_with_opt_in(to_phone: str, message: str, staff_id: Optional[int] = None, db=None):
+    """Sende WhatsApp-Nachricht mit Opt-In-Check
+    
+    Wenn Opt-In noch nicht gesendet wurde, wird zuerst die Opt-In-Vorlage gesendet,
+    danach die normale Nachricht.
+    """
+    # Prüfe ob Opt-In bereits gesendet wurde
+    opt_in_sent = False
+    if staff_id and db:
+        staff = db.get(Staff, staff_id)
+        if staff:
+            opt_in_sent = getattr(staff, 'whatsapp_opt_in_sent', False)
+    
+    # Wenn Opt-In noch nicht gesendet, sende es zuerst
+    if not opt_in_sent and TWILIO_WHATSAPP_CONTENT_SID:
+        log.info("📱 Sending Opt-In message first to %s", to_phone)
+        opt_in_message = "Willkommen! Du erhältst ab jetzt Benachrichtigungen über neue Aufgaben."  # Kann angepasst werden
+        opt_in_result = _send_whatsapp(to_phone, opt_in_message, use_template=True)
+        if opt_in_result and staff_id and db:
+            # Markiere Opt-In als gesendet
+            staff = db.get(Staff, staff_id)
+            if staff:
+                staff.whatsapp_opt_in_sent = True
+                db.commit()
+                log.info("✅ Opt-In marked as sent for staff %d", staff_id)
+        # Warte kurz, bevor die normale Nachricht gesendet wird
+        import time
+        time.sleep(1)
+    
+    # Sende normale Nachricht (freie Nachricht, da Opt-In bereits gesendet wurde)
+    return _send_whatsapp(to_phone, message, use_template=False)
 
 def build_assignment_whatsapp_message(lang: str, staff_name: str, items: list, base_url: str) -> str:
     """Erstelle WhatsApp-Nachricht für Zuweisungen"""
@@ -526,7 +564,7 @@ def send_assignment_emails_job():
                 if phone and phone.strip():
                     log.info("📱 Sending WhatsApp to %s for staff %s (%d tasks)", phone, staff.name, len(items))
                     whatsapp_msg = build_assignment_whatsapp_message(lang, staff.name, items, base_url)
-                    result = _send_whatsapp(phone, whatsapp_msg)
+                    result = _send_whatsapp_with_opt_in(phone, whatsapp_msg, staff_id=sid, db=db)
                     if result:
                         log.info("✅ WhatsApp queued/sent to %s (staff: %s) - Delivery status will be logged via webhook", phone, staff.name)
                     else:
@@ -617,7 +655,7 @@ def send_whatsapp_for_existing_assignments():
             try:
                 log.info("📱 Sending WhatsApp to %s for staff %s (%d existing tasks)", phone, staff.name, len(items))
                 whatsapp_msg = build_assignment_whatsapp_message(lang, staff.name, items, base_url)
-                result = _send_whatsapp(phone, whatsapp_msg)
+                result = _send_whatsapp_with_opt_in(phone, whatsapp_msg, staff_id=sid, db=db)
                 if result:
                     log.info("✅ WhatsApp queued/sent to %s (staff: %s) - Delivery status will be logged via webhook", phone, staff.name)
                 else:

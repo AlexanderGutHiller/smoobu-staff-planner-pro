@@ -64,3 +64,4 @@ def _apply_sqlite_migrations():
         add_col("ALTER TABLE staff ADD COLUMN language VARCHAR(8) DEFAULT 'de'")
         add_col("ALTER TABLE tasks ADD COLUMN assign_notified_at VARCHAR(19)")
         add_col("ALTER TABLE staff ADD COLUMN phone VARCHAR(20) DEFAULT ''")
+        add_col("ALTER TABLE staff ADD COLUMN whatsapp_opt_in_sent BOOLEAN DEFAULT 0")

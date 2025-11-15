@@ -34,6 +34,7 @@ class Staff(Base):
     magic_token: Mapped[str] = mapped_column(String(32), unique=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     language: Mapped[str] = mapped_column(String(8), default="de")
+    whatsapp_opt_in_sent: Mapped[bool] = mapped_column(Boolean, default=False)  # Opt-In-Nachricht bereits gesendet
 
 class Task(Base):
     __tablename__ = "tasks"
