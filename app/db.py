@@ -63,3 +63,4 @@ def _apply_sqlite_migrations():
         add_col("ALTER TABLE tasks ADD COLUMN assignment_status VARCHAR(16)")
         add_col("ALTER TABLE staff ADD COLUMN language VARCHAR(8) DEFAULT 'de'")
         add_col("ALTER TABLE tasks ADD COLUMN assign_notified_at VARCHAR(19)")
+        add_col("ALTER TABLE staff ADD COLUMN phone VARCHAR(20) DEFAULT ''")

@@ -483,17 +483,25 @@ def send_assignment_emails_job():
             _send_email(staff.email, subject, body_text, body_html)
             
             # WhatsApp-Benachrichtigung senden (falls Telefonnummer vorhanden)
-            if staff.phone and staff.phone.strip():
-                whatsapp_msg = build_assignment_whatsapp_message(lang, staff.name, items, base_url)
-                _send_whatsapp(staff.phone, whatsapp_msg)
+            try:
+                phone = getattr(staff, 'phone', None) or ""
+                if phone and phone.strip():
+                    whatsapp_msg = build_assignment_whatsapp_message(lang, staff.name, items, base_url)
+                    _send_whatsapp(phone, whatsapp_msg)
+            except Exception as e:
+                log.warning("WhatsApp notification skipped for staff %s: %s", staff.name, e)
             
             now = now_iso()
             for t in tasks_for_staff:
                 t.assign_notified_at = now
+            try:
+                phone = getattr(staff, 'phone', None) or ""
+            except:
+                phone = ""
             report.append({
                 'staff_name': staff.name,
                 'email': staff.email,
-                'phone': staff.phone or "",
+                'phone': phone,
                 'count': len(items),
                 'items': items,
             })

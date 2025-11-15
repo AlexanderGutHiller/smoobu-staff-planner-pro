@@ -196,7 +196,7 @@ function setLanguage(lang) {
       </div>
       <div class="col-12 col-md-auto">
         <label class="form-label small text-muted d-block">WhatsApp/Telefon</label>
-        <input class="form-control" name="phone" type="tel" value="{{ s.phone or '' }}" placeholder="+491701234567" pattern="[+]?[0-9\s\-]+">
+        <input class="form-control" name="phone" type="tel" value="{{ s.phone if s.phone else '' }}" placeholder="+491701234567" pattern="[+]?[0-9\s\-]+">
       </div>
       <div class="col-12 col-md-auto">
         <label class="form-label small text-muted d-block">Stundensatz</label>
@@ -303,7 +303,7 @@ function setLanguage(lang) {
       </div>
       <div class="col-12 col-md-auto">
         <label class="form-label small text-muted d-block">WhatsApp/Telefon</label>
-        <input class="form-control" name="phone" type="tel" value="{{ s.phone or '' }}" placeholder="+491701234567" pattern="[+]?[0-9\s\-]+">
+        <input class="form-control" name="phone" type="tel" value="{{ s.phone if s.phone else '' }}" placeholder="+491701234567" pattern="[+]?[0-9\s\-]+">
         </div>
         <div class="col-6">
           <label class="form-label small text-muted d-block">€/h</label>
