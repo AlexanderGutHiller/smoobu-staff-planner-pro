@@ -4,14 +4,28 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <title>{{ trans.meine_einsätze }}</title>
 <style>
+:root {
+  --primary: #0d6efd;
+  --success: #198754;
+  --warning: #ffc107;
+  --info: #0dcaf0;
+  --danger: #dc3545;
+  --muted: #6c757d;
+  --background: #f8f9fa;
+  --card-bg: #ffffff;
+  --border: #dee2e6;
+}
+
+body { background-color: var(--background); }
+
 .task-card {
-  border: 2px solid #dee2e6;
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
   padding: 1rem;
   margin-bottom: 1rem;
-  background: white;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  transition: all 0.2s;
+  background: var(--card-bg);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -19,13 +33,13 @@
   overflow: hidden;
 }
 .task-card:hover {
-  border-color: #0d6efd;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  border-color: var(--primary);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
 }
 .task-card.done {
   opacity: 0.6;
-  border-color: #6c757d;
-  background-color: #f8f9fa;
+  border-left: 4px solid var(--success);
 }
 .task-card.disabled {
   opacity: 0.5;
@@ -33,24 +47,87 @@
   background-color: #f8f9fa;
 }
 .task-card.paused {
-  border-color: #0dcaf0;
-  border-width: 3px;
+  border-left: 4px solid var(--info);
   background-color: #e7f8ff;
 }
+.task-card.running {
+  border-left: 4px solid var(--info);
+}
 .task-card.assign-accepted {
-  border-color: #198754;
-  border-width: 3px;
+  border-left: 4px solid var(--success);
   background-color: #e9f7ef;
 }
 .task-card.assign-pending {
-  border-color: #ffc107;
-  border-width: 3px;
+  border-left: 4px solid var(--warning);
   background-color: #fff8e1;
 }
 .task-card.assign-rejected {
-  border-color: #dc3545;
-  border-width: 3px;
+  border-left: 4px solid var(--danger);
   background-color: #fdecee;
+}
+
+.stats-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+}
+
+.stats-card:hover {
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+}
+
+.stats-card-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin: 0.5rem 0;
+}
+
+.stats-card-label {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.cleaner-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--card-bg);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.cleaner-avatar {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: rgba(13, 110, 253, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  font-size: 1.5rem;
+}
+
+.nav-tabs .nav-link {
+  border: none;
+  color: var(--muted);
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--primary);
+  background-color: transparent;
+  border-bottom: 2px solid var(--primary);
+  font-weight: 600;
 }
 .task-card-header {
   display: flex;
@@ -143,8 +220,15 @@
 .task-card:not(.running) { pointer-events: none; opacity: 0.5; }
 </style>
 {% endif %}
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
-  <h1 class="mb-0" style="font-size: 1.5rem;">{{ staff.name }} – {{ trans.meine_einsätze }}</h1>
+<!-- Header mit Avatar -->
+<div class="cleaner-header">
+  <div class="cleaner-avatar">
+    <i class="bi bi-person-fill"></i>
+  </div>
+  <div class="flex-1">
+    <h1 class="mb-0" style="font-size: 1.5rem; font-weight: 700;">{{ trans.meine_einsätze }}</h1>
+    <p class="mb-0 text-muted" style="font-size: 0.875rem;">{{ staff.name }}</p>
+  </div>
   <div class="d-flex gap-2 align-items-center">
     <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#newTaskModal"><i class="bi bi-plus-circle"></i> <span class="d-none d-md-inline">{{ trans.neue_aufgabe }}</span></button>
     <select class="form-select form-select-sm" style="width: auto;" onchange="setLanguage(this.value)">
@@ -171,28 +255,62 @@ function setLanguage(lang) {
   <div class="alert alert-info alert-dismissible fade show"><i class="bi bi-info-circle"></i> {{ trans.monat_erfasst }} {{ used_hours }} {{ trans.std_überschritten }}</div>
 {% endif %}
 
+<!-- Stats Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-4">
+    <div class="stats-card">
+      <i class="bi bi-calendar-check text-primary" style="font-size: 1.5rem;"></i>
+      <div class="stats-card-value">{% set today_str = dt.date.today().isoformat() %}{% set today_count = tasks|selectattr('date', 'equalto', today_str)|list|length %}{{ today_count }}</div>
+      <div class="stats-card-label">Heute</div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="stats-card">
+      <i class="bi bi-check-circle text-success" style="font-size: 1.5rem;"></i>
+      <div class="stats-card-value">{{ tasks|selectattr('status', 'equalto', 'done')|list|length }}</div>
+      <div class="stats-card-label">Erledigt</div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="stats-card">
+      <i class="bi bi-clock text-info" style="font-size: 1.5rem;"></i>
+      <div class="stats-card-value">{{ tasks|sum(attribute='planned_minutes') }}</div>
+      <div class="stats-card-label">Minuten</div>
+    </div>
+  </div>
+</div>
+
+<!-- Monatsübersicht -->
 <div class="d-flex gap-2 flex-wrap mb-3">
   <span class="badge bg-secondary">{{ trans.vorletzter_monat }}: {{ hours_prev_last }} {{ trans.stunden }}</span>
   <span class="badge bg-secondary">{{ trans.letzter_monat }}: {{ hours_last }} {{ trans.stunden }}</span>
   <span class="badge bg-primary">{{ trans.aktueller_monat }}: {{ hours_current }} {{ trans.stunden }}</span>
 </div>
 
-<div class="mb-3">
-  <div class="form-check form-check-inline">
-    <input class="form-check-input" type="checkbox" id="filterShowDone" {% if show_done %}checked{% endif %}>
-    <label class="form-check-label" for="filterShowDone">
-      {{ trans.erledigte_aufgaben }}
-    </label>
-  </div>
-  <div class="form-check form-check-inline">
-    <input class="form-check-input" type="checkbox" id="filterShowOpen" {% if show_open %}checked{% endif %}>
-    <label class="form-check-label" for="filterShowOpen">
-      {{ trans.offene_aufgaben }}
-    </label>
-  </div>
-</div>
+<!-- Tabs für Filterung -->
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="tab-all" data-bs-toggle="tab" data-bs-target="#content-all" type="button" role="tab">
+      Alle ({{ tasks|length }})
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-open" data-bs-toggle="tab" data-bs-target="#content-open" type="button" role="tab">
+      Offen ({{ tasks|selectattr('status', 'ne', 'done')|list|length }})
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-done" data-bs-toggle="tab" data-bs-target="#content-done" type="button" role="tab">
+      Erledigt ({{ tasks|selectattr('status', 'equalto', 'done')|list|length }})
+    </button>
+  </li>
+</ul>
 
-<div class="row g-3">
+<!-- Tab Content -->
+<div class="tab-content">
+  <!-- Alle Tasks -->
+  <div class="tab-pane fade show active" id="content-all" role="tabpanel">
+    <div class="row g-3">
 {% set running_task_id = none %}
 {% for t in tasks %}
   {% if t.status == 'running' %}
@@ -256,6 +374,17 @@ function setLanguage(lang) {
       <div class="task-info-row">
         <span class="task-info-label"><i class="bi bi-person"></i> Gast:</span>
         <span class="text-primary fw-bold">{{ guest_name }}</span>
+      </div>
+    {% endif %}
+    {% if booking_details_map.get(t.booking_id) %}
+      <div class="task-info-row">
+        <span class="task-info-label"><i class="bi bi-people"></i> Gäste:</span>
+        <span>
+          {{ booking_details_map[t.booking_id].adults }} {{ trans.erw }}
+          {% if booking_details_map[t.booking_id].children > 0 %}
+            + {{ booking_details_map[t.booking_id].children }} {{ trans.kinder }}
+          {% endif %}
+        </span>
       </div>
     {% endif %}
   {% endif %}
@@ -367,14 +496,278 @@ function setLanguage(lang) {
   </div>
 </div>
 {% endfor %}
-</div>
-<!-- End row container -->
-{% if not tasks %}
-  <div class="text-center py-5">
-    <i class="bi bi-inbox" style="font-size: 4rem; color: #dee2e6;"></i>
-    <p class="text-muted mt-3">Keine Einsätze vorhanden</p>
+    </div>
+    {% if not tasks %}
+      <div class="text-center py-5">
+        <i class="bi bi-inbox" style="font-size: 4rem; color: #dee2e6;"></i>
+        <p class="text-muted mt-3">Keine Einsätze vorhanden</p>
+      </div>
+    {% endif %}
   </div>
-{% endif %}
+  
+  <!-- Offene Tasks -->
+  <div class="tab-pane fade" id="content-open" role="tabpanel">
+    <div class="row g-3">
+{% set running_task_id = none %}
+{% for t in tasks %}
+  {% if t.status == 'running' %}
+    {% set running_task_id = t.id %}
+  {% endif %}
+{% endfor %}
+{% for t in tasks %}
+  {% if t.status != 'done' %}
+{% set started = run_map.get(t.id) %}
+{% set is_disabled = running_task_id and running_task_id != t.id and t.status != 'running' and t.status != 'done' %}
+{% set tl = timelog_map.get(t.id, {}) if timelog_map else {} %}
+{% set extras = extras_map.get(t.id, {}) if extras_map else {} %}
+{% set baby_beds = extras.get('baby_beds', 0) %}
+<div class="col-12 task-card {% if t.status=='done' %}done{% elif is_disabled %}disabled{% elif t.status=='paused' %}paused{% endif %} {% if t.status=='running' %}running{% endif %} {% if t.assignment_status=='accepted' %}assign-accepted{% elif t.assignment_status=='pending' %}assign-pending{% elif t.assignment_status=='rejected' %}assign-rejected{% endif %}">
+  <div class="task-card-header">
+    <div>
+      <strong style="font-size: 1.1rem;">{{ t.date | date_wd_de('short') }}</strong>
+      <div class="fw-bold text-primary" style="font-size: 1.2rem;">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
+    </div>
+    <div>
+      {% if t.status=='running' %}
+        <span class="badge bg-success"><i class="bi bi-play-circle"></i> {{ trans.läuft }}</span>
+      {% elif t.status=='paused' %}
+        <span class="badge bg-info"><i class="bi bi-pause-circle"></i> {{ trans.pausiert }}</span>
+      {% else %}
+        <span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> {{ trans.offen }}</span>
+      {% endif %}
+    </div>
+  </div>
+  
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.planned }}:</span>
+    <span class="fw-bold">{{ t.planned_minutes }} {{ trans.min }}</span>
+  </div>
+
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.babybetten }}:</span>
+    <span>{{ baby_beds }}</span>
+  </div>
+  
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.actual }}:</span>
+    <span>
+      {% if tl.get('actual_minutes') %}
+        <span class="fw-bold {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">
+          {{ tl.actual_minutes }} {{ trans.min }}
+        </span>
+        {% if tl.actual_minutes > t.planned_minutes %}
+          <small class="text-danger d-block">+{{ tl.actual_minutes - t.planned_minutes }} {{ trans.min }}</small>
+        {% endif %}
+      {% else %}
+        <span class="text-muted">-</span>
+      {% endif %}
+    </span>
+  </div>
+  
+  {% if t.booking_id %}
+    {% set guest_name = book_map.get(t.booking_id) or booking_details_map.get(t.booking_id, {}).get('guest_name', '') %}
+    {% if guest_name and guest_name.strip() %}
+      <div class="task-info-row">
+        <span class="task-info-label"><i class="bi bi-person"></i> Gast:</span>
+        <span class="text-primary fw-bold">{{ guest_name }}</span>
+      </div>
+    {% endif %}
+  {% endif %}
+  
+  {% if t.notes %}
+  <div class="task-info-row">
+    <span class="task-info-label"><i class="bi bi-sticky"></i> {{ trans.notiz }}:</span>
+    <span class="text-muted">{{ t.notes }}</span>
+  </div>
+  {% endif %}
+    
+    {% if t.status=='running' %}
+      <div class="text-center mb-3">
+        <div class="timer-display timer-running">
+          <div id="timer-{{ t.id }}" data-started="{{ started or '' }}" data-planned="{{ t.planned_minutes }}" data-accumulated="{{ (timelog_map.get(t.id, {}).get('actual_minutes', 0) if timelog_map else 0) or 0 }}">⏱️ 0:00</div>
+        </div>
+        <div class="small text-muted" id="remaining-{{ t.id }}" data-lang-over="{{ trans.über_zeit }}" data-lang-min="{{ trans.min }}" data-lang-remaining="{{ trans.noch }}">{{ trans.verbleibend }} --</div>
+      </div>
+    {% elif t.status=='paused' and tl.get('actual_minutes') %}
+      <div class="text-center mb-3">
+        <div class="timer-display" style="color: #0dcaf0;">
+          <div><i class="bi bi-pause-circle-fill"></i> {{ tl.actual_minutes }} {{ trans.min }}</div>
+        </div>
+        <div class="small text-muted">{{ trans.pausiert }}</div>
+      </div>
+    {% endif %}
+    
+    <div class="d-grid gap-2">
+      {% if t.assignment_status == 'pending' %}
+      <div class="alert alert-warning mb-2">
+        <i class="bi bi-hourglass-split"></i> <strong>{{ trans.zuweisung }} {{ trans.pending }}</strong>
+      </div>
+      <div class="row g-2 mb-2">
+        <div class="col-6">
+          <form method="post" action="/cleaner/{{ staff.magic_token }}/accept">
+            <input type="hidden" name="task_id" value="{{ t.id }}"/>
+            <button class="btn btn-success btn-touch w-100"><i class="bi bi-check-circle"></i> {{ trans.annehmen }}</button>
+          </form>
+        </div>
+        <div class="col-6">
+          <form method="post" action="/cleaner/{{ staff.magic_token }}/reject">
+            <input type="hidden" name="task_id" value="{{ t.id }}"/>
+            <button class="btn btn-danger btn-touch w-100"><i class="bi bi-x-circle"></i> {{ trans.ablehnen }}</button>
+          </form>
+        </div>
+      </div>
+      {% elif t.status=='open' and t.assignment_status != 'pending' %}
+      <form method="post" action="/cleaner/{{ staff.magic_token }}/start">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <button class="btn btn-success btn-touch" {% if is_disabled %}disabled{% endif %}><i class="bi bi-play-fill"></i> {{ trans.start }}</button>
+      </form>
+      {% elif t.status=='paused' and t.assignment_status != 'pending' %}
+      <form method="post" action="/cleaner/{{ staff.magic_token }}/start">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <button class="btn btn-success btn-touch" {% if is_disabled %}disabled{% endif %}><i class="bi bi-play-fill"></i> {{ trans.start }}</button>
+      </form>
+      {% elif t.status=='running' %}
+      <div class="row g-2">
+        <div class="col-6">
+          <form method="post" action="/cleaner/{{ staff.magic_token }}/stop">
+            <input type="hidden" name="task_id" value="{{ t.id }}"/>
+            <button class="btn btn-warning btn-touch w-100"><i class="bi bi-pause-fill"></i> {{ trans.pause }}</button>
+          </form>
+        </div>
+        <div class="col-6">
+          <form method="post" action="/cleaner/{{ staff.magic_token }}/done">
+            <input type="hidden" name="task_id" value="{{ t.id }}"/>
+            <button class="btn btn-primary btn-touch w-100"><i class="bi bi-check-circle"></i> {{ trans.fertig }}</button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+      {% if not t.auto_generated %}
+      <form method="post" action="/cleaner/{{ staff.magic_token }}/task/delete" onsubmit="return confirm('Diesen Task löschen?');" class="mt-2">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <button class="btn btn-outline-danger btn-touch-sm"><i class="bi bi-trash"></i> Löschen</button>
+      </form>
+      {% endif %}
+      <button class="btn btn-outline-primary btn-touch-sm" data-bs-toggle="modal" data-bs-target="#noteModal" data-task="{{ t.id }}" data-current="{{ t.notes|e }}">
+        <i class="bi bi-pencil-square"></i> {{ trans.notiz }}
+      </button>
+    </div>
+  </div>
+</div>
+  {% endif %}
+{% endfor %}
+    </div>
+    {% set open_tasks = tasks|selectattr('status', 'ne', 'done')|list %}
+    {% if not open_tasks %}
+      <div class="text-center py-5">
+        <i class="bi bi-inbox" style="font-size: 4rem; color: #dee2e6;"></i>
+        <p class="text-muted mt-3">Keine offenen Einsätze</p>
+      </div>
+    {% endif %}
+  </div>
+  
+  <!-- Erledigte Tasks -->
+  <div class="tab-pane fade" id="content-done" role="tabpanel">
+    <div class="row g-3">
+{% set running_task_id = none %}
+{% for t in tasks %}
+  {% if t.status == 'running' %}
+    {% set running_task_id = t.id %}
+  {% endif %}
+{% endfor %}
+{% for t in tasks %}
+  {% if t.status == 'done' %}
+{% set started = run_map.get(t.id) %}
+{% set is_disabled = running_task_id and running_task_id != t.id and t.status != 'running' and t.status != 'done' %}
+{% set tl = timelog_map.get(t.id, {}) if timelog_map else {} %}
+{% set extras = extras_map.get(t.id, {}) if extras_map else {} %}
+{% set baby_beds = extras.get('baby_beds', 0) %}
+<div class="col-12 task-card {% if t.status=='done' %}done{% elif is_disabled %}disabled{% elif t.status=='paused' %}paused{% endif %} {% if t.status=='running' %}running{% endif %} {% if t.assignment_status=='accepted' %}assign-accepted{% elif t.assignment_status=='pending' %}assign-pending{% elif t.assignment_status=='rejected' %}assign-rejected{% endif %}">
+  <div class="task-card-header">
+    <div>
+      <strong style="font-size: 1.1rem;">{{ t.date | date_wd_de('short') }}</strong>
+      <div class="fw-bold text-primary" style="font-size: 1.2rem;">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
+    </div>
+    <div>
+      <span class="badge bg-secondary"><i class="bi bi-check-circle"></i> {{ trans.erledigt }}</span>
+    </div>
+  </div>
+  
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.planned }}:</span>
+    <span class="fw-bold">{{ t.planned_minutes }} {{ trans.min }}</span>
+  </div>
+
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.babybetten }}:</span>
+    <span>{{ baby_beds }}</span>
+  </div>
+  
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.actual }}:</span>
+    <span>
+      {% if tl.get('actual_minutes') %}
+        <span class="fw-bold {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">
+          {{ tl.actual_minutes }} {{ trans.min }}
+        </span>
+        {% if tl.actual_minutes > t.planned_minutes %}
+          <small class="text-danger d-block">+{{ tl.actual_minutes - t.planned_minutes }} {{ trans.min }}</small>
+        {% endif %}
+      {% else %}
+        <span class="text-muted">-</span>
+      {% endif %}
+    </span>
+  </div>
+  
+  {% if t.booking_id %}
+    {% set guest_name = book_map.get(t.booking_id) or booking_details_map.get(t.booking_id, {}).get('guest_name', '') %}
+    {% if guest_name and guest_name.strip() %}
+      <div class="task-info-row">
+        <span class="task-info-label"><i class="bi bi-person"></i> Gast:</span>
+        <span class="text-primary fw-bold">{{ guest_name }}</span>
+      </div>
+    {% endif %}
+  {% endif %}
+  
+  {% if t.notes %}
+  <div class="task-info-row">
+    <span class="task-info-label"><i class="bi bi-sticky"></i> {{ trans.notiz }}:</span>
+    <span class="text-muted">{{ t.notes }}</span>
+  </div>
+  {% endif %}
+    
+    <div class="d-grid gap-2">
+      {% if t.status=='done' %}
+      <form method="post" action="/cleaner/{{ staff.magic_token }}/reopen">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <button class="btn btn-outline-danger btn-touch-sm"><i class="bi bi-arrow-counterclockwise"></i> {{ trans.wieder_öffnen }}</button>
+      </form>
+      {% endif %}
+      {% if not t.auto_generated %}
+      <form method="post" action="/cleaner/{{ staff.magic_token }}/task/delete" onsubmit="return confirm('Diesen Task löschen?');" class="mt-2">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <button class="btn btn-outline-danger btn-touch-sm"><i class="bi bi-trash"></i> Löschen</button>
+      </form>
+      {% endif %}
+      <button class="btn btn-outline-primary btn-touch-sm" data-bs-toggle="modal" data-bs-target="#noteModal" data-task="{{ t.id }}" data-current="{{ t.notes|e }}">
+        <i class="bi bi-pencil-square"></i> {{ trans.notiz }}
+      </button>
+    </div>
+  </div>
+</div>
+  {% endif %}
+{% endfor %}
+    </div>
+    {% set done_tasks = tasks|selectattr('status', 'equalto', 'done')|list %}
+    {% if not done_tasks %}
+      <div class="text-center py-5">
+        <i class="bi bi-inbox" style="font-size: 4rem; color: #dee2e6;"></i>
+        <p class="text-muted mt-3">Keine erledigten Einsätze</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+<!-- End tab content -->
 
 <!-- Note Modal -->
 <div class="modal fade" id="noteModal" tabindex="-1">
@@ -586,31 +979,30 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   }
   
-  // Filter-Checkboxen: URL aktualisieren bei Änderung
-  const filterShowDone = document.getElementById('filterShowDone');
-  const filterShowOpen = document.getElementById('filterShowOpen');
-  
-  function updateFilters() {
-    const showDone = filterShowDone.checked ? '1' : '0';
-    const showOpen = filterShowOpen.checked ? '1' : '0';
-    const baseUrl = '/cleaner/{{ staff.magic_token }}';
-    const params = new URLSearchParams();
-    if (showDone === '1' && showOpen === '1') {
-      // Beide aktiviert - Standard, keine Parameter nötig
-      window.location.href = baseUrl;
-    } else {
-      params.set('show_done', showDone);
-      params.set('show_open', showOpen);
-      window.location.href = baseUrl + '?' + params.toString();
-    }
-  }
-  
-  if (filterShowDone) {
-    filterShowDone.addEventListener('change', updateFilters);
-  }
-  if (filterShowOpen) {
-    filterShowOpen.addEventListener('change', updateFilters);
-  }
+  // Tab-Navigation: URL aktualisieren bei Tab-Wechsel (optional, für bessere UX)
+  const tabButtons = document.querySelectorAll('[data-bs-toggle="tab"]');
+  tabButtons.forEach(button => {
+    button.addEventListener('shown.bs.tab', function (e) {
+      const targetId = e.target.getAttribute('data-bs-target');
+      const baseUrl = '/cleaner/{{ staff.magic_token }}';
+      const params = new URLSearchParams();
+      
+      if (targetId === '#content-all') {
+        params.set('show_done', '1');
+        params.set('show_open', '1');
+      } else if (targetId === '#content-open') {
+        params.set('show_done', '0');
+        params.set('show_open', '1');
+      } else if (targetId === '#content-done') {
+        params.set('show_done', '1');
+        params.set('show_open', '0');
+      }
+      
+      // URL aktualisieren ohne Reload (für bessere UX)
+      const newUrl = baseUrl + '?' + params.toString();
+      window.history.pushState({}, '', newUrl);
+    });
+  });
 });
 </script>
 </div></body></html>

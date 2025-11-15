@@ -44,6 +44,18 @@
   .task-card.paused { border-left: 4px solid var(--warning); }
   .task-card.done { border-left: 4px solid var(--success); }
   .task-card.open { border-left: 4px solid var(--muted); }
+  .task-card.assign-pending {
+    border-left: 4px solid var(--warning);
+    background-color: #fff8e1;
+  }
+  .task-card.assign-accepted {
+    border-left: 4px solid var(--success);
+    background-color: #e9f7ef;
+  }
+  .task-card.assign-rejected {
+    border-left: 4px solid var(--danger);
+    background-color: #fdecee;
+  }
   
   .task-header {
     display: flex;
@@ -425,7 +437,7 @@ function setLanguage(lang) {
 {% set baby_beds = extras.get('baby_beds', 0) %}
 {% set tl = timelog_map.get(t.id, {}) %}
 <div class="col-md-6 col-lg-4">
-  <div class="task-card {% if t.status == 'done' %}done{% elif t.status == 'running' %}running{% elif t.status == 'paused' %}paused{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id == t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
+  <div class="task-card {% if t.assignment_status == 'rejected' %}assign-rejected{% elif t.assignment_status == 'pending' %}assign-pending{% elif t.assignment_status == 'accepted' %}assign-accepted{% elif t.status == 'done' %}done{% elif t.status == 'running' %}running{% elif t.status == 'paused' %}paused{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id == t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
     <div class="task-header">
       <div class="flex-1">
         <div class="task-apartment">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
@@ -444,6 +456,14 @@ function setLanguage(lang) {
           {% if guest_name and guest_name.strip() %}
             <div class="task-guest"><i class="bi bi-person"></i> {{ guest_name }}</div>
           {% endif %}
+        {% endif %}
+        {% if t.booking_id and booking_details_map.get(t.booking_id) %}
+          <div class="task-guest">
+            <i class="bi bi-people"></i> {{ booking_details_map[t.booking_id].adults }} {{ trans.erw }}
+            {% if booking_details_map[t.booking_id].children > 0 %}
+              + {{ booking_details_map[t.booking_id].children }} {{ trans.kinder }}
+            {% endif %}
+          </div>
         {% endif %}
       </div>
       <div>
@@ -480,13 +500,51 @@ function setLanguage(lang) {
         <span>{% for s in staff %}{% if s.id == t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}</span>
       </div>
       {% endif %}
+      {% if baby_beds > 0 %}
+      <div class="task-meta-item">
+        <i class="bi bi-moon-stars"></i>
+        <span>{{ trans.babybetten }}: {{ baby_beds }}</span>
+      </div>
+      {% endif %}
     </div>
+    
+    {% if t.assigned_staff_id %}
+    <div class="mb-2">
+      {% if t.assignment_status == 'pending' %}
+        <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> {{ trans.zuweisung }} {{ trans.pending }}</span>
+      {% elif t.assignment_status == 'accepted' %}
+        <span class="badge bg-success"><i class="bi bi-check-circle"></i> {{ trans.zuweisung }} {{ trans.accepted }}</span>
+      {% elif t.assignment_status == 'rejected' %}
+        <span class="badge bg-danger"><i class="bi bi-x-circle"></i> {{ trans.zuweisung }} {{ trans.rejected }}</span>
+      {% else %}
+        <span class="badge bg-secondary"><i class="bi bi-person-badge"></i> {{ trans.zuweisung }}</span>
+      {% endif %}
+    </div>
+    {% endif %}
     
     {% if t.notes %}
     <div class="mb-2">
       <small class="text-muted"><i class="bi bi-sticky"></i> {{ t.notes[:50] }}{% if t.notes|length > 50 %}...{% endif %}</small>
     </div>
     {% endif %}
+    
+    <!-- Babybetten Dropdown -->
+    <div class="mb-2">
+      <form method="post" action="/admin/{{ token }}/task/extras" class="extras-form">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <input type="hidden" name="field" value="baby_beds"/>
+        <input type="hidden" name="value" value="{{ baby_beds }}"/>
+        <input type="hidden" name="redirect" value="{{ current_url }}"/>
+        <div class="d-flex align-items-center gap-2">
+          <label class="mb-0" style="font-size: 0.875rem; color: var(--muted);"><i class="bi bi-moon-stars"></i> {{ trans.babybetten }}:</label>
+          <select class="form-select form-select-sm" style="width: auto;" onchange="handleExtraSelect(this)" data-last-value="{{ baby_beds }}">
+            <option value="0" {% if baby_beds == 0 %}selected{% endif %}>0</option>
+            <option value="1" {% if baby_beds == 1 %}selected{% endif %}>1</option>
+            <option value="2" {% if baby_beds == 2 %}selected{% endif %}>2</option>
+          </select>
+        </div>
+      </form>
+    </div>
     
     <div class="task-actions">
       <form method="post" action="/admin/{{ token }}/task/status" class="d-inline">

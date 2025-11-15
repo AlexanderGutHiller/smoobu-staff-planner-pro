@@ -275,6 +275,7 @@ templates.env.globals.update({
     "APP_VERSION": APP_VERSION,
     "APP_BUILD_DATE": APP_BUILD_DATE,
     "APP_VERSION_DISPLAY": f"Version {APP_VERSION} · {APP_BUILD_DATE}",
+    "dt": dt,
 })
 
 def _parse_iso_date(s: str):
