@@ -4,12 +4,117 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <title>Admin - Einsätze</title>
 <style>
+  :root {
+    --primary: #0d6efd;
+    --success: #198754;
+    --warning: #ffc107;
+    --info: #0dcaf0;
+    --danger: #dc3545;
+    --muted: #6c757d;
+    --background: #f8f9fa;
+    --card-bg: #ffffff;
+    --border: #dee2e6;
+  }
+  
+  body { background-color: var(--background); }
+  
   .filter-input { width: 160px; }
   thead input, thead select { font-size: .875rem; padding: .25rem .5rem; }
   .small-muted { color:#6c757d; font-style: italic; font-size: .9em; }
   .extras-form { margin: 0; }
   .extras-form .form-check-label { font-size: 0.8rem; }
   .extras-container { display: flex; flex-direction: column; gap: 0.35rem; }
+  
+  /* Card-basierte Task-Darstellung */
+  .task-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+  }
+  .task-card:hover {
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+  }
+  .task-card.done { opacity: 0.6; }
+  .task-card.running { border-left: 4px solid var(--info); }
+  .task-card.paused { border-left: 4px solid var(--warning); }
+  .task-card.done { border-left: 4px solid var(--success); }
+  .task-card.open { border-left: 4px solid var(--muted); }
+  
+  .task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+  
+  .task-apartment {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 0.25rem;
+  }
+  
+  .task-guest {
+    font-size: 0.875rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  
+  .task-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.75rem;
+    margin: 0.75rem 0;
+    font-size: 0.875rem;
+  }
+  
+  .task-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--muted);
+  }
+  
+  .task-meta-item i { color: var(--primary); }
+  
+  .task-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  
+  .stats-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  
+  .stats-card-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin: 0.5rem 0;
+  }
+  
+  .stats-card-label {
+    font-size: 0.875rem;
+    color: var(--muted);
+  }
   
   /* Übersichtlichere Tabelle */
   #task-table { font-size: 0.9rem; }
@@ -281,6 +386,140 @@ function setLanguage(lang) {
 
 <!-- Desktop View -->
 <div class="desktop-view">
+  <!-- Stats Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="stats-card">
+        <i class="bi bi-clipboard-list text-primary" style="font-size: 1.5rem;"></i>
+        <div class="stats-card-value">{{ tasks|length }}</div>
+        <div class="stats-card-label">Gesamt</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stats-card">
+        <i class="bi bi-hourglass-split text-warning" style="font-size: 1.5rem;"></i>
+        <div class="stats-card-value">{{ tasks|selectattr('status', 'equalto', 'open')|list|length }}</div>
+        <div class="stats-card-label">Offen</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stats-card">
+        <i class="bi bi-play-circle text-info" style="font-size: 1.5rem;"></i>
+        <div class="stats-card-value">{{ tasks|selectattr('status', 'equalto', 'running')|list|length + tasks|selectattr('status', 'equalto', 'paused')|list|length }}</div>
+        <div class="stats-card-label">In Arbeit</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stats-card">
+        <i class="bi bi-check-circle text-success" style="font-size: 1.5rem;"></i>
+        <div class="stats-card-value">{{ tasks|selectattr('status', 'equalto', 'done')|list|length }}</div>
+        <div class="stats-card-label">Erledigt</div>
+      </div>
+    </div>
+  </div>
+
+<!-- Card-basierte Ansicht -->
+<div id="task-cards-view" class="row g-3">
+{% for t in tasks %}
+{% set extras = extras_map.get(t.id, {}) %}
+{% set baby_beds = extras.get('baby_beds', 0) %}
+{% set tl = timelog_map.get(t.id, {}) %}
+<div class="col-md-6 col-lg-4">
+  <div class="task-card {% if t.status == 'done' %}done{% elif t.status == 'running' %}running{% elif t.status == 'paused' %}paused{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id == t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
+    <div class="task-header">
+      <div class="flex-1">
+        <div class="task-apartment">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
+        {% if t.booking_id %}
+          {% set guest_name = (book_map.get(t.booking_id) or booking_details_map.get(t.booking_id, {}).get('guest_name', '') or t.next_arrival_guest_name or '') %}
+          {% if not guest_name or not guest_name.strip() %}
+            {% if booking_details_map.get(t.booking_id) %}
+              {% set _ad = booking_details_map[t.booking_id].adults or 0 %}
+              {% set _ch = booking_details_map[t.booking_id].children or 0 %}
+              {% set _total = (_ad + _ch) %}
+              {% if _total > 0 %}
+                {% set guest_name = _total ~ ' Gäste' %}
+              {% endif %}
+            {% endif %}
+          {% endif %}
+          {% if guest_name and guest_name.strip() %}
+            <div class="task-guest"><i class="bi bi-person"></i> {{ guest_name }}</div>
+          {% endif %}
+        {% endif %}
+      </div>
+      <div>
+        {% if t.status == 'done' %}
+          <span class="badge bg-success"><i class="bi bi-check-circle"></i> {{ trans.erledigt }}</span>
+        {% elif t.status == 'running' %}
+          <span class="badge bg-primary"><i class="bi bi-play-circle"></i> {{ trans.läuft }}</span>
+        {% elif t.status == 'paused' %}
+          <span class="badge bg-info"><i class="bi bi-pause-circle"></i> {{ trans.pausiert }}</span>
+        {% else %}
+          <span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> {{ trans.offen }}</span>
+        {% endif %}
+      </div>
+    </div>
+    
+    <div class="task-meta">
+      <div class="task-meta-item">
+        <i class="bi bi-calendar"></i>
+        <span>{{ t.date | date_wd_de('short') }}</span>
+      </div>
+      <div class="task-meta-item">
+        <i class="bi bi-clock"></i>
+        <span>{{ t.planned_minutes }} {{ trans.min }}</span>
+      </div>
+      {% if tl.actual_minutes %}
+      <div class="task-meta-item">
+        <i class="bi bi-stopwatch {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}"></i>
+        <span class="{% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">{{ tl.actual_minutes }} {{ trans.min }}</span>
+      </div>
+      {% endif %}
+      {% if t.assigned_staff_id %}
+      <div class="task-meta-item">
+        <i class="bi bi-person-badge"></i>
+        <span>{% for s in staff %}{% if s.id == t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}</span>
+      </div>
+      {% endif %}
+    </div>
+    
+    {% if t.notes %}
+    <div class="mb-2">
+      <small class="text-muted"><i class="bi bi-sticky"></i> {{ t.notes[:50] }}{% if t.notes|length > 50 %}...{% endif %}</small>
+    </div>
+    {% endif %}
+    
+    <div class="task-actions">
+      <form method="post" action="/admin/{{ token }}/task/status" class="d-inline">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <select name="status" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+          <option value="open" {% if t.status=='open' %}selected{% endif %}>{{ trans.offen }}</option>
+          <option value="paused" {% if t.status=='paused' %}selected{% endif %}>{{ trans.pausiert }}</option>
+          <option value="done" {% if t.status=='done' %}selected{% endif %}>{{ trans.erledigt }}</option>
+        </select>
+      </form>
+      <form method="post" action="/admin/{{ token }}/task/assign" class="d-inline">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <select name="staff_id_raw" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+          <option value="">–</option>
+          {% for s in staff %}
+            <option value="{{ s.id }}" {% if t.assigned_staff_id==s.id %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      {% if not t.auto_generated %}
+      <form method="post" action="/admin/{{ token }}/task/delete" onsubmit="return confirm('Diesen manuellen Task löschen?');" class="d-inline">
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+
+<!-- Tabellen-Ansicht (ausgeblendet, kann bei Bedarf aktiviert werden) -->
+<div id="task-table-view" style="display: none;">
 <div class="table-wrapper" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
 <table id="task-table" class="table table-sm table-hover bg-white align-middle">
 <thead>
