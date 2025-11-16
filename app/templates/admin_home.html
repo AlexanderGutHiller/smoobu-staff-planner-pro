@@ -512,6 +512,18 @@ function setLanguage(lang) {
     </div>
   </div>
 
+<!-- View-Toggle (nur Desktop) -->
+<div class="mb-2 d-none d-md-flex justify-content-end gap-1">
+  <div class="btn-group btn-group-sm" role="group" aria-label="Ansicht wählen">
+    <button type="button" class="btn btn-outline-secondary active" id="btnViewCards">
+      <i class="bi bi-grid-3x3-gap"></i> Kacheln
+    </button>
+    <button type="button" class="btn btn-outline-secondary" id="btnViewTable">
+      <i class="bi bi-table"></i> Tabelle
+    </button>
+  </div>
+</div>
+
 <!-- Card-basierte Ansicht -->
 <div id="task-cards-view" class="row g-3">
 {% for t in tasks %}
@@ -1118,7 +1130,7 @@ function setLanguage(lang) {
     <p class="text-muted mt-3">{{ trans.keine_einsätze }}</p>
   </div>
 {% endif %}
-</div>
+...</div> <!-- Ende Desktop-Ansicht -->
 
 <script>
 function resetMobileFilters(){
@@ -1316,6 +1328,43 @@ document.addEventListener('DOMContentLoaded', function() {
     } else if (mobileForm) {
       mobileForm.submit();
     }
+  }
+
+  // Desktop: Ansicht Kacheln vs. Tabelle umschalten (mit localStorage)
+  const btnViewCards = document.getElementById('btnViewCards');
+  const btnViewTable = document.getElementById('btnViewTable');
+  const cardsView = document.getElementById('task-cards-view');
+  const tableView = document.getElementById('task-table-view');
+
+  function applyView(mode) {
+    if (!cardsView || !tableView || !btnViewCards || !btnViewTable) return;
+    if (mode === 'table') {
+      cardsView.style.display = 'none';
+      tableView.style.display = '';
+      btnViewTable.classList.add('active');
+      btnViewCards.classList.remove('active');
+    } else {
+      cardsView.style.display = '';
+      tableView.style.display = 'none';
+      btnViewCards.classList.add('active');
+      btnViewTable.classList.remove('active');
+    }
+  }
+
+  const savedView = window.localStorage.getItem('adminViewMode') || 'cards';
+  applyView(savedView);
+
+  if (btnViewCards) {
+    btnViewCards.addEventListener('click', function() {
+      window.localStorage.setItem('adminViewMode', 'cards');
+      applyView('cards');
+    });
+  }
+  if (btnViewTable) {
+    btnViewTable.addEventListener('click', function() {
+      window.localStorage.setItem('adminViewMode', 'table');
+      applyView('table');
+    });
   }
   
   if (filterShowDone) {
