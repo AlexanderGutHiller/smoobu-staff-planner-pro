@@ -242,26 +242,32 @@
       border-width: 3px;
       background-color: #f8d7da;
     }
+    /* Überarbeitete Status-Farben (mobile) für klare Unterscheidung */
     .task-card-mobile.done {
-      opacity: 0.6;
-      border-color: #6c757d;
-      background-color: #f8f9fa;
-    }
-    .task-card-mobile.running,
-    .task-card-mobile.paused {
-      border-color: #0dcaf0;
+      border-color: #198754;       /* success */
       border-width: 3px;
-      background-color: #e7f8ff;
+      background-color: #e9f7ef;   /* sanftes Grün */
+      opacity: 1;
+    }
+    .task-card-mobile.running {
+      border-color: #0dcaf0;       /* info */
+      border-width: 3px;
+      background-color: #e7f4ff;   /* dezentes Blau */
+    }
+    .task-card-mobile.paused {
+      border-color: #ffc107;       /* warning */
+      border-width: 3px;
+      background-color: #fff8e1;   /* warmes Gelb */
     }
     .task-card-mobile.assigned {
-      border-color: #198754;
+      border-color: #198754;       /* success */
       border-width: 2px;
       background-color: #d1e7dd;
     }
     .task-card-mobile.open {
-      border-color: #ffc107;
+      border-color: #6c757d;       /* muted */
       border-width: 2px;
-      background-color: #fff3cd;
+      background-color: #ffffff;   /* neutral weiß */
     }
     .extras-container { gap: 0.5rem; }
     .extras-form .form-check-label { font-size: 0.95rem; }
@@ -843,10 +849,13 @@ function setLanguage(lang) {
         const anchorId = sessionStorage.getItem('adminAnchor');
         const scrollY = sessionStorage.getItem('adminScrollY');
         if (anchorId) {
-          const el = document.getElementById(anchorId);
-          if (el) {
-            el.scrollIntoView({ behavior: 'instant', block: 'center' });
+          // Versuche zuerst gespeicherten Anker, sonst Desktop/Mobile-Varianten
+          let el = document.getElementById(anchorId);
+          if (!el) {
+            const id = anchorId.replace(/^task-mobile-/, '').replace(/^task-/, '');
+            el = document.getElementById('task-' + id) || document.getElementById('task-mobile-' + id);
           }
+          if (el) el.scrollIntoView({ behavior: 'auto', block: 'center' });
         } else if (scrollY) {
           window.scrollTo(0, parseInt(scrollY, 10) || 0);
         }
@@ -866,7 +875,8 @@ function setLanguage(lang) {
             const taskInput = form.querySelector('input[name="task_id"]');
             const taskId = taskInput ? taskInput.value : '';
             sessionStorage.setItem('adminScrollY', String(window.scrollY));
-            sessionStorage.setItem('adminAnchor', taskId ? ('task-' + taskId) : '');
+            const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+            sessionStorage.setItem('adminAnchor', taskId ? ((isMobile ? 'task-mobile-' : 'task-') + taskId) : '');
           } catch (e) {}
         }, { capture: true });
       });
@@ -878,7 +888,8 @@ function setLanguage(lang) {
             const taskInput = form.querySelector('input[name="task_id"]');
             const taskId = taskInput ? taskInput.value : '';
             sessionStorage.setItem('adminScrollY', String(window.scrollY));
-            sessionStorage.setItem('adminAnchor', taskId ? ('task-' + taskId) : '');
+            const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+            sessionStorage.setItem('adminAnchor', taskId ? ((isMobile ? 'task-mobile-' : 'task-') + taskId) : '');
           } catch (e) {}
         }, { capture: true });
       });
