@@ -69,6 +69,24 @@
     border-left: 4px solid var(--danger);
     background-color: #fdecee;
   }
+         /* Klarer Hinweis für nicht zugewiesen */
+         .task-card.unassigned {
+           border-left: 4px dashed #6f42c1 !important; /* violett, gestrichelt */
+           background-color: #f5f0ff !important;
+         }
+         .task-ribbon {
+           position: absolute;
+           top: 8px;
+           right: 8px;
+           font-size: 0.75rem;
+           padding: 0.15rem 0.35rem;
+           border-radius: 0.35rem;
+           background: #6f42c1;
+           color: #fff;
+         }
+         .task-ribbon.pending { background: #ffc107; color: #212529; }
+         .task-ribbon.rejected { background: #dc3545; }
+         .task-ribbon.accepted { background: #198754; }
   
   .task-header {
     display: flex;
@@ -370,11 +388,12 @@
     <div class="d-flex gap-2 align-items-center">
       <label class="mb-0 small text-muted">{{ trans.date }}:</label>
       <select id="f-date-desktop" class="form-select form-select-sm" style="width: auto;">
-        <option value="">{{ trans.all }}</option>
-        <option value="today">{{ trans.today }}</option>
-        <option value="week">{{ trans.week }}</option>
-        <option value="month">{{ trans.month }}</option>
-        <option value="next7">{{ trans.next7 }}</option>
+        {% set date_default = default_date_filter or '' %}
+        <option value="" {% if date_default=='' %}selected{% endif %}>{{ trans.all }}</option>
+        <option value="today" {% if date_default=='today' %}selected{% endif %}>{{ trans.today }}</option>
+        <option value="week" {% if date_default=='week' %}selected{% endif %}>{{ trans.week }}</option>
+        <option value="month" {% if date_default=='month' %}selected{% endif %}>{{ trans.month }}</option>
+        <option value="next7" {% if date_default=='next7' %}selected{% endif %}>{{ trans.next7 }}</option>
       </select>
     </div>
     <div class="d-flex gap-2 align-items-center">
@@ -410,11 +429,12 @@ function setLanguage(lang) {
 <div class="mobile-view mobile-filter-section">
   <h6 class="mb-2">{{ trans.date }}:</h6>
   <select id="f-date-mobile" class="form-select form-select-sm mb-3">
-    <option value="">{{ trans.all }}</option>
-    <option value="today">{{ trans.today }}</option>
-    <option value="week">{{ trans.week }}</option>
-    <option value="month">{{ trans.month }}</option>
-    <option value="next7">{{ trans.next7 }}</option>
+    {% set date_default = default_date_filter or '' %}
+    <option value="" {% if date_default=='' %}selected{% endif %}>{{ trans.all }}</option>
+    <option value="today" {% if date_default=='today' %}selected{% endif %}>{{ trans.today }}</option>
+    <option value="week" {% if date_default=='week' %}selected{% endif %}>{{ trans.week }}</option>
+    <option value="month" {% if date_default=='month' %}selected{% endif %}>{{ trans.month }}</option>
+    <option value="next7" {% if date_default=='next7' %}selected{% endif %}>{{ trans.next7 }}</option>
   </select>
   
   <h6 class="mb-2">{{ trans.apartment }}:</h6>
@@ -482,8 +502,16 @@ function setLanguage(lang) {
 {% set baby_beds = extras.get('baby_beds', 0) %}
 {% set tl = timelog_map.get(t.id, {}) %}
 <div class="col-md-6 col-lg-4">
-  <div id="task-{{ t.id }}" class="task-card {% if t.assignment_status == 'rejected' %}assign-rejected{% elif t.assignment_status == 'pending' %}assign-pending{% elif t.assignment_status == 'accepted' %}assign-accepted{% elif t.status == 'done' %}done{% elif t.status == 'running' %}running{% elif t.status == 'paused' %}paused{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id == t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
+  <div id="task-{{ t.id }}" class="task-card {% if t.assignment_status == 'rejected' %}assign-rejected{% elif t.assignment_status == 'pending' %}assign-pending{% elif t.assignment_status == 'accepted' %}assign-accepted{% endif %} {% if not t.assigned_staff_id %}unassigned{% endif %} {% if t.status == 'done' %}done{% elif t.status == 'running' %}running{% elif t.status == 'paused' %}paused{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id == t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
     <div class="task-header">
+      {% set _assign_class = 'accepted' if t.assignment_status=='accepted' else ('pending' if t.assignment_status=='pending' else ('rejected' if t.assignment_status=='rejected' else '')) %}
+      {% if not t.assigned_staff_id %}
+        <span class="task-ribbon">Nicht zugewiesen</span>
+      {% elif _assign_class %}
+        <span class="task-ribbon {{ _assign_class }}">
+          {% if _assign_class=='pending' %}Ausstehend{% elif _assign_class=='accepted' %}Angenommen{% else %}Abgelehnt{% endif %}
+        </span>
+      {% endif %}
       <div class="flex-1">
         <div class="task-apartment">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
         {% if t.booking_id %}
@@ -629,11 +657,12 @@ function setLanguage(lang) {
   <tr>
     <th>{{ trans.date }}<br>
       <select id="f-date" class="form-select form-select-sm filter-input">
-        <option value="">{{ trans.all }}</option>
-        <option value="today">{{ trans.today }}</option>
-        <option value="week">{{ trans.week }}</option>
-        <option value="month">{{ trans.month }}</option>
-        <option value="next7">{{ trans.next7 }}</option>
+        {% set date_default = default_date_filter or '' %}
+        <option value="" {% if date_default=='' %}selected{% endif %}>{{ trans.all }}</option>
+        <option value="today" {% if date_default=='today' %}selected{% endif %}>{{ trans.today }}</option>
+        <option value="week" {% if date_default=='week' %}selected{% endif %}>{{ trans.week }}</option>
+        <option value="month" {% if date_default=='month' %}selected{% endif %}>{{ trans.month }}</option>
+        <option value="next7" {% if date_default=='next7' %}selected{% endif %}>{{ trans.next7 }}</option>
       </select>
     </th>
     <th>{{ trans.apartment }}<br>
@@ -822,8 +851,19 @@ function setLanguage(lang) {
 {% set tl = timelog_map.get(t.id, {}) %}
 {% set extras = extras_map.get(t.id, {}) %}
 {% set baby_beds = extras.get('baby_beds', 0) %}
-<div id="task-mobile-{{ t.id }}" class="task-card-mobile {% if t.assignment_status=='rejected' %}rejected{% elif t.status=='done' %}done{% elif t.status=='running' or t.status=='paused' %}running{% elif t.assigned_staff_id %}assigned{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id==t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
+<div id="task-mobile-{{ t.id }}" class="task-card-mobile {% if not t.assigned_staff_id %}unassigned{% endif %} {% if t.assignment_status=='rejected' %}rejected{% elif t.assignment_status=='pending' %}pending{% elif t.assignment_status=='accepted' %}accepted{% endif %} {% if t.status=='done' %}done{% elif t.status=='running' %}running{% elif t.status=='paused' %}paused{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id==t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
   <div class="task-card-header">
+    <div>
+      {% if not t.assigned_staff_id %}
+        <span class="badge rounded-pill text-bg-secondary">Nicht zugewiesen</span>
+      {% elif t.assignment_status=='pending' %}
+        <span class="badge rounded-pill text-bg-warning text-dark">Ausstehend</span>
+      {% elif t.assignment_status=='accepted' %}
+        <span class="badge rounded-pill text-bg-success">Angenommen</span>
+      {% elif t.assignment_status=='rejected' %}
+        <span class="badge rounded-pill text-bg-danger">Abgelehnt</span>
+      {% endif %}
+    </div>
     <div>
       <strong style="font-size: 1.1rem;">{{ t.date | date_wd_de('short') }}</strong>
       <div class="fw-bold text-primary" style="font-size: 1.2rem;">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
@@ -1046,6 +1086,24 @@ function setLanguage(lang) {
 <script>
 const rows = Array.from(document.querySelectorAll("#task-table tbody tr"));
 const today = new Date().toISOString().split('T')[0];
+
+// Standard: Filter "nächste 7 Tage" beim ersten Laden setzen (wenn nichts gewählt)
+document.addEventListener('DOMContentLoaded', function(){
+  try {
+    const selects = [
+      document.getElementById('f-date-desktop'),
+      document.getElementById('f-date-mobile'),
+      document.getElementById('f-date')
+    ].filter(Boolean);
+    const anyPreselected = selects.some(s => (s && s.value && s.value.length > 0));
+    if (!anyPreselected) {
+      selects.forEach(s => { if (s) s.value = 'next7'; });
+      // Filter anwenden
+      if (typeof applyFilter === 'function') applyFilter();
+      if (typeof applyCardFilter === 'function') applyCardFilter();
+    }
+  } catch(e) {}
+});
 
 function parseDateToIso(input) {
   if (!input) return '';

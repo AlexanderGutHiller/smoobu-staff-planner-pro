@@ -1001,6 +1001,13 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     trans = get_translations(lang)
     
     q = db.query(Task)
+    # Standard: nächste 7 Tage, wenn kein Datumsfilter gesetzt ist
+    default_date_filter = ""
+    if not date_from and not date_to:
+        today = dt.date.today()
+        date_from = today.isoformat()
+        date_to = (today + dt.timedelta(days=7)).isoformat()
+        default_date_filter = "next7"
     if date_from: q = q.filter(Task.date >= date_from)
     if date_to: q = q.filter(Task.date <= date_to)
     if staff_id: q = q.filter(Task.assigned_staff_id == staff_id)
@@ -1055,7 +1062,7 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     base_url = BASE_URL.rstrip("/")
     if not base_url:
         base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
-    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "extras_map": extras_map, "base_url": base_url, "lang": lang, "trans": trans, "show_done": show_done, "show_open": show_open})
+    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "extras_map": extras_map, "base_url": base_url, "lang": lang, "trans": trans, "show_done": show_done, "show_open": show_open, "default_date_filter": default_date_filter})
 
 @app.get("/admin/{token}/staff")
 async def admin_staff(request: Request, token: str, db=Depends(get_db)):
