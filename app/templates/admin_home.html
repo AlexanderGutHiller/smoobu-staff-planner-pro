@@ -39,24 +39,6 @@
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     transform: translateY(-2px);
   }
-         /* Status-Farben (überarbeitet für bessere Lesbarkeit) */
-         .task-card.open {
-           border-left: 4px solid var(--muted);
-           background-color: #ffffff; /* neutral */
-         }
-         .task-card.running {
-           border-left: 4px solid var(--info);
-           background-color: #e7f4ff; /* dezentes Blau */
-         }
-         .task-card.paused {
-           border-left: 4px solid var(--warning);
-           background-color: #fff8e1; /* warmes Gelb */
-         }
-         .task-card.done {
-           border-left: 4px solid var(--success);
-           background-color: #e9f7ef; /* sanftes Grün */
-           opacity: 0.9; /* weniger ausgegraut für Lesbarkeit */
-         }
   .task-card.assign-pending {
     border-left: 4px solid var(--warning);
     background-color: #fff8e1;
@@ -69,6 +51,22 @@
     border-left: 4px solid var(--danger);
     background-color: #fdecee;
   }
+         /* FINAL: Status-Farben mit höherer Priorität (überschreiben ggf. assign-Styles) */
+         .task-card.open       { border-left: 4px solid var(--muted)   !important; background-color: #ffffff !important; }
+         .task-card.running    { border-left: 4px solid #0dcaf0        !important; background-color: #e7f4ff !important; }
+         .task-card.paused     { border-left: 4px solid #ffc107        !important; background-color: #fff8e1 !important; }
+         .task-card.done       { border-left: 4px solid #198754        !important; background-color: #e9f7ef !important; opacity: 1 !important; }
+         /* Unzugewiesen: nicht Hintergrundfarbe ändern (Status bleibt sichtbar), nur dezenter Rahmen + Ribbon */
+         .task-card.unassigned { box-shadow: 0 0 0 2px rgba(111,66,212,0.25) inset; border-left-style: dashed; }
+         .task-id-badge {
+           font-size: 0.75rem;
+           color: var(--muted);
+           border: 1px solid var(--border);
+           border-radius: 12px;
+           padding: 0.1rem 0.4rem;
+           margin-left: 0.5rem;
+           white-space: nowrap;
+         }
          /* Klarer Hinweis für nicht zugewiesen */
          .task-card.unassigned {
            border-left: 4px dashed #6f42c1 !important; /* violett, gestrichelt */
@@ -260,33 +258,16 @@
       border-width: 3px;
       background-color: #f8d7da;
     }
-    /* Überarbeitete Status-Farben (mobile) für klare Unterscheidung */
-    .task-card-mobile.done {
-      border-color: #198754;       /* success */
-      border-width: 3px;
-      background-color: #e9f7ef;   /* sanftes Grün */
-      opacity: 1;
-    }
-    .task-card-mobile.running {
-      border-color: #0dcaf0;       /* info */
-      border-width: 3px;
-      background-color: #e7f4ff;   /* dezentes Blau */
-    }
-    .task-card-mobile.paused {
-      border-color: #ffc107;       /* warning */
-      border-width: 3px;
-      background-color: #fff8e1;   /* warmes Gelb */
-    }
-    .task-card-mobile.assigned {
-      border-color: #198754;       /* success */
-      border-width: 2px;
-      background-color: #d1e7dd;
-    }
-    .task-card-mobile.open {
-      border-color: #6c757d;       /* muted */
-      border-width: 2px;
-      background-color: #ffffff;   /* neutral weiß */
-    }
+    /* Mobile: Status-Farben mit hoher Priorität */
+    .task-card-mobile.done    { border-color: #198754 !important; border-width: 3px; background-color: #e9f7ef !important; opacity: 1 !important; }
+    .task-card-mobile.running { border-color: #0dcaf0 !important; border-width: 3px; background-color: #e7f4ff !important; }
+    .task-card-mobile.paused  { border-color: #ffc107 !important; border-width: 3px; background-color: #fff8e1 !important; }
+    .task-card-mobile.open    { border-color: #6c757d !important; border-width: 2px;  background-color: #ffffff !important; }
+    /* Mobile assignment cues without overriding status background */
+    .task-card-mobile.unassigned { outline: 2px dashed rgba(111,66,212,0.6); }
+    .task-card-mobile.accepted   { box-shadow: 0 0 0 2px rgba(25,135,84,0.25) inset; }
+    .task-card-mobile.pending    { box-shadow: 0 0 0 2px rgba(255,193,7,0.25) inset; }
+    .task-card-mobile.rejected   { /* keep red background already set above */ }
     .extras-container { gap: 0.5rem; }
     .extras-form .form-check-label { font-size: 0.95rem; }
     
@@ -539,7 +520,7 @@ function setLanguage(lang) {
           </div>
         {% endif %}
       </div>
-      <div>
+      <div class="d-flex align-items-center gap-2">
         {% if t.status == 'done' %}
           <span class="badge bg-success"><i class="bi bi-check-circle"></i> {{ trans.erledigt }}</span>
         {% elif t.status == 'running' %}
@@ -549,6 +530,7 @@ function setLanguage(lang) {
         {% else %}
           <span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> {{ trans.offen }}</span>
         {% endif %}
+        <span class="task-id-badge">#{{ t.id }}</span>
       </div>
     </div>
     
@@ -594,6 +576,25 @@ function setLanguage(lang) {
       {% endif %}
     </div>
     {% endif %}
+
+    <!-- Checklist (Desktop) -->
+    <div class="mt-2">
+      <div class="task-info-label mb-1">{{ trans.checklist }}:</div>
+      <div class="extras-container">
+        {% for field, label in checklist_fields %}
+        <form method="post" action="/admin/{{ token }}/task/extras" class="extras-form">
+          <input type="hidden" name="task_id" value="{{ t.id }}"/>
+          <input type="hidden" name="field" value="{{ field }}"/>
+          <input type="hidden" name="value" value="{{ 1 if extras.get(field) else 0 }}"/>
+          <input type="hidden" name="redirect" value="{{ current_url }}"/>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="{{ field }}-desktop-{{ t.id }}" {% if extras.get(field) %}checked{% endif %} data-last-value="{{ 1 if extras.get(field) else 0 }}" onchange="handleExtraToggle(this)">
+            <label class="form-check-label" for="{{ field }}-desktop-{{ t.id }}">{{ label }}</label>
+          </div>
+        </form>
+        {% endfor %}
+      </div>
+    </div>
     
     {% if t.notes %}
     <div class="mb-2">

@@ -36,6 +36,7 @@ class Staff(Base):
     language: Mapped[str] = mapped_column(String(8), default="de")
     whatsapp_opt_in_sent: Mapped[bool] = mapped_column(Boolean, default=False)  # Opt-In-Nachricht bereits gesendet
     whatsapp_opt_in_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)  # Opt-In wurde bestätigt (Zustimmung erhalten)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
 
 class Task(Base):
     __tablename__ = "tasks"
