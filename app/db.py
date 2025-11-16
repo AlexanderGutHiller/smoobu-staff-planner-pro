@@ -66,7 +66,35 @@ def _apply_sqlite_migrations():
         add_col("ALTER TABLE staff ADD COLUMN phone VARCHAR(20) DEFAULT ''")
         add_col("ALTER TABLE staff ADD COLUMN whatsapp_opt_in_sent BOOLEAN DEFAULT 0")
         add_col("ALTER TABLE staff ADD COLUMN whatsapp_opt_in_confirmed BOOLEAN DEFAULT 0")
-        add_col(\"ALTER TABLE staff ADD COLUMN is_admin BOOLEAN DEFAULT 0\")
+        add_col("ALTER TABLE staff ADD COLUMN is_admin BOOLEAN DEFAULT 0")
         # Create task_series table if not exists
         try:
-            conn.exec_driver_sql(\"\"\"\nCREATE TABLE IF NOT EXISTS task_series (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  title VARCHAR(255) DEFAULT '',\n  description TEXT DEFAULT '',\n  apartment_id INTEGER NULL,\n  staff_id INTEGER NULL,\n  planned_minutes INTEGER DEFAULT 60,\n  start_date VARCHAR(10) NOT NULL,\n  start_time VARCHAR(5) DEFAULT '',\n  frequency VARCHAR(16) NOT NULL,\n  interval INTEGER DEFAULT 1,\n  byweekday VARCHAR(64) DEFAULT '',\n  bymonthday VARCHAR(64) DEFAULT '',\n  end_date VARCHAR(10) NULL,\n  count INTEGER NULL,\n  active BOOLEAN DEFAULT 1,\n  created_at VARCHAR(19) DEFAULT ''\n);\n\"\"\")\n        except Exception as e:\n            msg = str(e).lower()\n            if \"already exists\" not in msg:\n                raise\n+        # Add recurrence columns to tasks if missing\n+        add_col(\"ALTER TABLE tasks ADD COLUMN series_id INTEGER\")\n+        add_col(\"ALTER TABLE tasks ADD COLUMN is_recurring BOOLEAN DEFAULT 0\")
+            conn.exec_driver_sql(
+                """
+CREATE TABLE IF NOT EXISTS task_series (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title VARCHAR(255) DEFAULT '',
+  description TEXT DEFAULT '',
+  apartment_id INTEGER NULL,
+  staff_id INTEGER NULL,
+  planned_minutes INTEGER DEFAULT 60,
+  start_date VARCHAR(10) NOT NULL,
+  start_time VARCHAR(5) DEFAULT '',
+  frequency VARCHAR(16) NOT NULL,
+  interval INTEGER DEFAULT 1,
+  byweekday VARCHAR(64) DEFAULT '',
+  bymonthday VARCHAR(64) DEFAULT '',
+  end_date VARCHAR(10) NULL,
+  count INTEGER NULL,
+  active BOOLEAN DEFAULT 1,
+  created_at VARCHAR(19) DEFAULT ''
+);
+                """
+            )
+        except Exception as e:
+            msg = str(e).lower()
+            if "already exists" not in msg:
+                pass
+        # Add recurrence columns to tasks if missing
+        add_col("ALTER TABLE tasks ADD COLUMN series_id INTEGER")
+        add_col("ALTER TABLE tasks ADD COLUMN is_recurring BOOLEAN DEFAULT 0")
