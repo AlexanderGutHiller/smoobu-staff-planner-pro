@@ -1447,8 +1447,15 @@ document.addEventListener('DOMContentLoaded', function() {
       if (isMobile) {
         setTimeout(function(){
           const mobileCards = Array.from(document.querySelectorAll('.task-card-mobile'));
-          const anyVisible = mobileCards.some(c => c.offsetParent !== null);
-          if (!anyVisible) {
+          const desktopCardWrappers = Array.from(document.querySelectorAll('#task-cards-view .col-md-6, #task-cards-view .col-lg-4'));
+          const anyMobileVisible = mobileCards.some(c => c.offsetParent !== null);
+          const anyDesktopVisible = desktopCardWrappers.some(w => w.offsetParent !== null);
+          
+          if (!anyMobileVisible && !anyDesktopVisible) {
+            // Harte Wiederherstellung: Alle Karten einblenden
+            desktopCardWrappers.forEach(w => { w.style.display = ''; });
+            mobileCards.forEach(c => { c.style.display = ''; });
+            // Sicherheitshalber auch die Desktop-Section einblenden
             const desktop = document.querySelector('.desktop-view');
             if (desktop) desktop.style.display = 'block';
           }
