@@ -193,6 +193,8 @@
     .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .desktop-view { display: none; }
     .mobile-view { display: block; }
+    /* Lovable/iOS Fallback: Karten immer sichtbar erzwingen */
+    .task-card-mobile { display: block !important; visibility: visible !important; }
     .filter-input { width: 100%; margin-bottom: 0.5rem; }
     /* Bessere Bedienbarkeit auf iOS/iPhone */
     .mobile-filter-section select.form-select {
@@ -1121,19 +1123,9 @@ function applyCardFilter() {
     card.closest('.col-md-6, .col-lg-4').style.display = ok ? '' : 'none';
   });
   
-  // Mobile Cards filtern
+  // Mobile Cards: Lovable/iOS Fallback – nicht ausblenden, immer sichtbar lassen
   const mobileCards = document.querySelectorAll('.task-card-mobile');
-  mobileCards.forEach(card => {
-    const dateTxt = card.getAttribute('data-date') || '';
-    const aptTxt = card.getAttribute('data-apt') || '';
-    const staffTxt = card.getAttribute('data-staff') || '';
-    
-    const ok = matchesDateFilter(dateTxt, fDate)
-            && (!fApt || aptTxt.toLowerCase().includes(fApt.toLowerCase()))
-            && (!fStaff || staffTxt.toLowerCase().includes(fStaff.toLowerCase()));
-    
-    card.style.display = ok ? '' : 'none';
-  });
+  mobileCards.forEach(card => { card.style.display = ''; });
 }
 
 // Mobile-Filter auch hinzufügen
