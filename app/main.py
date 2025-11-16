@@ -421,33 +421,41 @@ def _send_whatsapp(to_phone: str, message: str, use_template: bool = False):
 def _send_whatsapp_with_opt_in(to_phone: str, message: str, staff_id: Optional[int] = None, db=None):
     """Sende WhatsApp-Nachricht mit Opt-In-Check
     
-    Wenn Opt-In noch nicht gesendet wurde, wird zuerst die Opt-In-Vorlage gesendet,
-    danach die normale Nachricht.
+    Wenn Opt-In noch nicht bestätigt wurde, wird nur die Opt-In-Vorlage gesendet.
+    Die normale Nachricht wird erst gesendet, wenn Opt-In bestätigt wurde.
     """
-    # Prüfe ob Opt-In bereits gesendet wurde
+    # Prüfe Opt-In-Status
     opt_in_sent = False
+    opt_in_confirmed = False
     if staff_id and db:
         staff = db.get(Staff, staff_id)
         if staff:
             opt_in_sent = getattr(staff, 'whatsapp_opt_in_sent', False)
+            opt_in_confirmed = getattr(staff, 'whatsapp_opt_in_confirmed', False)
     
-    # Wenn Opt-In noch nicht gesendet, sende es zuerst
-    if not opt_in_sent and TWILIO_WHATSAPP_CONTENT_SID:
-        log.info("📱 Sending Opt-In message first to %s", to_phone)
-        opt_in_message = "Willkommen! Du erhältst ab jetzt Benachrichtigungen über neue Aufgaben."  # Kann angepasst werden
-        opt_in_result = _send_whatsapp(to_phone, opt_in_message, use_template=True)
-        if opt_in_result and staff_id and db:
-            # Markiere Opt-In als gesendet
-            staff = db.get(Staff, staff_id)
-            if staff:
-                staff.whatsapp_opt_in_sent = True
-                db.commit()
-                log.info("✅ Opt-In marked as sent for staff %d", staff_id)
-        # Warte kurz, bevor die normale Nachricht gesendet wird
-        import time
-        time.sleep(1)
+    # Wenn Opt-In noch nicht bestätigt wurde
+    if not opt_in_confirmed:
+        # Wenn Opt-In-Vorlage noch nicht gesendet wurde, sende sie jetzt
+        if not opt_in_sent and TWILIO_WHATSAPP_CONTENT_SID:
+            log.info("📱 Sending Opt-In message to %s (waiting for confirmation)", to_phone)
+            opt_in_message = "Willkommen! Du erhältst ab jetzt Benachrichtigungen über neue Aufgaben."  # Kann angepasst werden
+            opt_in_result = _send_whatsapp(to_phone, opt_in_message, use_template=True)
+            if opt_in_result and staff_id and db:
+                # Markiere Opt-In als gesendet (aber noch nicht bestätigt)
+                staff = db.get(Staff, staff_id)
+                if staff:
+                    staff.whatsapp_opt_in_sent = True
+                    db.commit()
+                    log.info("✅ Opt-In message sent to staff %d (waiting for confirmation)", staff_id)
+            # KEINE normale Nachricht senden, da Opt-In noch nicht bestätigt wurde
+            return opt_in_result  # True wenn Opt-In-Vorlage erfolgreich gesendet wurde
+        else:
+            log.info("📱 Opt-In already sent to %s, waiting for confirmation before sending normal message", to_phone)
+            # KEINE normale Nachricht senden, da Opt-In noch nicht bestätigt wurde
+            return False
     
-    # Sende normale Nachricht (freie Nachricht, da Opt-In bereits gesendet wurde)
+    # Opt-In wurde bestätigt - sende normale Nachricht
+    log.info("📱 Opt-In confirmed for %s, sending normal message", to_phone)
     return _send_whatsapp(to_phone, message, use_template=False)
 
 def build_assignment_whatsapp_message(lang: str, staff_name: str, items: list, base_url: str) -> str:
@@ -1554,6 +1562,54 @@ async def twilio_status_webhook(request: Request):
         return Response(status_code=200)
     except Exception as e:
         log.error("Error processing Twilio webhook: %s", e, exc_info=True)
+        return Response(status_code=500)
+
+@app.post("/webhook/twilio/message")
+async def twilio_message_webhook(request: Request, db=Depends(get_db)):
+    """Webhook-Endpoint für eingehende WhatsApp-Nachrichten (Opt-In-Bestätigung)"""
+    try:
+        form_data = await request.form()
+        from_number = form_data.get("From", "")
+        message_body = form_data.get("Body", "").strip().upper()
+        
+        # Entferne "whatsapp:" Präfix
+        from_clean = from_number.replace("whatsapp:", "") if from_number.startswith("whatsapp:") else from_number
+        
+        log.info("📱 Incoming WhatsApp message from %s: %s", from_clean, message_body)
+        
+        # Suche Staff-Mitglied mit dieser Telefonnummer
+        staff = db.query(Staff).filter(Staff.phone.like(f"%{from_clean}%")).first()
+        
+        if staff:
+            # Normalisiere Telefonnummer für Vergleich
+            staff_phone = staff.phone.strip().replace(" ", "").replace("-", "")
+            if not staff_phone.startswith("+"):
+                if staff_phone.startswith("0"):
+                    staff_phone = "+49" + staff_phone[1:]
+                else:
+                    staff_phone = "+49" + staff_phone
+            
+            if staff_phone == from_clean:
+                # Prüfe ob Nachricht eine Opt-In-Bestätigung ist
+                # Typische Bestätigungen: "JA", "YES", "OK", "START", etc.
+                opt_in_keywords = ["JA", "YES", "OK", "START", "BEGINNEN", "ANFANGEN", "ZUSTIMMEN", "ACCEPT"]
+                if any(keyword in message_body for keyword in opt_in_keywords) or len(message_body) <= 3:
+                    # Markiere Opt-In als bestätigt
+                    if not staff.whatsapp_opt_in_confirmed:
+                        staff.whatsapp_opt_in_confirmed = True
+                        db.commit()
+                        log.info("✅ Opt-In confirmed for staff %d (%s) via WhatsApp message", staff.id, staff.name)
+                    else:
+                        log.debug("Opt-In already confirmed for staff %d", staff.id)
+                else:
+                    log.debug("Message from %s does not appear to be an Opt-In confirmation", from_clean)
+        else:
+            log.debug("No staff member found with phone number %s", from_clean)
+        
+        # Return 200 OK für Twilio (immer, auch wenn kein Staff gefunden)
+        return Response(status_code=200)
+    except Exception as e:
+        log.error("Error processing Twilio message webhook: %s", e, exc_info=True)
         return Response(status_code=500)
 
 @app.get("/admin/{token}/notify_assignments")

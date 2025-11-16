@@ -306,6 +306,15 @@
   </button>
 </div>
 
+{% if show_done == 0 and show_open == 0 %}
+<div class="alert alert-warning d-flex justify-content-between align-items-center" role="alert" style="margin-bottom: 1rem;">
+  <div><i class="bi bi-funnel"></i> Filter sind so gesetzt, dass keine Aufgaben angezeigt werden.</div>
+  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetMobileFilters()">
+    Filter zurücksetzen
+  </button>
+  </div>
+{% endif %}
+
 <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
         <a class="btn btn-outline-secondary" href="/admin/{{ token }}/staff"><i class="bi bi-people"></i> {{ trans.team }}</a>
         <a class="btn btn-outline-secondary" href="/admin/{{ token }}/apartments"><i class="bi bi-building"></i> {{ trans.apartments }}</a>
@@ -466,7 +475,7 @@ function setLanguage(lang) {
 {% set baby_beds = extras.get('baby_beds', 0) %}
 {% set tl = timelog_map.get(t.id, {}) %}
 <div class="col-md-6 col-lg-4">
-  <div class="task-card {% if t.assignment_status == 'rejected' %}assign-rejected{% elif t.assignment_status == 'pending' %}assign-pending{% elif t.assignment_status == 'accepted' %}assign-accepted{% elif t.status == 'done' %}done{% elif t.status == 'running' %}running{% elif t.status == 'paused' %}paused{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id == t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
+  <div id="task-{{ t.id }}" class="task-card {% if t.assignment_status == 'rejected' %}assign-rejected{% elif t.assignment_status == 'pending' %}assign-pending{% elif t.assignment_status == 'accepted' %}assign-accepted{% elif t.status == 'done' %}done{% elif t.status == 'running' %}running{% elif t.status == 'paused' %}paused{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id == t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
     <div class="task-header">
       <div class="flex-1">
         <div class="task-apartment">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
@@ -806,7 +815,7 @@ function setLanguage(lang) {
 {% set tl = timelog_map.get(t.id, {}) %}
 {% set extras = extras_map.get(t.id, {}) %}
 {% set baby_beds = extras.get('baby_beds', 0) %}
-<div class="task-card-mobile {% if t.assignment_status=='rejected' %}rejected{% elif t.status=='done' %}done{% elif t.status=='running' or t.status=='paused' %}running{% elif t.assigned_staff_id %}assigned{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id==t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
+<div id="task-mobile-{{ t.id }}" class="task-card-mobile {% if t.assignment_status=='rejected' %}rejected{% elif t.status=='done' %}done{% elif t.status=='running' or t.status=='paused' %}running{% elif t.assigned_staff_id %}assigned{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id==t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
   <div class="task-card-header">
     <div>
       <strong style="font-size: 1.1rem;">{{ t.date | date_wd_de('short') }}</strong>
@@ -825,6 +834,58 @@ function setLanguage(lang) {
     </div>
   </div>
   
+<script>
+  // Scroll-Position und Fokus nach Zuweisung erhalten
+  (function() {
+    document.addEventListener('DOMContentLoaded', function() {
+      try {
+        const anchorId = sessionStorage.getItem('adminAnchor');
+        const scrollY = sessionStorage.getItem('adminScrollY');
+        if (anchorId) {
+          const el = document.getElementById(anchorId);
+          if (el) {
+            el.scrollIntoView({ behavior: 'instant', block: 'center' });
+          }
+        } else if (scrollY) {
+          window.scrollTo(0, parseInt(scrollY, 10) || 0);
+        }
+      } catch (e) {}
+      // Nach Wiederherstellung aufräumen
+      try {
+        sessionStorage.removeItem('adminAnchor');
+        sessionStorage.removeItem('adminScrollY');
+      } catch (e) {}
+    });
+    // Vor Submit von Zuweisungs-Formularen Position merken
+    function attachPreserveHandlers() {
+      const assignForms = document.querySelectorAll('form[action$="/task/assign"]');
+      assignForms.forEach(function(form) {
+        form.addEventListener('submit', function() {
+          try {
+            const taskInput = form.querySelector('input[name="task_id"]');
+            const taskId = taskInput ? taskInput.value : '';
+            sessionStorage.setItem('adminScrollY', String(window.scrollY));
+            sessionStorage.setItem('adminAnchor', taskId ? ('task-' + taskId) : '');
+          } catch (e) {}
+        }, { capture: true });
+      });
+      // Auch für Status/Extras-Formulare, damit die Ansicht nicht "verspringt"
+      const otherForms = document.querySelectorAll('form[action*="/task/status"], form[action*="/task/extras"]');
+      otherForms.forEach(function(form) {
+        form.addEventListener('submit', function() {
+          try {
+            const taskInput = form.querySelector('input[name="task_id"]');
+            const taskId = taskInput ? taskInput.value : '';
+            sessionStorage.setItem('adminScrollY', String(window.scrollY));
+            sessionStorage.setItem('adminAnchor', taskId ? ('task-' + taskId) : '');
+          } catch (e) {}
+        }, { capture: true });
+      });
+    }
+    attachPreserveHandlers();
+  })();
+</script>
+
   <div class="task-info-row">
     <span class="task-info-label">{{ trans.status }}:</span>
     <span>
