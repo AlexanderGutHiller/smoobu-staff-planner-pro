@@ -1401,6 +1401,41 @@ document.addEventListener('DOMContentLoaded', function() {
   if (filterShowOpenMobile) {
     filterShowOpenMobile.addEventListener('change', updateStatusFilters);
   }
+
+  // iOS Safari: sichere Label-Klicks für die Mobile-Checkboxen ab
+  const doneLabel = document.querySelector('label[for="filterShowDoneMobile"]');
+  const openLabel = document.querySelector('label[for="filterShowOpenMobile"]');
+  function toggleAndUpdate(cb) {
+    if (!cb) return;
+    cb.checked = !cb.checked;
+    // Trigger change programmatically
+    const evt = new Event('change', { bubbles: true });
+    cb.dispatchEvent(evt);
+  }
+  if (doneLabel && filterShowDoneMobile) {
+    doneLabel.addEventListener('click', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      toggleAndUpdate(filterShowDoneMobile);
+    });
+    doneLabel.addEventListener('touchend', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      toggleAndUpdate(filterShowDoneMobile);
+    }, { passive: false });
+  }
+  if (openLabel && filterShowOpenMobile) {
+    openLabel.addEventListener('click', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      toggleAndUpdate(filterShowOpenMobile);
+    });
+    openLabel.addEventListener('touchend', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      toggleAndUpdate(filterShowOpenMobile);
+    }, { passive: false });
+  }
 });
 </script>
 
