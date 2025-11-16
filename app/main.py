@@ -428,6 +428,7 @@ def expand_series_job(days_ahead: int = 30):
         horizon = _date.today() + _td(days=days_ahead)
         series_list = db.query(TaskSeries).filter(TaskSeries.active==True).all()
         created = 0
+        new_tasks: list[Task] = []
         for ser in series_list:
             # find last generated date for this series
             last = db.query(Task).filter(Task.series_id==ser.id).order_by(Task.date.desc()).first()
@@ -452,7 +453,14 @@ def expand_series_job(days_ahead: int = 30):
                 )
                 db.add(t)
                 created += 1
+                new_tasks.append(t)
         db.commit()
+        # Sofort benachrichtigen, wenn neue Zuweisungen entstanden sind
+        if created > 0:
+            try:
+                send_assignment_emails_job()
+            except Exception as e:
+                log.error("send_assignment_emails_job after series expansion failed: %s", e)
         log.info("🗓️ Series expansion created %d tasks up to %s", created, horizon.isoformat())
         return created
 
@@ -1286,6 +1294,10 @@ async def admin_series_add(
     db.add(s); db.commit()
     # expand immediately a bit
     expand_series_job(days_ahead=30)
+    try:
+        send_assignment_emails_job()
+    except Exception as e:
+        log.error("notify after series add failed: %s", e)
     return RedirectResponse(url=f"/admin/{{token}}/series", status_code=303)
 
 @app.post("/admin/{token}/series/toggle")
@@ -1316,6 +1328,11 @@ async def admin_series_delete(token: str, series_id: int = Form(...), delete_fut
 async def admin_series_expand(token: str, days: int = 30):
     if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
     created = expand_series_job(days_ahead=days)
+    try:
+        if created:
+            send_assignment_emails_job()
+    except Exception as e:
+        log.error("notify after series expand failed: %s", e)
     return PlainTextResponse(f"Created {created} tasks for next {days} days.")
 
 @app.get("/admin/{token}/staff")

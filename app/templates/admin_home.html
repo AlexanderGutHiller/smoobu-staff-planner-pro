@@ -421,7 +421,7 @@ function setLanguage(lang) {
 <!-- Mobile Filter Section -->
 <div class="mobile-view mobile-filter-section">
   <h6 class="mb-2">{{ trans.date }}:</h6>
-  <select id="f-date-mobile" class="form-select form-select-sm mb-3">
+  <select id="f-date-mobile" class="form-select form-select-sm mb-3" onchange="handleMobileFilterChange(this)" oninput="handleMobileFilterChange(this)">
     {% set date_default = default_date_filter or '' %}
     <option value="" {% if date_default=='' %}selected{% endif %}>{{ trans.all }}</option>
     <option value="today" {% if date_default=='today' %}selected{% endif %}>{{ trans.today }}</option>
@@ -431,7 +431,7 @@ function setLanguage(lang) {
   </select>
   
   <h6 class="mb-2">{{ trans.apartment }}:</h6>
-  <select id="f-apt-mobile" class="form-select form-select-sm mb-3">
+  <select id="f-apt-mobile" class="form-select form-select-sm mb-3" onchange="handleMobileFilterChange(this)" oninput="handleMobileFilterChange(this)">
     <option value="">{{ trans.all }}</option>
     <option value="{{ trans.manuelle_aufgabe }}">{{ trans.manuelle_aufgabe }}</option>
     {% for apt in apartments %}
@@ -440,7 +440,7 @@ function setLanguage(lang) {
   </select>
   
   <h6 class="mb-2">{{ trans.ma }}:</h6>
-  <select id="f-staff-mobile" class="form-select form-select-sm mb-3">
+  <select id="f-staff-mobile" class="form-select form-select-sm mb-3" onchange="handleMobileFilterChange(this)" oninput="handleMobileFilterChange(this)">
     <option value="">{{ trans.all }}</option>
     {% for s in staff %}
       <option value="{{ s.name }}">{{ s.name }}</option>
@@ -1221,65 +1221,31 @@ function applyCardFilter() {
 // Mobile-Filter auch hinzufügen
 ['f-date','f-apt','f-staff','f-date-mobile','f-apt-mobile','f-staff-mobile','f-date-desktop','f-apt-desktop','f-staff-desktop'].forEach(id => {
   const el = document.getElementById(id);
-  if (el) el.addEventListener('change', function() {
+  if (!el) return;
+  const handler = function() {
     applyFilter();
     applyCardFilter();
     
-    // Synchronisiere alle Filter
-    const fDate = document.getElementById('f-date-desktop')?.value || 
-                  document.getElementById('f-date')?.value || 
-                  document.getElementById('f-date-mobile')?.value || '';
-    const fApt = document.getElementById('f-apt-desktop')?.value || 
-                 document.getElementById('f-apt')?.value || 
-                 document.getElementById('f-apt-mobile')?.value || '';
-    const fStaff = document.getElementById('f-staff-desktop')?.value || 
-                   document.getElementById('f-staff')?.value || 
-                   document.getElementById('f-staff-mobile')?.value || '';
-    
-    // Synchronisiere Filter zwischen Desktop, Mobile und Table
-    ['f-date', 'f-date-mobile', 'f-date-desktop'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = fDate;
-    });
-    ['f-apt', 'f-apt-mobile', 'f-apt-desktop'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = fApt;
-    });
-    ['f-staff', 'f-staff-mobile', 'f-staff-desktop'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = fStaff;
-    });
-
-    // iOS Workaround: Stelle sicher, dass Select nach Change wieder interaktiv ist
-    const selectEl = this;
-    // Wichtig: pointer-events explizit wieder aktivieren
-    selectEl.style.pointerEvents = 'auto';
-    
-    setTimeout(function() {
-      try {
-        // Entfokussiere nur wenn User nicht mehr am Select arbeitet
-        if (document.activeElement !== selectEl) {
-          selectEl.blur();
-        }
-        // Stelle sicher, dass das Select weiterhin interaktiv ist
-        selectEl.style.pointerEvents = 'auto';
-        selectEl.style.touchAction = 'manipulation';
-      } catch(e) {}
-    }, 300);
-  });
+    // Wert auf verbundene Selects spiegeln
+    const map = {
+      'f-date-mobile': ['f-date-desktop','f-date'],
+      'f-apt-mobile': ['f-apt-desktop','f-apt'],
+      'f-staff-mobile': ['f-staff-desktop','f-staff']
+    };
+    const others = map[el.id] || [];
+    others.forEach(id => { const o = document.getElementById(id); if (o) o.value = el.value; });
+    // iOS: Menü schließen und Fokus lösen, damit Wert sicher übernommen ist
+    setTimeout(function(){ try { el.blur(); } catch(e){} }, 50);
+  };
+  el.addEventListener('change', handler, false);
+  el.addEventListener('input', handler, false);
 });
 
-// Zusätzlicher Handler für iOS: Stelle sicher dass Selects immer klickbar sind
 document.addEventListener('DOMContentLoaded', function() {
   const mobileSelects = document.querySelectorAll('.mobile-filter-section select');
   mobileSelects.forEach(function(sel) {
-    // Bei jedem Click/Touch: Stelle sicher dass Select interaktiv ist
-    sel.addEventListener('click', function() {
-      this.style.pointerEvents = 'auto';
-    }, true);
-    sel.addEventListener('focus', function() {
-      this.style.pointerEvents = 'auto';
-    });
+    sel.style.pointerEvents = 'auto';
+    sel.style.touchAction = 'manipulation';
   });
 });
 
