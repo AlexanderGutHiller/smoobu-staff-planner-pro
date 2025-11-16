@@ -98,3 +98,23 @@ CREATE TABLE IF NOT EXISTS task_series (
         # Add recurrence columns to tasks if missing
         add_col("ALTER TABLE tasks ADD COLUMN series_id INTEGER")
         add_col("ALTER TABLE tasks ADD COLUMN is_recurring BOOLEAN DEFAULT 0")
+        # Push subscriptions table
+        try:
+            conn.exec_driver_sql(
+                """
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  staff_id INTEGER NULL,
+  endpoint TEXT NOT NULL,
+  p256dh VARCHAR(256) NOT NULL,
+  auth VARCHAR(256) NOT NULL,
+  user_agent VARCHAR(255) DEFAULT '',
+  created_at VARCHAR(19) DEFAULT '',
+  FOREIGN KEY(staff_id) REFERENCES staff(id)
+);
+                """
+            )
+        except Exception as e:
+            msg = str(e).lower()
+            if "already exists" not in msg:
+                pass

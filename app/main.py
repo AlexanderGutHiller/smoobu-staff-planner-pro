@@ -7,9 +7,10 @@ from fastapi.templating import Jinja2Templates
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from datetime import date as _date, datetime as _dt, timedelta as _td
+from pywebpush import webpush, WebPushException
 
 from .db import init_db, SessionLocal
-from .models import Booking, Staff, Apartment, Task, TimeLog, TaskSeries
+from .models import Booking, Staff, Apartment, Task, TimeLog, TaskSeries, PushSubscription
 from .services_smoobu import SmoobuClient
 from .utils import new_token, today_iso, now_iso
 from .sync import upsert_tasks_from_bookings
@@ -266,6 +267,9 @@ TWILIO_WHATSAPP_FROM = os.getenv("TWILIO_WHATSAPP_FROM", "")  # Format: whatsapp
 TWILIO_WHATSAPP_CONTENT_SID = os.getenv("TWILIO_WHATSAPP_CONTENT_SID", "")  # Content SID für WhatsApp-Vorlage (Opt-In)
 APP_VERSION = os.getenv("APP_VERSION", "v6.3")
 APP_BUILD_DATE = os.getenv("APP_BUILD_DATE", dt.date.today().strftime("%Y-%m-%d"))
+VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
+VAPID_EMAIL = os.getenv("VAPID_EMAIL", "mailto:admin@example.com")
 
 log = logging.getLogger("smoobu")
 logging.basicConfig(level=logging.INFO)
@@ -274,6 +278,15 @@ app = FastAPI(title="Smoobu Staff Planner Pro (v6.3)")
 
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Service Worker aus static bereitstellen (Fallback, falls kein static-Ordner)
+@app.get("/sw.js")
+async def service_worker():
+    try:
+        with open("static/sw.js", "rb") as f:
+            return Response(f.read(), media_type="application/javascript")
+    except Exception:
+        return Response("// no service worker", media_type="application/javascript")
 
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals.update({
@@ -1205,7 +1218,11 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     base_url = BASE_URL.rstrip("/")
     if not base_url:
         base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
-    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "extras_map": extras_map, "base_url": base_url, "lang": lang, "trans": trans, "show_done": show_done, "show_open": show_open, "default_date_filter": default_date_filter})
+    # Prüfe, ob der Token zu einem Admin-Staff gehört (für Switch-Link)
+    token_staff = db.query(Staff).filter(Staff.magic_token==token, Staff.is_admin==True, Staff.active==True).first()
+    # Wenn Token einem Staff entspricht, Switch-Button ermöglichen
+    staff_self = db.query(Staff).filter(Staff.magic_token==token).first()
+    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "extras_map": extras_map, "base_url": base_url, "lang": lang, "trans": trans, "show_done": show_done, "show_open": show_open, "default_date_filter": default_date_filter, "staff_self": staff_self})
 
 # ---------- Task Series Admin ----------
 @app.get("/admin/{token}/series")
@@ -2360,3 +2377,84 @@ def _is_admin_token(token: str, db) -> bool:
         return bool(s)
     except Exception:
         return False
+
+# ------------- Web Push Endpoints -------------
+@app.get("/push/public_key")
+async def push_public_key():
+    if not VAPID_PUBLIC_KEY:
+        return JSONResponse({"publicKey": ""})
+    return JSONResponse({"publicKey": VAPID_PUBLIC_KEY})
+
+@app.post("/push/subscribe")
+async def push_subscribe(request: Request, staff_token: Optional[str] = Query(None), db=Depends(get_db)):
+    data = await request.json()
+    endpoint = data.get("endpoint")
+    keys = data.get("keys", {})
+    p256dh = keys.get("p256dh", "")
+    auth = keys.get("auth", "")
+    if not endpoint or not p256dh or not auth:
+        raise HTTPException(status_code=400, detail="Invalid subscription")
+    staff_id = None
+    if staff_token:
+        s = db.query(Staff).filter(Staff.magic_token==staff_token).first()
+        if s: staff_id = s.id
+    # deduplicate
+    existing = db.query(PushSubscription).filter(PushSubscription.endpoint==endpoint).first()
+    ua = request.headers.get("user-agent", "")[:250]
+    now = now_iso()
+    if existing:
+        existing.p256dh = p256dh
+        existing.auth = auth
+        existing.user_agent = ua
+        if staff_id: existing.staff_id = staff_id
+    else:
+        sub = PushSubscription(staff_id=staff_id, endpoint=endpoint, p256dh=p256dh, auth=auth, user_agent=ua, created_at=now)
+        db.add(sub)
+    db.commit()
+    return JSONResponse({"ok": True})
+
+@app.post("/push/unsubscribe")
+async def push_unsubscribe(request: Request, db=Depends(get_db)):
+    data = await request.json()
+    endpoint = data.get("endpoint")
+    if not endpoint:
+        raise HTTPException(status_code=400, detail="Missing endpoint")
+    sub = db.query(PushSubscription).filter(PushSubscription.endpoint==endpoint).first()
+    if sub:
+        db.delete(sub)
+        db.commit()
+    return JSONResponse({"ok": True})
+
+def _send_webpush_to_subscription(sub: PushSubscription, payload: dict):
+    if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY:
+        log.warning("WebPush disabled: missing VAPID keys")
+        return False
+    try:
+        webpush(
+            subscription_info={
+                "endpoint": sub.endpoint,
+                "keys": {"p256dh": sub.p256dh, "auth": sub.auth},
+            },
+            data=json.dumps(payload),
+            vapid_private_key=VAPID_PRIVATE_KEY,
+            vapid_claims={"sub": VAPID_EMAIL},
+            ttl=60,
+        )
+        return True
+    except WebPushException as e:
+        log.warning("WebPush failed: %s", e)
+        return False
+
+@app.post("/admin/{token}/push/test")
+async def admin_push_test(token: str, staff_id: Optional[int] = Form(None), db=Depends(get_db)):
+    if not _is_admin_token(token, db):
+        raise HTTPException(status_code=403)
+    q = db.query(PushSubscription)
+    if staff_id:
+        q = q.filter(PushSubscription.staff_id==staff_id)
+    subs = q.all()
+    sent = 0
+    for sub in subs:
+        ok = _send_webpush_to_subscription(sub, {"title": "Test", "body": "Web Push funktioniert.", "url": f"/admin/{token}"})
+        if ok: sent += 1
+    return JSONResponse({"ok": True, "sent": sent})

@@ -221,6 +221,7 @@
     .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .desktop-view { display: block; } /* Zeige Desktop-Karten auch mobil (Lovable/iOS Fix) */
     .mobile-view { display: block; }
+    .hide-on-mobile { display: none !important; }
     /* Lovable/iOS Fallback: Karten immer sichtbar erzwingen */
     .task-card-mobile { display: block !important; visibility: visible !important; }
     .filter-input { width: 100%; margin-bottom: 0.5rem; }
@@ -323,7 +324,17 @@
   <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#newTaskModal">
     <i class="bi bi-plus-circle"></i> <span class="d-none d-md-inline">{{ trans.neue_aufgabe }}</span>
   </button>
+  {% if staff_self %}
+  <a class="btn btn-outline-primary btn-sm" href="/cleaner/{{ token }}"><i class="bi bi-arrow-left-right"></i> Zur Cleaner-Ansicht</a>
+  {% endif %}
 </div>
+
+{% if token_staff %}
+<div class="mb-3">
+  <a class="btn btn-outline-primary btn-sm" href="/cleaner/{{ token_staff.magic_token }}"><i class="bi bi-arrow-left-right"></i> Zur Cleaner-Ansicht</a>
+  <small class="text-muted ms-2">({{ token_staff.name }})</small>
+  </div>
+{% endif %}
 
 {% if show_done == 0 and show_open == 0 %}
 <div class="alert alert-warning d-flex justify-content-between align-items-center" role="alert" style="margin-bottom: 1rem;">
@@ -337,7 +348,9 @@
 <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
         <a class="btn btn-outline-secondary" href="/admin/{{ token }}/staff"><i class="bi bi-people"></i> {{ trans.team }}</a>
         <a class="btn btn-outline-secondary" href="/admin/{{ token }}/apartments"><i class="bi bi-building"></i> {{ trans.apartments }}</a>
+        <a class="btn btn-outline-secondary" href="/admin/{{ token }}/series"><i class="bi bi-repeat"></i> Serien</a>
         <a class="btn btn-primary" href="/admin/{{ token }}/import"><i class="bi bi-arrow-repeat"></i> {{ trans.import_now }}</a>
+        <button id="btnEnablePush" class="btn btn-outline-success btn-sm" type="button"><i class="bi bi-bell"></i> Push aktivieren</button>
   <select class="form-select form-select-sm" style="width: auto;" onchange="setLanguage(this.value)">
     <option value="de" {% if lang == 'de' %}selected{% endif %}>🇩🇪 Deutsch</option>
     <option value="en" {% if lang == 'en' %}selected{% endif %}>🇬🇧 English</option>
@@ -351,7 +364,7 @@
 </div>
 
 <!-- Status Filter (Desktop) -->
-<div class="desktop-view mb-3">
+<div class="desktop-view mb-3 hide-on-mobile">
   <div class="d-flex gap-3 align-items-center flex-wrap">
     <div class="form-check">
       <input class="form-check-input" type="checkbox" id="filterShowDone" {% if show_done %}checked{% endif %}>
@@ -1167,15 +1180,16 @@ function applyFilter(){
 
 // Filter-Funktion für Cards (Desktop und Mobile)
 function applyCardFilter() {
-  const fDate = document.getElementById('f-date-desktop')?.value || 
-                document.getElementById('f-date')?.value || 
-                document.getElementById('f-date-mobile')?.value || '';
-  const fApt = document.getElementById('f-apt-desktop')?.value || 
-               document.getElementById('f-apt')?.value || 
-               document.getElementById('f-apt-mobile')?.value || '';
-  const fStaff = document.getElementById('f-staff-desktop')?.value || 
-                 document.getElementById('f-staff')?.value || 
-                 document.getElementById('f-staff-mobile')?.value || '';
+  const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  const fDate = isMobile ?
+    (document.getElementById('f-date-mobile')?.value || document.getElementById('f-date-desktop')?.value || document.getElementById('f-date')?.value || '') :
+    (document.getElementById('f-date-desktop')?.value || document.getElementById('f-date')?.value || document.getElementById('f-date-mobile')?.value || '');
+  const fApt = isMobile ?
+    (document.getElementById('f-apt-mobile')?.value || document.getElementById('f-apt-desktop')?.value || document.getElementById('f-apt')?.value || '') :
+    (document.getElementById('f-apt-desktop')?.value || document.getElementById('f-apt')?.value || document.getElementById('f-apt-mobile')?.value || '');
+  const fStaff = isMobile ?
+    (document.getElementById('f-staff-mobile')?.value || document.getElementById('f-staff-desktop')?.value || document.getElementById('f-staff')?.value || '') :
+    (document.getElementById('f-staff-desktop')?.value || document.getElementById('f-staff')?.value || document.getElementById('f-staff-mobile')?.value || '');
   
   // Desktop Cards filtern
   const desktopCards = document.querySelectorAll('#task-cards-view .task-card');

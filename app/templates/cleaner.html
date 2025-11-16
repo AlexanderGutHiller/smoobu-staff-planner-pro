@@ -241,6 +241,10 @@ body { background-color: var(--background); }
   </div>
   <div class="d-flex gap-2 align-items-center">
     <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#newTaskModal"><i class="bi bi-plus-circle"></i> <span class="d-none d-md-inline">{{ trans.neue_aufgabe }}</span></button>
+    <button id="btnEnablePushCleaner" class="btn btn-outline-success btn-sm" type="button"><i class="bi bi-bell"></i></button>
+    {% if staff.is_admin %}
+    <a class="btn btn-outline-primary btn-sm" href="/admin/{{ staff.magic_token }}"><i class="bi bi-arrow-left-right"></i></a>
+    {% endif %}
     <select class="form-select form-select-sm" style="width: auto;" onchange="setLanguage(this.value)">
     <option value="de" {% if lang == 'de' %}selected{% endif %}>🇩🇪 Deutsch</option>
     <option value="en" {% if lang == 'en' %}selected{% endif %}>🇬🇧 English</option>
@@ -253,6 +257,11 @@ body { background-color: var(--background); }
     </select>
   </div>
 </div>
+{% if staff.is_admin %}
+<div class="mb-3">
+  <a class="btn btn-outline-primary btn-sm" href="/admin/{{ staff.magic_token }}"><i class="bi bi-arrow-left-right"></i> Zur Admin-Ansicht</a>
+</div>
+{% endif %}
 <script>
 function setLanguage(lang) {
   const currentPath = window.location.pathname + window.location.search;
@@ -1086,6 +1095,36 @@ document.addEventListener('DOMContentLoaded', function(){
       window.history.pushState({}, '', newUrl);
     });
   });
+});
+</script>
+<script>
+// Web Push Registration (Cleaner)
+async function registerPushCleaner() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) { alert('Push nicht unterstützt'); return; }
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') return;
+    await navigator.serviceWorker.register('/sw.js');
+    const reg = await navigator.serviceWorker.ready;
+    const resp = await fetch('/push/public_key');
+    const { publicKey } = await resp.json();
+    if (!publicKey) { alert('VAPID fehlt'); return; }
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
+    await fetch(`/push/subscribe?staff_token={{ staff.magic_token }}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) });
+    alert('Push aktiviert');
+  } catch(e) { console.error(e); alert('Push fehlgeschlagen'); }
+}
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+document.addEventListener('DOMContentLoaded', function(){
+  const btn = document.getElementById('btnEnablePushCleaner');
+  if (btn) btn.addEventListener('click', registerPushCleaner);
 });
 </script>
 </div></body></html>

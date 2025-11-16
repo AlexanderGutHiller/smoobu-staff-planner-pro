@@ -6,3 +6,5 @@ apscheduler==3.10.4
 requests==2.32.3
 python-multipart==0.0.9
 twilio>=8.0.0
+pywebpush==2.0.0
+cryptography>=41.0.0

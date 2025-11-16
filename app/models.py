@@ -91,3 +91,13 @@ class TimeLog(Base):
     started_at: Mapped[str] = mapped_column(String(19))  # yyyy-mm-dd HH:MM:SS
     ended_at: Mapped[str | None] = mapped_column(String(19), nullable=True)
     actual_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+class PushSubscription(Base):
+    __tablename__ = "push_subscriptions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    staff_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("staff.id"), nullable=True)
+    endpoint: Mapped[str] = mapped_column(Text)
+    p256dh: Mapped[str] = mapped_column(String(256))
+    auth: Mapped[str] = mapped_column(String(256))
+    user_agent: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[str] = mapped_column(String(19), default="")

@@ -143,7 +143,7 @@ function setLanguage(lang) {
   <th>Max/Monat</th>
   <th>{{ trans.geleistete_stunden }}</th>
   <th>Status</th>
-  <th>Magic-Link</th>
+  <th>Links</th>
   <th>Aktion</th>
 </tr></thead>
 <tbody>
@@ -168,11 +168,23 @@ function setLanguage(lang) {
     {% if s.is_admin %}<span class="badge bg-dark ms-1">Admin</span>{% endif %}
   </td>
   <td>
-    {% set link = (base_url ~ '/cleaner/' ~ s.magic_token) %}
-    <div class="input-group input-group-sm">
-      <input class="form-control" value="{{ link }}" readonly id="link-{{ s.id }}">
-      <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText('{{ link }}')" title="Link kopieren"><i class="bi bi-clipboard"></i></button>
-      <a class="btn btn-outline-primary" href="{{ link }}" target="_blank" title="Link öffnen"><i class="bi bi-box-arrow-up-right"></i></a>
+    <div class="d-flex flex-column gap-1">
+      {% set link_cleaner = (base_url ~ '/cleaner/' ~ s.magic_token) %}
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">Cleaner</span>
+        <input class="form-control" value="{{ link_cleaner }}" readonly id="link-cleaner-{{ s.id }}">
+        <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText('{{ link_cleaner }}')" title="Link kopieren"><i class="bi bi-clipboard"></i></button>
+        <a class="btn btn-outline-primary" href="{{ link_cleaner }}" target="_blank" title="Link öffnen"><i class="bi bi-box-arrow-up-right"></i></a>
+      </div>
+      {% if s.is_admin %}
+      {% set link_admin = (base_url ~ '/admin/' ~ s.magic_token) %}
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">Admin</span>
+        <input class="form-control" value="{{ link_admin }}" readonly id="link-admin-{{ s.id }}">
+        <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText('{{ link_admin }}')" title="Link kopieren"><i class="bi bi-clipboard"></i></button>
+        <a class="btn btn-outline-primary" href="{{ link_admin }}" target="_blank" title="Link öffnen"><i class="bi bi-box-arrow-up-right"></i></a>
+      </div>
+      {% endif %}
     </div>
   </td>
   <td>
@@ -285,13 +297,23 @@ function setLanguage(lang) {
   
   <div class="staff-actions">
     <div class="mb-2">
-      <label class="form-label small fw-bold">Magic-Link:</label>
-      {% set link = (base_url ~ '/cleaner/' ~ s.magic_token) %}
-      <div class="input-group input-group-sm">
-        <input class="form-control" value="{{ link }}" readonly id="link-mobile-{{ s.id }}" style="font-size: 0.75rem;">
-        <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText('{{ link }}')" title="Link kopieren"><i class="bi bi-clipboard"></i></button>
-        <a class="btn btn-outline-primary" href="{{ link }}" target="_blank" title="Link öffnen"><i class="bi bi-box-arrow-up-right"></i></a>
+      <label class="form-label small fw-bold">Magic-Links:</label>
+      {% set link_cleaner = (base_url ~ '/cleaner/' ~ s.magic_token) %}
+      <div class="input-group input-group-sm mb-1">
+        <span class="input-group-text">Cleaner</span>
+        <input class="form-control" value="{{ link_cleaner }}" readonly id="link-mobile-cleaner-{{ s.id }}" style="font-size: 0.75rem;">
+        <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText('{{ link_cleaner }}')" title="Link kopieren"><i class="bi bi-clipboard"></i></button>
+        <a class="btn btn-outline-primary" href="{{ link_cleaner }}" target="_blank" title="Link öffnen"><i class="bi bi-box-arrow-up-right"></i></a>
       </div>
+      {% if s.is_admin %}
+      {% set link_admin = (base_url ~ '/admin/' ~ s.magic_token) %}
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">Admin</span>
+        <input class="form-control" value="{{ link_admin }}" readonly id="link-mobile-admin-{{ s.id }}" style="font-size: 0.75rem;">
+        <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText('{{ link_admin }}')" title="Link kopieren"><i class="bi bi-clipboard"></i></button>
+        <a class="btn btn-outline-primary" href="{{ link_admin }}" target="_blank" title="Link öffnen"><i class="bi bi-box-arrow-up-right"></i></a>
+      </div>
+      {% endif %}
     </div>
     
     <form method="post" action="/admin/{{ token }}/staff/toggle" class="w-100">
