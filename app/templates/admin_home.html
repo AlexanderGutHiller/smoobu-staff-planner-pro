@@ -1436,6 +1436,26 @@ document.addEventListener('DOMContentLoaded', function() {
       toggleAndUpdate(filterShowOpenMobile);
     }, { passive: false });
   }
+
+  // Initial anwenden der Filter (iOS Safari Fall-Back)
+  document.addEventListener('DOMContentLoaded', function(){
+    try {
+      applyFilter();
+      applyCardFilter();
+      // Fallback: Wenn auf Mobile keine Karten sichtbar sind, zeige Desktop-View zusätzlich
+      const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+      if (isMobile) {
+        setTimeout(function(){
+          const mobileCards = Array.from(document.querySelectorAll('.task-card-mobile'));
+          const anyVisible = mobileCards.some(c => c.offsetParent !== null);
+          if (!anyVisible) {
+            const desktop = document.querySelector('.desktop-view');
+            if (desktop) desktop.style.display = 'block';
+          }
+        }, 200);
+      }
+    } catch(e) {}
+  });
 });
 </script>
 
