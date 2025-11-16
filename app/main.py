@@ -1157,7 +1157,18 @@ async def set_language(lang: str, redirect: str = "/"):
 
 # -------------------- Admin UI --------------------
 @app.get("/admin/{token}")
-async def admin_home(request: Request, token: str, date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None), staff_id: Optional[int] = Query(None), apartment_id: Optional[int] = Query(None), show_done: int = 1, show_open: int = 1, db=Depends(get_db)):
+async def admin_home(
+    request: Request,
+    token: str,
+    date_range: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    staff_id: Optional[int] = Query(None),
+    apartment_id: Optional[int] = Query(None),
+    show_done: int = 1,
+    show_open: int = 1,
+    db=Depends(get_db),
+):
     if not _is_admin_token(token, db):
         raise HTTPException(status_code=403)
     
@@ -1165,17 +1176,47 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     trans = get_translations(lang)
     
     q = db.query(Task)
-    # Standard: nächste 7 Tage, wenn kein Datumsfilter gesetzt ist
-    default_date_filter = ""
+    # Datumsvoreinstellung / -filter
+    default_date_filter = date_range or ""
+    today = dt.date.today()
+    if date_range and not (date_from or date_to):
+        if date_range == "today":
+            date_from = today.isoformat()
+            date_to = today.isoformat()
+        elif date_range == "week":
+            start = today - dt.timedelta(days=today.weekday())
+            end = start + dt.timedelta(days=6)
+            date_from = start.isoformat()
+            date_to = end.isoformat()
+        elif date_range == "month":
+            start = today.replace(day=1)
+            if start.month == 12:
+                next_month = start.replace(year=start.year + 1, month=1, day=1)
+            else:
+                next_month = start.replace(month=start.month + 1, day=1)
+            end = next_month - dt.timedelta(days=1)
+            date_from = start.isoformat()
+            date_to = end.isoformat()
+        elif date_range == "next7":
+            date_from = today.isoformat()
+            date_to = (today + dt.timedelta(days=7)).isoformat()
     if not date_from and not date_to:
-        today = dt.date.today()
+        # Fallback, wenn gar nichts gesetzt: nächste 7 Tage
         date_from = today.isoformat()
         date_to = (today + dt.timedelta(days=7)).isoformat()
-        default_date_filter = "next7"
-    if date_from: q = q.filter(Task.date >= date_from)
-    if date_to: q = q.filter(Task.date <= date_to)
-    if staff_id: q = q.filter(Task.assigned_staff_id == staff_id)
-    if apartment_id: q = q.filter(Task.apartment_id == apartment_id)
+        if not default_date_filter:
+            default_date_filter = "next7"
+    if date_from:
+        q = q.filter(Task.date >= date_from)
+    if date_to:
+        q = q.filter(Task.date <= date_to)
+    if staff_id:
+        q = q.filter(Task.assigned_staff_id == staff_id)
+    if apartment_id is not None:
+        if apartment_id == 0:
+            q = q.filter(Task.apartment_id == None)  # manuelle Aufgaben
+        elif apartment_id:
+            q = q.filter(Task.apartment_id == apartment_id)
     # Filter nach Status: erledigte und/oder offene Aufgaben
     from sqlalchemy import or_
     status_filters = []
@@ -1298,7 +1339,8 @@ async def admin_series_add(
         send_assignment_emails_job()
     except Exception as e:
         log.error("notify after series add failed: %s", e)
-    return RedirectResponse(url=f"/admin/{{token}}/series", status_code=303)
+    # korrekt auf die Seite mit deinem echten Token umleiten
+    return RedirectResponse(url=f"/admin/{token}/series", status_code=303)
 
 @app.post("/admin/{token}/series/toggle")
 async def admin_series_toggle(token: str, series_id: int = Form(...), db=Depends(get_db)):
@@ -1307,7 +1349,7 @@ async def admin_series_toggle(token: str, series_id: int = Form(...), db=Depends
     if not s: raise HTTPException(status_code=404)
     s.active = not s.active
     db.commit()
-    return RedirectResponse(url=f"/admin/{{token}}/series", status_code=303)
+    return RedirectResponse(url=f"/admin/{token}/series", status_code=303)
 
 @app.post("/admin/{token}/series/delete")
 async def admin_series_delete(token: str, series_id: int = Form(...), delete_future: int = Form(0), db=Depends(get_db)):
@@ -1322,7 +1364,63 @@ async def admin_series_delete(token: str, series_id: int = Form(...), delete_fut
             db.delete(t)
     db.delete(s)
     db.commit()
-    return RedirectResponse(url=f"/admin/{{token}}/series", status_code=303)
+    return RedirectResponse(url=f"/admin/{token}/series", status_code=303)
+
+@app.post("/admin/{token}/series/update")
+async def admin_series_update(
+    token: str,
+    series_id: int = Form(...),
+    title: str = Form(...),
+    description: str = Form(""),
+    apartment_id_raw: str = Form(""),
+    staff_id_raw: str = Form(""),
+    planned_minutes: int = Form(60),
+    start_date: str = Form(...),
+    start_time: str = Form(""),
+    frequency: str = Form(...),
+    interval: int = Form(1),
+    byweekday: str = Form(""),
+    bymonthday: str = Form(""),
+    end_date: str = Form(""),
+    count: int | None = Form(None),
+    db=Depends(get_db)
+):
+    if not _is_admin_token(token, db):
+        raise HTTPException(status_code=403)
+    s = db.get(TaskSeries, series_id)
+    if not s:
+        raise HTTPException(status_code=404)
+    apt_id = None
+    if apartment_id_raw.strip():
+        try:
+            aid = int(apartment_id_raw)
+            if aid > 0:
+                apt_id = aid
+        except Exception:
+            pass
+    staff_id = None
+    if staff_id_raw.strip():
+        try:
+            sid = int(staff_id_raw)
+            if sid > 0:
+                staff_id = sid
+        except Exception:
+            pass
+    s.title = title.strip()
+    s.description = description.strip()
+    s.apartment_id = apt_id
+    s.staff_id = staff_id
+    s.planned_minutes = planned_minutes
+    s.start_date = start_date[:10]
+    s.start_time = start_time[:5] if start_time else ""
+    s.frequency = frequency
+    s.interval = max(1, int(interval or 1))
+    s.byweekday = byweekday.strip()
+    s.bymonthday = bymonthday.strip()
+    s.end_date = (end_date[:10] if end_date else None)
+    s.count = (int(count) if (str(count).strip().isdigit()) else None)
+    db.commit()
+    return RedirectResponse(url=f"/admin/{token}/series", status_code=303)
 
 @app.get("/admin/{token}/series/expand")
 async def admin_series_expand(token: str, days: int = 30):

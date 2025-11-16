@@ -363,25 +363,25 @@
   </select>
 </div>
 
-<!-- Status Filter (Desktop) -->
-<div class="desktop-view mb-3 hide-on-mobile">
+<!-- Filter (Desktop) -->
+<form id="filterForm" class="desktop-view mb-3 hide-on-mobile" method="get" action="/admin/{{ token }}">
   <div class="d-flex gap-3 align-items-center flex-wrap">
     <div class="form-check">
-      <input class="form-check-input" type="checkbox" id="filterShowDone" {% if show_done %}checked{% endif %}>
+      <input class="form-check-input" type="checkbox" id="filterShowDone" name="show_done" value="1" {% if show_done %}checked{% endif %}>
       <label class="form-check-label" for="filterShowDone">
         {{ trans.erledigte_aufgaben }}
       </label>
     </div>
     <div class="form-check">
-      <input class="form-check-input" type="checkbox" id="filterShowOpen" {% if show_open %}checked{% endif %}>
+      <input class="form-check-input" type="checkbox" id="filterShowOpen" name="show_open" value="1" {% if show_open %}checked{% endif %}>
       <label class="form-check-label" for="filterShowOpen">
         {{ trans.offene_aufgaben }}
       </label>
     </div>
     <div class="d-flex gap-2 align-items-center">
       <label class="mb-0 small text-muted">{{ trans.date }}:</label>
-      <select id="f-date-desktop" class="form-select form-select-sm" style="width: auto;">
-        {% set date_default = default_date_filter or '' %}
+      {% set date_default = default_date_filter or '' %}
+      <select id="f-date-desktop" name="date_range" class="form-select form-select-sm" style="width: auto;" onchange="document.getElementById('filterForm').submit()">
         <option value="" {% if date_default=='' %}selected{% endif %}>{{ trans.all }}</option>
         <option value="today" {% if date_default=='today' %}selected{% endif %}>{{ trans.today }}</option>
         <option value="week" {% if date_default=='week' %}selected{% endif %}>{{ trans.week }}</option>
@@ -391,25 +391,25 @@
     </div>
     <div class="d-flex gap-2 align-items-center">
       <label class="mb-0 small text-muted">{{ trans.apartment }}:</label>
-      <select id="f-apt-desktop" class="form-select form-select-sm" style="width: auto;">
+      <select id="f-apt-desktop" name="apartment_id" class="form-select form-select-sm" style="width: auto;" onchange="document.getElementById('filterForm').submit()">
         <option value="">{{ trans.all }}</option>
-        <option value="{{ trans.manuelle_aufgabe }}">{{ trans.manuelle_aufgabe }}</option>
+        <option value="0" {% if not apartment_id %}selected{% endif %}>{{ trans.manuelle_aufgabe }}</option>
         {% for apt in apartments %}
-          <option value="{{ apt.name }}">{{ apt.name }}</option>
+          <option value="{{ apt.id }}" {% if apartment_id and apartment_id==apt.id %}selected{% endif %}>{{ apt.name }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="d-flex gap-2 align-items-center">
       <label class="mb-0 small text-muted">{{ trans.ma }}:</label>
-      <select id="f-staff-desktop" class="form-select form-select-sm" style="width: auto;">
+      <select id="f-staff-desktop" name="staff_id" class="form-select form-select-sm" style="width: auto;" onchange="document.getElementById('filterForm').submit()">
         <option value="">{{ trans.all }}</option>
         {% for s in staff %}
-          <option value="{{ s.name }}">{{ s.name }}</option>
+          <option value="{{ s.id }}" {% if staff_id and staff_id==s.id %}selected{% endif %}>{{ s.name }}</option>
         {% endfor %}
       </select>
     </div>
   </div>
-</div>
+</form>
 
 <script>
 function setLanguage(lang) {
@@ -418,40 +418,55 @@ function setLanguage(lang) {
 }
 </script>
 
-<!-- Mobile Filter Section -->
+<!-- Mobile Filter Section (gleiche Parameter wie Desktop, submit per JS) -->
 <div class="mobile-view mobile-filter-section">
-  <h6 class="mb-2">{{ trans.date }}:</h6>
-  <select id="f-date-mobile" class="form-select form-select-sm mb-3" onchange="handleMobileFilterChange(this)" oninput="handleMobileFilterChange(this)">
+  <form id="filterFormMobile" method="get" action="/admin/{{ token }}">
+    <h6 class="mb-2">{{ trans.date }}:</h6>
     {% set date_default = default_date_filter or '' %}
-    <option value="" {% if date_default=='' %}selected{% endif %}>{{ trans.all }}</option>
-    <option value="today" {% if date_default=='today' %}selected{% endif %}>{{ trans.today }}</option>
-    <option value="week" {% if date_default=='week' %}selected{% endif %}>{{ trans.week }}</option>
-    <option value="month" {% if date_default=='month' %}selected{% endif %}>{{ trans.month }}</option>
-    <option value="next7" {% if date_default=='next7' %}selected{% endif %}>{{ trans.next7 }}</option>
-  </select>
-  
-  <h6 class="mb-2">{{ trans.apartment }}:</h6>
-  <select id="f-apt-mobile" class="form-select form-select-sm mb-3" onchange="handleMobileFilterChange(this)" oninput="handleMobileFilterChange(this)">
-    <option value="">{{ trans.all }}</option>
-    <option value="{{ trans.manuelle_aufgabe }}">{{ trans.manuelle_aufgabe }}</option>
-    {% for apt in apartments %}
-      <option value="{{ apt.name }}">{{ apt.name }}</option>
-    {% endfor %}
-  </select>
-  
-  <h6 class="mb-2">{{ trans.ma }}:</h6>
-  <select id="f-staff-mobile" class="form-select form-select-sm mb-3" onchange="handleMobileFilterChange(this)" oninput="handleMobileFilterChange(this)">
-    <option value="">{{ trans.all }}</option>
-    {% for s in staff %}
-      <option value="{{ s.name }}">{{ s.name }}</option>
-    {% endfor %}
-  </select>
-  
-  <!-- Status-Checkboxen auf Mobile entfernt (Duplikat) -->
+    <select id="f-date-mobile" name="date_range" class="form-select form-select-sm mb-3">
+      <option value="" {% if date_default=='' %}selected{% endif %}>{{ trans.all }}</option>
+      <option value="today" {% if date_default=='today' %}selected{% endif %}>{{ trans.today }}</option>
+      <option value="week" {% if date_default=='week' %}selected{% endif %}>{{ trans.week }}</option>
+      <option value="month" {% if date_default=='month' %}selected{% endif %}>{{ trans.month }}</option>
+      <option value="next7" {% if date_default=='next7' %}selected{% endif %}>{{ trans.next7 }}</option>
+    </select>
+    
+    <h6 class="mb-2">{{ trans.apartment }}:</h6>
+    <select id="f-apt-mobile" name="apartment_id" class="form-select form-select-sm mb-3">
+      <option value="">{{ trans.all }}</option>
+      <option value="0" {% if not apartment_id %}selected{% endif %}>{{ trans.manuelle_aufgabe }}</option>
+      {% for apt in apartments %}
+        <option value="{{ apt.id }}" {% if apartment_id and apartment_id==apt.id %}selected{% endif %}>{{ apt.name }}</option>
+      {% endfor %}
+    </select>
+    
+    <h6 class="mb-2">{{ trans.ma }}:</h6>
+    <select id="f-staff-mobile" name="staff_id" class="form-select form-select-sm mb-3">
+      <option value="">{{ trans.all }}</option>
+      {% for s in staff %}
+        <option value="{{ s.id }}" {% if staff_id and staff_id==s.id %}selected{% endif %}>{{ s.name }}</option>
+      {% endfor %}
+    </select>
 
-  <div class="d-flex gap-2 mt-3">
-    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="resetMobileFilters()"><i class="bi bi-x-circle"></i> Reset</button>
-  </div>
+    <!-- Status-Checkboxen Mobile: an Backend binden -->
+    <div class="form-check mb-1">
+      <input class="form-check-input" type="checkbox" id="filterShowDoneMobile" name="show_done" value="1" {% if show_done %}checked{% endif %}>
+      <label class="form-check-label" for="filterShowDoneMobile">
+        {{ trans.erledigte_aufgaben }}
+      </label>
+    </div>
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" id="filterShowOpenMobile" name="show_open" value="1" {% if show_open %}checked{% endif %}>
+      <label class="form-check-label" for="filterShowOpenMobile">
+        {{ trans.offene_aufgaben }}
+      </label>
+    </div>
+    
+    <div class="d-flex gap-2 mt-2">
+      <button class="btn btn-outline-secondary btn-sm" type="button" onclick="resetMobileFilters()"><i class="bi bi-x-circle"></i> Reset</button>
+      <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-funnel"></i> {{ trans.apply if trans.apply is defined else 'Filter anwenden' }}</button>
+    </div>
+  </form>
 </div>
 
 <!-- Desktop View -->
@@ -1097,163 +1112,11 @@ function setLanguage(lang) {
 </div>
 
 <script>
-const rows = Array.from(document.querySelectorAll("#task-table tbody tr"));
-const today = new Date().toISOString().split('T')[0];
-
-// Standard: Filter "nächste 7 Tage" beim ersten Laden setzen (wenn nichts gewählt)
-document.addEventListener('DOMContentLoaded', function(){
-  try {
-    const selects = [
-      document.getElementById('f-date-desktop'),
-      document.getElementById('f-date-mobile'),
-      document.getElementById('f-date')
-    ].filter(Boolean);
-    const anyPreselected = selects.some(s => (s && s.value && s.value.length > 0));
-    if (!anyPreselected) {
-      selects.forEach(s => { if (s) s.value = 'next7'; });
-      // Filter anwenden
-      if (typeof applyFilter === 'function') applyFilter();
-      if (typeof applyCardFilter === 'function') applyCardFilter();
-    }
-  } catch(e) {}
-});
-
-function parseDateToIso(input) {
-  if (!input) return '';
-  // ISO (yyyy-mm-dd)
-  if (input.includes('-')) {
-    return input.slice(0,10);
-  }
-  // Versuche dd.mm.yyyy irgendwo im Text zu finden (z.B. "Mo, 30.10.2025")
-  const m = input.match(/(\d{2})\.(\d{2})\.(\d{4})/);
-  if (m) {
-    const [, dd, mm, yyyy] = m;
-    return `${yyyy}-${mm}-${dd}`;
-  }
-  return '';
-}
-
-function matchesDateFilter(taskDateDisplay, filter, taskDateIsoAttr) {
-  if (!filter) return true;
-  const taskDateIso = taskDateIsoAttr || parseDateToIso(taskDateDisplay);
-  const todayObj = new Date(today);
-  
-  switch(filter) {
-    case 'today':
-      return taskDateIso === today;
-    case 'week':
-      const weekStart = new Date(todayObj.setDate(todayObj.getDate() - todayObj.getDay()));
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekEnd.getDate() + 6);
-      const taskDateObj = new Date(taskDateIso);
-      return taskDateObj >= weekStart && taskDateObj <= weekEnd;
-    case 'month':
-      return taskDateIso.startsWith(today.substring(0, 7));
-    case 'next7':
-      const next7 = new Date(today);
-      next7.setDate(next7.getDate() + 7);
-      const taskDateObj2 = new Date(taskDateIso);
-      return taskDateObj2 >= new Date(today) && taskDateObj2 <= next7;
-    default:
-      return true;
-  }
-}
-
-function applyFilter(){
-  const fDate = document.getElementById('f-date').value;
-  const fApt = document.getElementById('f-apt').value;
-  const fStaff = document.getElementById('f-staff').value;
-  
-  rows.forEach(tr => {
-    const dateTxt = tr.querySelector('[data-col="date"]').innerText;
-    const dateIsoAttr = tr.getAttribute('data-date') || '';
-    const aptTxt = tr.querySelector('[data-col="apt"]').innerText;
-    const staffTxt = tr.querySelector('[data-col="staff"]').innerText;
-    
-    const ok = matchesDateFilter(dateTxt, fDate, dateIsoAttr)
-            && (!fApt || aptTxt.toLowerCase().includes(fApt.toLowerCase()))
-            && (!fStaff || staffTxt.toLowerCase().includes(fStaff.toLowerCase()));
-    
-    tr.style.display = ok ? '' : 'none';
-  });
-}
-
-// Filter-Funktion für Cards (Desktop und Mobile)
-function applyCardFilter() {
-  const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-  const fDate = isMobile ?
-    (document.getElementById('f-date-mobile')?.value || document.getElementById('f-date-desktop')?.value || document.getElementById('f-date')?.value || '') :
-    (document.getElementById('f-date-desktop')?.value || document.getElementById('f-date')?.value || document.getElementById('f-date-mobile')?.value || '');
-  const fApt = isMobile ?
-    (document.getElementById('f-apt-mobile')?.value || document.getElementById('f-apt-desktop')?.value || document.getElementById('f-apt')?.value || '') :
-    (document.getElementById('f-apt-desktop')?.value || document.getElementById('f-apt')?.value || document.getElementById('f-apt-mobile')?.value || '');
-  const fStaff = isMobile ?
-    (document.getElementById('f-staff-mobile')?.value || document.getElementById('f-staff-desktop')?.value || document.getElementById('f-staff')?.value || '') :
-    (document.getElementById('f-staff-desktop')?.value || document.getElementById('f-staff')?.value || document.getElementById('f-staff-mobile')?.value || '');
-  
-  // Desktop Cards filtern
-  const desktopCards = document.querySelectorAll('#task-cards-view .task-card');
-  desktopCards.forEach(card => {
-    const dateIso = card.getAttribute('data-date') || '';
-    const aptTxt = card.getAttribute('data-apt') || '';
-    const staffTxt = card.getAttribute('data-staff') || '';
-    
-    const ok = matchesDateFilter('', fDate, dateIso)
-            && (!fApt || aptTxt.toLowerCase().includes(fApt.toLowerCase()))
-            && (!fStaff || staffTxt.toLowerCase().includes(fStaff.toLowerCase()));
-    
-    card.closest('.col-md-6, .col-lg-4').style.display = ok ? '' : 'none';
-  });
-  
-  // Mobile Cards: ebenfalls filtern
-  const mobileCards = document.querySelectorAll('.task-card-mobile');
-  mobileCards.forEach(card => {
-    const dateIso = card.getAttribute('data-date') || '';
-    const aptTxt = card.getAttribute('data-apt') || '';
-    const staffTxt = card.getAttribute('data-staff') || '';
-    const ok = matchesDateFilter('', fDate, dateIso)
-             && (!fApt || aptTxt.toLowerCase().includes(fApt.toLowerCase()))
-             && (!fStaff || staffTxt.toLowerCase().includes(fStaff.toLowerCase()));
-    card.style.display = ok ? '' : 'none';
-  });
-}
-
-// Mobile-Filter auch hinzufügen
-['f-date','f-apt','f-staff','f-date-mobile','f-apt-mobile','f-staff-mobile','f-date-desktop','f-apt-desktop','f-staff-desktop'].forEach(id => {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const handler = function() {
-    applyFilter();
-    applyCardFilter();
-    
-    // Wert auf verbundene Selects spiegeln
-    const map = {
-      'f-date-mobile': ['f-date-desktop','f-date'],
-      'f-apt-mobile': ['f-apt-desktop','f-apt'],
-      'f-staff-mobile': ['f-staff-desktop','f-staff']
-    };
-    const others = map[el.id] || [];
-    others.forEach(id => { const o = document.getElementById(id); if (o) o.value = el.value; });
-    // iOS: Menü schließen und Fokus lösen, damit Wert sicher übernommen ist
-    setTimeout(function(){ try { el.blur(); } catch(e){} }, 50);
-  };
-  el.addEventListener('change', handler, false);
-  el.addEventListener('input', handler, false);
-});
-
-document.addEventListener('DOMContentLoaded', function() {
-  const mobileSelects = document.querySelectorAll('.mobile-filter-section select');
-  mobileSelects.forEach(function(sel) {
-    sel.style.pointerEvents = 'auto';
-    sel.style.touchAction = 'manipulation';
-  });
-});
-
 function resetMobileFilters(){
-  const ids = ['f-date','f-apt','f-staff','f-date-mobile','f-apt-mobile','f-staff-mobile','f-date-desktop','f-apt-desktop','f-staff-desktop'];
-  ids.forEach(id => { const el = document.getElementById(id); if (el) el.value=''; });
-  applyFilter();
-  applyCardFilter();
+  const form = document.getElementById('filterFormMobile');
+  if (!form) return;
+  form.querySelectorAll('select').forEach(s => s.value = '');
+  form.querySelectorAll('input[type=\"checkbox\"]').forEach(cb => cb.checked = true);
 }
 
 function handleExtraToggle(checkbox){
@@ -1422,19 +1285,27 @@ document.addEventListener('DOMContentLoaded', function() {
   const filterShowOpenMobile = document.getElementById('filterShowOpenMobile');
   
   function updateStatusFilters() {
-    const showDone = (filterShowDone?.checked ?? filterShowDoneMobile?.checked) ? '1' : '0';
-    const showOpen = (filterShowOpen?.checked ?? filterShowOpenMobile?.checked) ? '1' : '0';
-    
-    const url = new URL(window.location.href);
-    if (showDone === '1' && showOpen === '1') {
-      // Beide aktiviert - Standard, entferne Parameter
-      url.searchParams.delete('show_done');
-      url.searchParams.delete('show_open');
-    } else {
-      url.searchParams.set('show_done', showDone);
-      url.searchParams.set('show_open', showOpen);
+    const desktopForm = document.getElementById('filterForm');
+    const mobileForm = document.getElementById('filterFormMobile');
+    // Spiegeln: wenn Desktop geändert wurde, aktualisiere Mobile und umgekehrt
+    if (filterShowDone && filterShowDoneMobile) {
+      filterShowDoneMobile.checked = filterShowDone.checked;
     }
-    window.location.href = url.toString();
+    if (filterShowOpen && filterShowOpenMobile) {
+      filterShowOpenMobile.checked = filterShowOpen.checked;
+    }
+    if (filterShowDoneMobile && filterShowDone && !filterShowDoneMobile.matches(':focus')) {
+      filterShowDone.checked = filterShowDoneMobile.checked;
+    }
+    if (filterShowOpenMobile && filterShowOpen && !filterShowOpenMobile.matches(':focus')) {
+      filterShowOpen.checked = filterShowOpenMobile.checked;
+    }
+    // Desktop-Form absenden (führt Filter-Reload aus)
+    if (desktopForm) {
+      desktopForm.submit();
+    } else if (mobileForm) {
+      mobileForm.submit();
+    }
   }
   
   if (filterShowDone) {
