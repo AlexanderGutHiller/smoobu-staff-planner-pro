@@ -242,8 +242,23 @@ body { background-color: var(--background); }
 </div>
 {% if has_running %}
 <style>
-/* Harte Absicherung: wenn ein Task läuft, alle anderen Karten deaktivieren */
+/* Harte Absicherung: wenn ein Task läuft, alle anderen Karten deaktivieren (Desktop) */
 .task-card:not(.running) { pointer-events: none; opacity: 0.5; }
+
+/* Mobile: Nur die laufende Aufgabe anzeigen, Scrollen verhindern */
+@media (max-width: 768px) {
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
+  .mobile-view {
+    max-height: 100vh;
+    overflow: hidden;
+  }
+  .mobile-view .task-card-mobile:not(.running) {
+    display: none !important;
+  }
+}
 </style>
 {% endif %}
 <!-- Header mit Avatar -->
@@ -946,50 +961,19 @@ document.getElementById('saveNoteBtn').addEventListener('click', async () => {
   }
 });
 
-// Live timer mit besserer Anzeige
+// Live-Timer: einfache, robuste Berechnung seit Startzeit
 function secondsSince(startIso){
-  if(!startIso || startIso === '' || startIso.trim() === '') return 0;
+  if(!startIso || !startIso.trim()) return 0;
   try {
-    // Konvertiere "YYYY-MM-DD HH:MM:SS" zu "YYYY-MM-DDTHH:MM:SS" für ISO-Format
-    const isoString = startIso.replace(' ', 'T');
+    const isoString = startIso.replace(' ', 'T'); // "YYYY-MM-DD HH:MM:SS" -> ISO
     const start = new Date(isoString);
+    if (isNaN(start.getTime())) return 0;
     const now = new Date();
-    
-    // Prüfe ob das Datum gültig ist
-    if(isNaN(start.getTime())) {
-      return 0;
-    }
-    
-    let diff = Math.floor((now - start)/1000);
-    
-    // Wenn negativ (Zeitzonen-Problem oder Zukunft), auf 0 setzen
-    if(diff < 0) {
-      diff = 0;
-    }
-    
-    // Erkenne Zeitzonen-Probleme: Wenn die Differenz genau 1 Stunde (3600s) ist oder nahe dran,
-    // und die Seite gerade erst geladen wurde, ist es wahrscheinlich ein Zeitzonen-Offset
-    const pageAge = Math.floor((Date.now() - (window.pageLoadTime || Date.now())) / 1000);
-    
-    // Wenn Diff genau 3600 (±60 Sekunden) und Seite gerade geladen, ist es ein Zeitzonen-Problem
-    if((diff >= 3540 && diff <= 3660) && pageAge < 120) {
-      diff = Math.max(0, pageAge);
-    }
-    // Oder wenn Diff > 30 Min aber Seite < 2 Min alt
-    else if(pageAge < 120 && diff > 1800) {
-      diff = Math.max(0, pageAge);
-    }
-    
-    // Stelle sicher, dass der Wert nicht zu groß ist
-    return Math.min(Math.max(0, diff), 86400 * 30); // Maximal 30 Tage, minimal 0
+    const diff = Math.floor((now - start) / 1000);
+    return diff > 0 ? diff : 0;
   } catch(e) {
     return 0;
   }
-}
-
-// Speichere Seitenladezeit beim ersten Laden
-if(!window.pageLoadTime) {
-  window.pageLoadTime = Date.now();
 }
 
 function formatTimeSeconds(totalSeconds){

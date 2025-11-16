@@ -471,34 +471,43 @@ function setLanguage(lang) {
 
 <!-- Desktop View -->
 <div class="desktop-view">
-  <!-- Stats Cards -->
-  <div class="row g-3 mb-4">
-    <div class="col-md-3">
-      <div class="stats-card">
-        <i class="bi bi-clipboard-list text-primary" style="font-size: 1.5rem;"></i>
-        <div class="stats-card-value">{{ tasks|length }}</div>
-        <div class="stats-card-label">Gesamt</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="stats-card">
-        <i class="bi bi-hourglass-split text-warning" style="font-size: 1.5rem;"></i>
-        <div class="stats-card-value">{{ tasks|selectattr('status', 'equalto', 'open')|list|length }}</div>
-        <div class="stats-card-label">Offen</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="stats-card">
-        <i class="bi bi-play-circle text-info" style="font-size: 1.5rem;"></i>
-        <div class="stats-card-value">{{ tasks|selectattr('status', 'equalto', 'running')|list|length + tasks|selectattr('status', 'equalto', 'paused')|list|length }}</div>
-        <div class="stats-card-label">In Arbeit</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="stats-card">
-        <i class="bi bi-check-circle text-success" style="font-size: 1.5rem;"></i>
-        <div class="stats-card-value">{{ tasks|selectattr('status', 'equalto', 'done')|list|length }}</div>
-        <div class="stats-card-label">Erledigt</div>
+  <!-- Kompakte Gesamt-Statistik in EINER Kachel -->
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="stats-card d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-clipboard-list text-primary" style="font-size: 1.4rem;"></i>
+          <div>
+            <div class="stats-card-label">Gesamt</div>
+            <div class="stats-card-value">
+              {{ tasks|length }} · {{ (tasks|sum(attribute='planned_minutes')) | minutes_to_hhmm }}
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="stats-card-label">Offen</div>
+          <div class="stats-card-value">
+            {{ tasks|selectattr('status', 'equalto', 'open')|list|length }}
+            · {{ (tasks|selectattr('status', 'equalto', 'open')|sum(attribute='planned_minutes')) | minutes_to_hhmm }}
+          </div>
+        </div>
+        <div>
+          <div class="stats-card-label">In Arbeit</div>
+          <div class="stats-card-value">
+            {{ tasks|selectattr('status', 'equalto', 'running')|list|length + tasks|selectattr('status', 'equalto', 'paused')|list|length }}
+            · {{
+              (tasks|selectattr('status', 'equalto', 'running')|sum(attribute='planned_minutes')
+               + tasks|selectattr('status', 'equalto', 'paused')|sum(attribute='planned_minutes')) | minutes_to_hhmm
+            }}
+          </div>
+        </div>
+        <div>
+          <div class="stats-card-label">Erledigt</div>
+          <div class="stats-card-value">
+            {{ tasks|selectattr('status', 'equalto', 'done')|list|length }}
+            · {{ (tasks|selectattr('status', 'equalto', 'done')|sum(attribute='planned_minutes')) | minutes_to_hhmm }}
+          </div>
+        </div>
       </div>
     </div>
   </div>
