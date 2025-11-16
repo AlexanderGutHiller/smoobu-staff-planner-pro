@@ -16,7 +16,8 @@ from ..shared import templates
 from ..config import BASE_URL, ADMIN_TOKEN, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM
 from ..models import Booking, Staff, Apartment, Task, TimeLog, TaskSeries
 from ..utils import new_token, today_iso, now_iso
-from ..main import send_assignment_emails_job, send_whatsapp_for_existing_assignments, refresh_bookings_job, expand_series_job, log
+from ..jobs import send_assignment_emails_job, send_whatsapp_for_existing_assignments, refresh_bookings_job, expand_series_job
+from ..main import log
 
 router = APIRouter(prefix="/admin/{token}", tags=["admin"])
 

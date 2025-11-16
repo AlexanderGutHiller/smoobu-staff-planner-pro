@@ -13,6 +13,7 @@ from .models import Booking, Staff, Apartment, Task, TimeLog, TaskSeries, PushSu
 from .services_smoobu import SmoobuClient
 from .utils import new_token, today_iso, now_iso
 from .sync import upsert_tasks_from_bookings
+from .jobs import refresh_bookings_job, expand_series_job, send_assignment_emails_job, send_whatsapp_for_existing_assignments
 
 def detect_language(request: Request) -> str:
     """Erkenne Browser-Sprache aus Cookie, Query-Parameter oder Accept-Language Header"""
