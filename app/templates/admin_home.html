@@ -324,7 +324,7 @@
   
   @media (min-width: 769px) {
     .desktop-view { display: block; }
-    .mobile-view { display: none; }
+    .mobile-view:not([style*="display: block"]) { display: none; }
   }
 </style>
 </head>
@@ -1000,8 +1000,17 @@ function setLanguage(lang) {
 </div>
 
 <!-- Mobile View -->
-<div class="mobile-view" style="display: block !important; visibility: visible !important;">
+<div class="mobile-view" style="display: block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 1 !important;">
 <!-- Debug: Anzahl Tasks: {{ tasks|length }} -->
+{% if tasks|length > 0 %}
+  <div style="background: red; color: white; padding: 10px; margin: 10px 0; border-radius: 5px;">
+    DEBUG: {{ tasks|length }} Tasks gefunden - Mobile View sollte sichtbar sein!
+  </div>
+{% else %}
+  <div style="background: orange; color: white; padding: 10px; margin: 10px 0; border-radius: 5px;">
+    DEBUG: Keine Tasks gefunden - Bitte Filter prüfen!
+  </div>
+{% endif %}
 {% for t in tasks %}
 {% set tl = timelog_map.get(t.id, {}) %}
 {% set extras = extras_map.get(t.id, {}) %}
