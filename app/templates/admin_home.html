@@ -219,7 +219,7 @@
     .container { padding-left: 10px; padding-right: 10px; }
     .btn { padding: 0.4rem 0.6rem; font-size: 0.8rem; }
     .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .desktop-view { display: block; } /* Zeige Desktop-Karten auch mobil (Lovable/iOS Fix) */
+    .desktop-view { display: none !important; } /* Desktop-Ansicht auf mobilen Geräten ausblenden */
     .mobile-view { display: block; }
     .hide-on-mobile { display: none !important; }
     /* Lovable/iOS Fallback: Karten immer sichtbar erzwingen */
@@ -1243,6 +1243,11 @@ function resetMobileFilters(){
   if (!form) return;
   form.querySelectorAll('select').forEach(s => s.value = '');
   form.querySelectorAll('input[type=\"checkbox\"]').forEach(cb => cb.checked = true);
+  // Hidden-Felder direkt aktualisieren
+  const hiddenDoneMobile = document.getElementById('showDoneMobileHidden');
+  const hiddenOpenMobile = document.getElementById('showOpenMobileHidden');
+  if (hiddenDoneMobile) hiddenDoneMobile.value = '1';
+  if (hiddenOpenMobile) hiddenOpenMobile.value = '1';
   form.submit();
 }
 
@@ -1456,10 +1461,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const filterAssignmentOpen = document.getElementById('filterAssignmentOpen');
     const filterAssignmentOpenMobile = document.getElementById('filterAssignmentOpenMobile');
 
-    // aktuellen Zustand aus den Checkboxen ermitteln (Desktop hat Priorität, dann Mobile)
-    const showDoneChecked = (filterShowDone && filterShowDone.checked) ? true : ((filterShowDoneMobile && filterShowDoneMobile.checked) ? true : false);
-    const showOpenChecked = (filterShowOpen && filterShowOpen.checked) ? true : ((filterShowOpenMobile && filterShowOpenMobile.checked) ? true : false);
-    const assignmentOpenChecked = (filterAssignmentOpen && filterAssignmentOpen.checked) ? true : ((filterAssignmentOpenMobile && filterAssignmentOpenMobile.checked) ? true : false);
+    // Prüfe, ob wir auf Mobile sind
+    const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+    
+    // Aktuellen Zustand aus den Checkboxen ermitteln (je nach View)
+    let showDoneChecked, showOpenChecked, assignmentOpenChecked;
+    if (isMobile) {
+      // Mobile: Werte aus Mobile-Checkboxen
+      showDoneChecked = filterShowDoneMobile && filterShowDoneMobile.checked;
+      showOpenChecked = filterShowOpenMobile && filterShowOpenMobile.checked;
+      assignmentOpenChecked = filterAssignmentOpenMobile && filterAssignmentOpenMobile.checked;
+    } else {
+      // Desktop: Werte aus Desktop-Checkboxen
+      showDoneChecked = filterShowDone && filterShowDone.checked;
+      showOpenChecked = filterShowOpen && filterShowOpen.checked;
+      assignmentOpenChecked = filterAssignmentOpen && filterAssignmentOpen.checked;
+    }
 
     // Hidden-Felder mit 0/1 befüllen (immer aktuell aus den Checkboxen)
     if (hiddenDoneDesktop) hiddenDoneDesktop.value = showDoneChecked ? '1' : '0';
@@ -1467,32 +1484,37 @@ document.addEventListener('DOMContentLoaded', function() {
     if (hiddenDoneMobile) hiddenDoneMobile.value = showDoneChecked ? '1' : '0';
     if (hiddenOpenMobile) hiddenOpenMobile.value = showOpenChecked ? '1' : '0';
     
-    // "Zuweisung noch offen" Checkbox synchronisieren
+    // "Zuweisung noch offen" Checkbox synchronisieren (bidirektional)
     if (filterAssignmentOpen && filterAssignmentOpenMobile) {
-      filterAssignmentOpenMobile.checked = filterAssignmentOpen.checked;
-    }
-    if (filterAssignmentOpenMobile && filterAssignmentOpen && !filterAssignmentOpenMobile.matches(':focus')) {
-      filterAssignmentOpen.checked = filterAssignmentOpenMobile.checked;
+      if (isMobile) {
+        filterAssignmentOpen.checked = filterAssignmentOpenMobile.checked;
+      } else {
+        filterAssignmentOpenMobile.checked = filterAssignmentOpen.checked;
+      }
     }
     
-    // Spiegeln: wenn Desktop geändert wurde, aktualisiere Mobile und umgekehrt (nur Anzeige)
+    // Status-Checkboxen synchronisieren (bidirektional)
     if (filterShowDone && filterShowDoneMobile) {
-      filterShowDoneMobile.checked = filterShowDone.checked;
+      if (isMobile) {
+        filterShowDone.checked = filterShowDoneMobile.checked;
+      } else {
+        filterShowDoneMobile.checked = filterShowDone.checked;
+      }
     }
     if (filterShowOpen && filterShowOpenMobile) {
-      filterShowOpenMobile.checked = filterShowOpen.checked;
+      if (isMobile) {
+        filterShowOpen.checked = filterShowOpenMobile.checked;
+      } else {
+        filterShowOpenMobile.checked = filterShowOpen.checked;
+      }
     }
-    if (filterShowDoneMobile && filterShowDone && !filterShowDoneMobile.matches(':focus')) {
-      filterShowDone.checked = filterShowDoneMobile.checked;
-    }
-    if (filterShowOpenMobile && filterShowOpen && !filterShowOpenMobile.matches(':focus')) {
-      filterShowOpen.checked = filterShowOpenMobile.checked;
-    }
-    // Desktop-Form absenden (führt Filter-Reload aus)
-    if (desktopForm) {
-      desktopForm.submit();
-    } else if (mobileForm) {
+    
+    // Richtiges Formular absenden (je nach View)
+    if (isMobile && mobileForm) {
+      updateMobileHiddenFields(); // Stelle sicher, dass Hidden-Felder aktualisiert sind
       mobileForm.submit();
+    } else if (desktopForm) {
+      desktopForm.submit();
     }
   }
 
@@ -1594,28 +1616,20 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
-  // Desktop Checkboxen: Direkte Event-Listener
+  // Desktop Checkboxen: Nur change-Event (click wird automatisch zu change)
   if (filterShowDone) {
     filterShowDone.addEventListener('change', function() {
       updateStatusFilters();
-    });
-    filterShowDone.addEventListener('click', function(e) {
-      e.stopPropagation();
-      // Checkbox-Status wird automatisch geändert, dann updateStatusFilters aufrufen
-      setTimeout(updateStatusFilters, 10);
     });
   }
   if (filterShowOpen) {
     filterShowOpen.addEventListener('change', function() {
       updateStatusFilters();
     });
-    filterShowOpen.addEventListener('click', function(e) {
-      e.stopPropagation();
-      setTimeout(updateStatusFilters, 10);
-    });
   }
   
   // Mobile Checkboxen: change-Event (wird auch von touchend/click getriggert)
+  // Zusätzliche Event-Listener entfernt, da change ausreicht und doppelte Submits verhindert
   if (filterShowDoneMobile) {
     filterShowDoneMobile.addEventListener('change', function() {
       updateStatusFilters();
@@ -1632,10 +1646,6 @@ document.addEventListener('DOMContentLoaded', function() {
   if (filterAssignmentOpen) {
     filterAssignmentOpen.addEventListener('change', function() {
       updateStatusFilters();
-    });
-    filterAssignmentOpen.addEventListener('click', function(e) {
-      e.stopPropagation();
-      setTimeout(updateStatusFilters, 10);
     });
   }
   if (filterAssignmentOpenMobile) {
@@ -1657,40 +1667,8 @@ document.addEventListener('DOMContentLoaded', function() {
     cb.dispatchEvent(evt);
   }
   
-  // Mobile Checkboxen: Direkte Event-Listener für Touch/Click
-  if (filterShowDoneMobile) {
-    filterShowDoneMobile.addEventListener('click', function(e) {
-      e.stopPropagation();
-      updateStatusFilters();
-    });
-    filterShowDoneMobile.addEventListener('touchend', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      updateStatusFilters();
-    }, { passive: false });
-  }
-  if (filterShowOpenMobile) {
-    filterShowOpenMobile.addEventListener('click', function(e) {
-      e.stopPropagation();
-      updateStatusFilters();
-    });
-    filterShowOpenMobile.addEventListener('touchend', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      updateStatusFilters();
-    }, { passive: false });
-  }
-  if (filterAssignmentOpenMobile) {
-    filterAssignmentOpenMobile.addEventListener('click', function(e) {
-      e.stopPropagation();
-      updateStatusFilters();
-    });
-    filterAssignmentOpenMobile.addEventListener('touchend', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      updateStatusFilters();
-    }, { passive: false });
-  }
+  // Mobile Checkboxen: change-Event reicht aus (wird automatisch von click/touchend getriggert)
+  // Doppelte Event-Listener entfernt, um mehrfache Submits zu vermeiden
   
   if (doneLabel && filterShowDoneMobile) {
     doneLabel.addEventListener('click', function(e){

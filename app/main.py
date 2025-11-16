@@ -3,7 +3,6 @@ from typing import List, Optional, Dict
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, Query
 from fastapi.responses import RedirectResponse, StreamingResponse, PlainTextResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from datetime import date as _date, datetime as _dt, timedelta as _td
@@ -251,50 +250,50 @@ def get_translations(lang: str) -> Dict[str, str]:
     }
     return translations.get(lang, translations["de"])
 
-ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
-TIMEZONE = os.getenv("TIMEZONE", "Europe/Berlin")
-REFRESH_INTERVAL_MINUTES = int(os.getenv("REFRESH_INTERVAL_MINUTES", "60"))
-BASE_URL = os.getenv("BASE_URL", "")
-SMTP_HOST = os.getenv("SMTP_HOST", "")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-SMTP_FROM = os.getenv("SMTP_FROM", "")
-# WhatsApp/Twilio Configuration
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
-TWILIO_WHATSAPP_FROM = os.getenv("TWILIO_WHATSAPP_FROM", "")  # Format: whatsapp:+14155238886
-TWILIO_WHATSAPP_CONTENT_SID = os.getenv("TWILIO_WHATSAPP_CONTENT_SID", "")  # Content SID für WhatsApp-Vorlage (Opt-In)
-APP_VERSION = os.getenv("APP_VERSION", "v6.3")
-APP_BUILD_DATE = os.getenv("APP_BUILD_DATE", dt.date.today().strftime("%Y-%m-%d"))
-VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
-VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
-VAPID_EMAIL = os.getenv("VAPID_EMAIL", "mailto:admin@example.com")
+# Import configuration from config.py
+from .config import (
+    ADMIN_TOKEN, TIMEZONE, REFRESH_INTERVAL_MINUTES, BASE_URL,
+    SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM,
+    TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, TWILIO_WHATSAPP_CONTENT_SID,
+    APP_VERSION, APP_BUILD_DATE, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL
+)
+from .shared import templates
 
 log = logging.getLogger("smoobu")
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Smoobu Staff Planner Pro (v6.3)")
 
+# Register routers
+from .routers import main as main_router, admin as admin_router, cleaner as cleaner_router, webhooks as webhooks_router, push as push_router
+app.include_router(main_router.router)
+app.include_router(admin_router.router)
+app.include_router(cleaner_router.router)
+app.include_router(cleaner_router.router_short)
+app.include_router(webhooks_router.router)
+app.include_router(push_router.router)
+app.include_router(push_router.router_admin)
+
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Service Worker aus static bereitstellen (Fallback, falls kein static-Ordner)
-@app.get("/sw.js")
-async def service_worker():
+@app.on_event("startup")
+async def startup_event():
+    init_db()
+    if not ADMIN_TOKEN:
+        log.warning("ADMIN_TOKEN not set! Admin UI will be inaccessible.")
     try:
-        with open("static/sw.js", "rb") as f:
-            return Response(f.read(), media_type="application/javascript")
-    except Exception:
-        return Response("// no service worker", media_type="application/javascript")
-
-templates = Jinja2Templates(directory="app/templates")
-templates.env.globals.update({
-    "APP_VERSION": APP_VERSION,
-    "APP_BUILD_DATE": APP_BUILD_DATE,
-    "APP_VERSION_DISPLAY": f"Version {APP_VERSION} · {APP_BUILD_DATE}",
-    "dt": dt,
-})
+        await refresh_bookings_job()
+    except Exception as e:
+        log.exception("Initial import failed: %s", e)
+    scheduler = AsyncIOScheduler(timezone=TIMEZONE)
+    scheduler.add_job(refresh_bookings_job, IntervalTrigger(minutes=REFRESH_INTERVAL_MINUTES))
+    # Bündel-E-Mails für Zuweisungen alle 30 Minuten
+    scheduler.add_job(send_assignment_emails_job, IntervalTrigger(minutes=30))
+    # Expand recurring TaskSeries daily
+    scheduler.add_job(expand_series_job, IntervalTrigger(hours=24))
+    scheduler.start()
 
 def _parse_iso_date(s: str):
     try:
@@ -314,6 +313,271 @@ def date_wd_de(s: str, style: str = "short") -> str:
     wd_long  = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
     name = wd_long[d.weekday()] if style == "long" else wd_short[d.weekday()]
     return f"{name}, {d.strftime('%d.%m.%Y')}"
+
+def _daterange(days=60):
+    start = dt.date.today()
+    end = start + dt.timedelta(days=days)
+    return start.isoformat(), end.isoformat()
+
+def _best_guest_name(it: dict) -> str:
+    guest = it.get("guest") or {}
+    # Häufige Felder
+    candidates = [
+        guest.get("fullName"),
+        (f"{guest.get('firstName','')} {guest.get('lastName','')}".strip() or None),
+        (f"{it.get('firstName','')} {it.get('lastName','')}".strip() or None),
+        it.get("guestName"),
+        it.get("mainGuestName"),
+        it.get("contactName"),
+        it.get("name"),
+        (it.get("contact") or {}).get("name"),
+    ]
+    for c in candidates:
+        if c and isinstance(c, str) and c.strip():
+            return c.strip()
+    return ""
+
+def _guest_count_label(it: dict) -> str:
+    try:
+        adults = it.get("adults")
+        children = it.get("children")
+        # Alternativ-Felder absichern
+        if adults is None:
+            adults = it.get("numAdults") or it.get("guests") or 0
+        if children is None:
+            children = it.get("numChildren") or 0
+        adults = int(adults or 0)
+        children = int(children or 0)
+        total = adults + children
+        if total <= 0 and (adults > 0 or children > 0):
+            total = adults + children
+        if total > 0:
+            # Einfache deutsche Bezeichnung
+            return f"{total} Gäste"
+    except Exception:
+        pass
+    return ""
+
+async def refresh_bookings_job():
+    client = SmoobuClient()
+    start, end = _daterange(60)
+    log.info("🔄 Starting refresh: %s to %s", start, end)
+    items = client.get_reservations(start, end)
+    log.info("📥 Fetched %d bookings from Smoobu", len(items))
+    with SessionLocal() as db:
+        seen_booking_ids: List[int] = []
+        seen_apartment_ids: List[int] = []
+        for it in items:
+            b_id = int(it.get("id"))
+            apt = it.get("apartment") or {}
+            apt_id = int(apt.get("id")) if apt.get("id") is not None else None
+            apt_name = apt.get("name") or ""
+            guest_name = _best_guest_name(it)
+            if guest_name:
+                log.debug("📝 Guest name for booking %d: '%s'", b_id, guest_name)
+            else:
+                # Breiteres Logging zur Diagnose, wenn kein Name geliefert wird
+                try:
+                    log.warning("⚠️ No guest name in booking %d. Available keys: %s", b_id, list(it.keys()))
+                    if it.get("guest"):
+                        log.warning("⚠️ guest keys: %s", list((it.get("guest") or {}).keys()))
+                    if it.get("contact"):
+                        log.warning("⚠️ contact keys: %s", list((it.get("contact") or {}).keys()))
+                    log.warning("⚠️ adults=%s children=%s guests=%s", it.get("adults"), it.get("children"), it.get("guests"))
+                except Exception:
+                    pass
+                # Fallback: Gästeanzahl
+                guest_name = _guest_count_label(it) or ""
+            arrival = (it.get("arrival") or "")[:10]
+            departure = (it.get("departure") or "")[:10]
+
+            # Check if booking is cancelled or blocked
+            is_blocked = it.get("isBlockedBooking", False) or it.get("blocked", False)
+            status = it.get("status", "").lower() if it.get("status") else ""
+            cancelled = status == "cancelled" or it.get("cancelled", False)
+            is_internal = it.get("isInternal", False)
+            
+            # Check for various status
+            is_draft = status == "draft"
+            is_pending = status == "pending"
+            is_on_hold = status == "on hold" or status == "on_hold"
+            
+            log.debug("Smoobu booking %d: apt='%s', arrival='%s', departure='%s', status='%s'", 
+                     b_id, apt_name, arrival, departure, it.get("status"))
+            
+            # Log ALL fields for Romantik to debug
+            if apt_name and "romantik" in apt_name.lower() and "2025-10-29" in departure:
+                log.warning("🎯 ROMANTIK FULL BOOKING DATA: %s", it)
+                log.warning("🎯 Status fields: type='%s', status='%s', cancelled=%s, blocked=%s, internal=%s, draft=%s, pending=%s, on_hold=%s", 
+                           it.get("type"), status, cancelled, is_blocked, is_internal, is_draft, is_pending, is_on_hold)
+
+            # Check booking type FIRST - before we update or create the booking
+            booking_type = it.get("type", "").lower()
+            
+            # Check for cancelled, blocked, internal, draft, pending, on-hold bookings OR cancellation type - SKIP and DELETE these!
+            should_skip = False
+            reason = ""
+            
+            if booking_type == "cancellation":
+                should_skip = True
+                reason = "cancellation type"
+            elif cancelled:
+                should_skip = True
+                reason = "cancelled"
+            elif is_blocked:
+                should_skip = True
+                reason = "blocked"
+            elif is_internal:
+                should_skip = True
+                reason = "internal"
+            elif is_draft:
+                should_skip = True
+                reason = "draft"
+            elif is_pending:
+                should_skip = True
+                reason = "pending"
+            elif is_on_hold:
+                should_skip = True
+                reason = "on-hold"
+            
+            # Check for invalid bookings - also skip and delete
+            if not departure or not departure.strip():
+                log.info("⛔ SKIP INVALID booking %d (%s) - NO DEPARTURE, arrival='%s'", b_id, apt_name, arrival)
+                should_skip = True
+                reason = "invalid (no departure)"
+            elif not arrival or not arrival.strip():
+                log.info("⛔ SKIP INVALID booking %d (%s) - NO ARRIVAL, departure='%s'", b_id, apt_name, departure)
+                should_skip = True
+                reason = "invalid (no arrival)"
+            elif departure <= arrival:
+                log.info("⛔ SKIP INVALID booking %d (%s) - departure <= arrival ('%s' <= '%s')", b_id, apt_name, departure, arrival)
+                should_skip = True
+                reason = "invalid (departure <= arrival)"
+            
+            if should_skip:
+                log.info("⛔ SKIP %s booking %d (%s) - arrival: %s, departure: %s", reason, b_id, apt_name, arrival, departure)
+                # Sofort-Benachrichtigung an zugewiesene Cleaner über Storno + zugehörige Tasks löschen
+                try:
+                    # Sammle betroffene Tasks
+                    tasks = db.query(Task).filter(Task.booking_id==b_id).all()
+                    by_staff: Dict[int, list] = {}
+                    for t in tasks:
+                        if t.assigned_staff_id and t.assignment_status != "rejected":
+                            by_staff.setdefault(t.assigned_staff_id, []).append(t)
+                    for sid, tlist in by_staff.items():
+                        staff = db.get(Staff, sid)
+                        if not staff or not (staff.email or "").strip():
+                            continue
+                        lang = staff.language or "de"
+                        trans = get_translations(lang)
+                        # E-Mail-Inhalte pro Staff
+                        items = []
+                        for t in tlist:
+                            token = staff.magic_token
+                            items.append({
+                                'date': t.date,
+                                'apt': apt_name or "",
+                                'desc': (t.notes or "").strip() or trans.get('tätigkeit','Tätigkeit'),
+                                'link': f"{BASE_URL.rstrip('/')}/cleaner/{token}",
+                            })
+                        subject = f"{trans.get('cleanup','Bereinigen')}: {trans.get('zuweisung','Zuweisung')} storniert"
+                        # Text
+                        lines = [f"{trans.get('zuweisung','Zuweisung')} storniert:"]
+                        for it in items:
+                            lines.append(f"- {it['date']} · {it['apt']} · {it['desc']}")
+                        lines.append("")
+                        lines.append(items[0]['link'])
+                        body_text = "\n".join(lines)
+                        # HTML
+                        cards = []
+                        for it in items:
+                            cards.append(f"""
+                            <div style='border:1px solid #f1b0b7;border-radius:8px;padding:12px;margin:10px 0;background:#fff5f5;'>
+                              <div style='display:flex;justify-content:space-between;align-items:center;'>
+                                <div style='font-weight:700;font-size:16px'>{it['date']} · {it['apt']}</div>
+                                <span style='background:#dc3545;color:#fff;border-radius:12px;padding:4px 8px;font-size:12px;'>Storniert</span>
+                              </div>
+                              <div style='margin-top:6px;font-size:14px;'>{it['desc']}</div>
+                            </div>
+                            """)
+                        body_html = f"""
+                        <div style='font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f8f9fa;padding:16px;'>
+                          <div style='max-width:680px;margin:0 auto;'>
+                            <h2 style='margin:0 0 12px 0;font-size:20px;'>Storno: Aufgaben entfallen</h2>
+                            {''.join(cards)}
+                            <div style='margin-top:12px;'>
+                              <a href='{items[0]['link']}' style='text-decoration:none;background:#0d6efd;color:#fff;padding:8px 10px;border-radius:6px;font-weight:600;'>Zur Übersicht</a>
+                            </div>
+                          </div>
+                        </div>
+                        """
+                        _send_email(staff.email, subject, body_text, body_html)
+                except Exception as e:
+                    log.error("Error sending cancellation notifications for booking %d: %s", b_id, e)
+                # Delete existing booking if it exists
+                b_existing = db.get(Booking, b_id)
+                if b_existing:
+                    db.delete(b_existing)
+                    log.info("🗑️ Deleted existing booking %d from database", b_id)
+                # Lösche zugehörige Tasks direkt
+                for t in db.query(Task).filter(Task.booking_id==b_id).all():
+                    db.delete(t)
+                db.commit()
+                continue
+            
+            # Only log valid bookings
+            log.info("✓ Valid booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
+            
+            if apt_id is not None and apt_id not in seen_apartment_ids:
+                a = db.get(Apartment, apt_id)
+                if not a:
+                    a = Apartment(id=apt_id, name=apt_name, planned_minutes=90, active=True)
+                    db.add(a)
+                else:
+                    a.name = apt_name or a.name
+                seen_apartment_ids.append(apt_id)
+
+            b = db.get(Booking, b_id)
+            if not b:
+                b = Booking(id=b_id)
+                db.add(b)
+            b.apartment_id = apt_id
+            b.apartment_name = apt_name or ""
+            b.arrival = (it.get("arrival") or "")[:10]
+            b.departure = (it.get("departure") or "")[:10]
+            b.nights = int(it.get("nights") or 0)
+            b.adults = int(it.get("adults") or 1)
+            b.children = int(it.get("children") or 0)
+            b.guest_comments = (it.get("guestComments") or it.get("comments") or "")[:2000]
+            b.guest_name = (guest_name or "").strip()
+            if b.guest_name:
+                log.debug("✅ Saving guest name '%s' for booking %d", b.guest_name, b_id)
+            else:
+                log.warning("⚠️ No guest name found for booking %d (apt: %s)", b_id, apt_name)
+            
+            seen_booking_ids.append(b_id)
+
+        existing_ids = [row[0] for row in db.query(Booking.id).all()]
+        for bid in existing_ids:
+            if bid not in seen_booking_ids:
+                db.delete(db.get(Booking, bid))
+
+        db.commit()
+
+        bookings = db.query(Booking).all()
+        log.info("📋 Processing %d bookings from database", len(bookings))
+        upsert_tasks_from_bookings(bookings)
+
+        removed = 0
+        for t in db.query(Task).all():
+            if not t.date or not t.date.strip():
+                db.delete(t); removed += 1
+        if removed:
+            log.info("🧹 Cleanup: %d Tasks ohne Datum entfernt.", removed)
+        db.commit()
+        log.info("✅ Refresh completed successfully")
+
+# Helper functions for date parsing and series expansion
 def _parse_date(s: str) -> _date | None:
     try:
         return _dt.strptime(s, "%Y-%m-%d").date()
@@ -472,6 +736,7 @@ def minutes_to_hhmm(minutes: Optional[int]) -> str:
     mins = minutes % 60
     return f"{hours:02d}:{mins:02d}"
 
+# Register template filters
 templates.env.filters["date_de"] = date_de
 templates.env.filters["date_wd_de"] = date_wd_de
 templates.env.filters["minutes_to_hhmm"] = minutes_to_hhmm
@@ -841,1926 +1106,3 @@ def send_whatsapp_for_existing_assignments():
             })
         db.commit()
         return report
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-@app.on_event("startup")
-async def startup_event():
-    init_db()
-    if not ADMIN_TOKEN:
-        log.warning("ADMIN_TOKEN not set! Admin UI will be inaccessible.")
-    try:
-        await refresh_bookings_job()
-    except Exception as e:
-        log.exception("Initial import failed: %s", e)
-    scheduler = AsyncIOScheduler(timezone=TIMEZONE)
-    scheduler.add_job(refresh_bookings_job, IntervalTrigger(minutes=REFRESH_INTERVAL_MINUTES))
-    # Bündel-E-Mails für Zuweisungen alle 30 Minuten
-    scheduler.add_job(send_assignment_emails_job, IntervalTrigger(minutes=30))
-    # Expand recurring TaskSeries daily
-    scheduler.add_job(expand_series_job, IntervalTrigger(hours=24))
-    scheduler.start()
-
-def _daterange(days=60):
-    start = dt.date.today()
-    end = start + dt.timedelta(days=days)
-    return start.isoformat(), end.isoformat()
-
-def _best_guest_name(it: dict) -> str:
-    guest = it.get("guest") or {}
-    # Häufige Felder
-    candidates = [
-        guest.get("fullName"),
-        (f"{guest.get('firstName','')} {guest.get('lastName','')}".strip() or None),
-        (f"{it.get('firstName','')} {it.get('lastName','')}".strip() or None),
-        it.get("guestName"),
-        it.get("mainGuestName"),
-        it.get("contactName"),
-        it.get("name"),
-        (it.get("contact") or {}).get("name"),
-    ]
-    for c in candidates:
-        if c and isinstance(c, str) and c.strip():
-            return c.strip()
-    return ""
-
-def _guest_count_label(it: dict) -> str:
-    try:
-        adults = it.get("adults")
-        children = it.get("children")
-        # Alternativ-Felder absichern
-        if adults is None:
-            adults = it.get("numAdults") or it.get("guests") or 0
-        if children is None:
-            children = it.get("numChildren") or 0
-        adults = int(adults or 0)
-        children = int(children or 0)
-        total = adults + children
-        if total <= 0 and (adults > 0 or children > 0):
-            total = adults + children
-        if total > 0:
-            # Einfache deutsche Bezeichnung
-            return f"{total} Gäste"
-    except Exception:
-        pass
-    return ""
-
-async def refresh_bookings_job():
-    client = SmoobuClient()
-    start, end = _daterange(60)
-    log.info("🔄 Starting refresh: %s to %s", start, end)
-    items = client.get_reservations(start, end)
-    log.info("📥 Fetched %d bookings from Smoobu", len(items))
-    with SessionLocal() as db:
-        seen_booking_ids: List[int] = []
-        seen_apartment_ids: List[int] = []
-        for it in items:
-            b_id = int(it.get("id"))
-            apt = it.get("apartment") or {}
-            apt_id = int(apt.get("id")) if apt.get("id") is not None else None
-            apt_name = apt.get("name") or ""
-            guest_name = _best_guest_name(it)
-            if guest_name:
-                log.debug("📝 Guest name for booking %d: '%s'", b_id, guest_name)
-            else:
-                # Breiteres Logging zur Diagnose, wenn kein Name geliefert wird
-                try:
-                    log.warning("⚠️ No guest name in booking %d. Available keys: %s", b_id, list(it.keys()))
-                    if it.get("guest"):
-                        log.warning("⚠️ guest keys: %s", list((it.get("guest") or {}).keys()))
-                    if it.get("contact"):
-                        log.warning("⚠️ contact keys: %s", list((it.get("contact") or {}).keys()))
-                    log.warning("⚠️ adults=%s children=%s guests=%s", it.get("adults"), it.get("children"), it.get("guests"))
-                except Exception:
-                    pass
-                # Fallback: Gästeanzahl
-                guest_name = _guest_count_label(it) or ""
-            arrival = (it.get("arrival") or "")[:10]
-            departure = (it.get("departure") or "")[:10]
-
-            # Check if booking is cancelled or blocked
-            is_blocked = it.get("isBlockedBooking", False) or it.get("blocked", False)
-            status = it.get("status", "").lower() if it.get("status") else ""
-            cancelled = status == "cancelled" or it.get("cancelled", False)
-            is_internal = it.get("isInternal", False)
-            
-            # Check for various status
-            is_draft = status == "draft"
-            is_pending = status == "pending"
-            is_on_hold = status == "on hold" or status == "on_hold"
-            
-            log.debug("Smoobu booking %d: apt='%s', arrival='%s', departure='%s', status='%s'", 
-                     b_id, apt_name, arrival, departure, it.get("status"))
-            
-            # Log ALL fields for Romantik to debug
-            if apt_name and "romantik" in apt_name.lower() and "2025-10-29" in departure:
-                log.warning("🎯 ROMANTIK FULL BOOKING DATA: %s", it)
-                log.warning("🎯 Status fields: type='%s', status='%s', cancelled=%s, blocked=%s, internal=%s, draft=%s, pending=%s, on_hold=%s", 
-                           it.get("type"), status, cancelled, is_blocked, is_internal, is_draft, is_pending, is_on_hold)
-
-            # Check booking type FIRST - before we update or create the booking
-            booking_type = it.get("type", "").lower()
-            
-            # Check for cancelled, blocked, internal, draft, pending, on-hold bookings OR cancellation type - SKIP and DELETE these!
-            should_skip = False
-            reason = ""
-            
-            if booking_type == "cancellation":
-                should_skip = True
-                reason = "cancellation type"
-            elif cancelled:
-                should_skip = True
-                reason = "cancelled"
-            elif is_blocked:
-                should_skip = True
-                reason = "blocked"
-            elif is_internal:
-                should_skip = True
-                reason = "internal"
-            elif is_draft:
-                should_skip = True
-                reason = "draft"
-            elif is_pending:
-                should_skip = True
-                reason = "pending"
-            elif is_on_hold:
-                should_skip = True
-                reason = "on-hold"
-            
-            # Check for invalid bookings - also skip and delete
-            if not departure or not departure.strip():
-                log.info("⛔ SKIP INVALID booking %d (%s) - NO DEPARTURE, arrival='%s'", b_id, apt_name, arrival)
-                should_skip = True
-                reason = "invalid (no departure)"
-            elif not arrival or not arrival.strip():
-                log.info("⛔ SKIP INVALID booking %d (%s) - NO ARRIVAL, departure='%s'", b_id, apt_name, departure)
-                should_skip = True
-                reason = "invalid (no arrival)"
-            elif departure <= arrival:
-                log.info("⛔ SKIP INVALID booking %d (%s) - departure <= arrival ('%s' <= '%s')", b_id, apt_name, departure, arrival)
-                should_skip = True
-                reason = "invalid (departure <= arrival)"
-            
-            if should_skip:
-                log.info("⛔ SKIP %s booking %d (%s) - arrival: %s, departure: %s", reason, b_id, apt_name, arrival, departure)
-                # Sofort-Benachrichtigung an zugewiesene Cleaner über Storno + zugehörige Tasks löschen
-                try:
-                    # Sammle betroffene Tasks
-                    tasks = db.query(Task).filter(Task.booking_id==b_id).all()
-                    by_staff: Dict[int, list] = {}
-                    for t in tasks:
-                        if t.assigned_staff_id and t.assignment_status != "rejected":
-                            by_staff.setdefault(t.assigned_staff_id, []).append(t)
-                    for sid, tlist in by_staff.items():
-                        staff = db.get(Staff, sid)
-                        if not staff or not (staff.email or "").strip():
-                            continue
-                        lang = staff.language or "de"
-                        trans = get_translations(lang)
-                        # E-Mail-Inhalte pro Staff
-                        items = []
-                        for t in tlist:
-                            token = staff.magic_token
-                            items.append({
-                                'date': t.date,
-                                'apt': apt_name or "",
-                                'desc': (t.notes or "").strip() or trans.get('tätigkeit','Tätigkeit'),
-                                'link': f"{BASE_URL.rstrip('/')}/cleaner/{token}",
-                            })
-                        subject = f"{trans.get('cleanup','Bereinigen')}: {trans.get('zuweisung','Zuweisung')} storniert"
-                        # Text
-                        lines = [f"{trans.get('zuweisung','Zuweisung')} storniert:"]
-                        for it in items:
-                            lines.append(f"- {it['date']} · {it['apt']} · {it['desc']}")
-                        lines.append("")
-                        lines.append(items[0]['link'])
-                        body_text = "\n".join(lines)
-                        # HTML
-                        cards = []
-                        for it in items:
-                            cards.append(f"""
-                            <div style='border:1px solid #f1b0b7;border-radius:8px;padding:12px;margin:10px 0;background:#fff5f5;'>
-                              <div style='display:flex;justify-content:space-between;align-items:center;'>
-                                <div style='font-weight:700;font-size:16px'>{it['date']} · {it['apt']}</div>
-                                <span style='background:#dc3545;color:#fff;border-radius:12px;padding:4px 8px;font-size:12px;'>Storniert</span>
-                              </div>
-                              <div style='margin-top:6px;font-size:14px;'>{it['desc']}</div>
-                            </div>
-                            """)
-                        body_html = f"""
-                        <div style='font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f8f9fa;padding:16px;'>
-                          <div style='max-width:680px;margin:0 auto;'>
-                            <h2 style='margin:0 0 12px 0;font-size:20px;'>Storno: Aufgaben entfallen</h2>
-                            {''.join(cards)}
-                            <div style='margin-top:12px;'>
-                              <a href='{items[0]['link']}' style='text-decoration:none;background:#0d6efd;color:#fff;padding:8px 10px;border-radius:6px;font-weight:600;'>Zur Übersicht</a>
-                            </div>
-                          </div>
-                        </div>
-                        """
-                        _send_email(staff.email, subject, body_text, body_html)
-                except Exception as e:
-                    log.error("Error sending cancellation notifications for booking %d: %s", b_id, e)
-                # Delete existing booking if it exists
-                b_existing = db.get(Booking, b_id)
-                if b_existing:
-                    db.delete(b_existing)
-                    log.info("🗑️ Deleted existing booking %d from database", b_id)
-                # Lösche zugehörige Tasks direkt
-                for t in db.query(Task).filter(Task.booking_id==b_id).all():
-                    db.delete(t)
-                db.commit()
-                continue
-            
-            # Only log valid bookings
-            log.info("✓ Valid booking %d (%s) - arrival: %s, departure: %s", b_id, apt_name, arrival, departure)
-            
-            if apt_id is not None and apt_id not in seen_apartment_ids:
-                a = db.get(Apartment, apt_id)
-                if not a:
-                    a = Apartment(id=apt_id, name=apt_name, planned_minutes=90, active=True)
-                    db.add(a)
-                else:
-                    a.name = apt_name or a.name
-                seen_apartment_ids.append(apt_id)
-
-            b = db.get(Booking, b_id)
-            if not b:
-                b = Booking(id=b_id)
-                db.add(b)
-            b.apartment_id = apt_id
-            b.apartment_name = apt_name or ""
-            b.arrival = (it.get("arrival") or "")[:10]
-            b.departure = (it.get("departure") or "")[:10]
-            b.nights = int(it.get("nights") or 0)
-            b.adults = int(it.get("adults") or 1)
-            b.children = int(it.get("children") or 0)
-            b.guest_comments = (it.get("guestComments") or it.get("comments") or "")[:2000]
-            b.guest_name = (guest_name or "").strip()
-            if b.guest_name:
-                log.debug("✅ Saving guest name '%s' for booking %d", b.guest_name, b_id)
-            else:
-                log.warning("⚠️ No guest name found for booking %d (apt: %s)", b_id, apt_name)
-            
-            seen_booking_ids.append(b_id)
-
-        existing_ids = [row[0] for row in db.query(Booking.id).all()]
-        for bid in existing_ids:
-            if bid not in seen_booking_ids:
-                db.delete(db.get(Booking, bid))
-
-        db.commit()
-
-        bookings = db.query(Booking).all()
-        log.info("📋 Processing %d bookings from database", len(bookings))
-        upsert_tasks_from_bookings(bookings)
-
-        removed = 0
-        for t in db.query(Task).all():
-            if not t.date or not t.date.strip():
-                db.delete(t); removed += 1
-        if removed:
-            log.info("🧹 Cleanup: %d Tasks ohne Datum entfernt.", removed)
-        db.commit()
-        log.info("✅ Refresh completed successfully")
-
-@app.get("/", response_class=HTMLResponse)
-async def root():
-    return "<html><head><link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css' rel='stylesheet'></head><body class='p-4' style='font-family:system-ui;'><h1>Smoobu Staff Planner Pro</h1><p>Service läuft. Admin-UI: <code>/admin/&lt;ADMIN_TOKEN&gt;</code></p><p>Health: <a href='/health'>/health</a></p></body></html>"
-
-@app.get("/health")
-async def health():
-    return {"ok": True, "time": now_iso()}
-
-@app.get("/set-language")
-async def set_language(lang: str, redirect: str = "/"):
-    """Setze die Sprache als Cookie und leite weiter"""
-    if lang not in ["de", "en", "fr", "it", "es", "ro", "ru", "bg"]:
-        lang = "de"
-    
-    # Erstelle Response mit Redirect
-    response = RedirectResponse(url=redirect)
-    response.set_cookie(
-        key="lang",
-        value=lang,
-        max_age=365*24*60*60,  # 1 Jahr
-        httponly=False,
-        secure=False,
-        samesite="lax"
-    )
-    return response
-
-# -------------------- Admin UI --------------------
-@app.get("/admin/{token}")
-async def admin_home(
-    request: Request,
-    token: str,
-    date_range: Optional[str] = Query(None),
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
-    staff_id: Optional[str] = Query(None),
-    apartment_id: Optional[str] = Query(None),
-    show_done: Optional[str] = Query(None),
-    show_open: Optional[str] = Query(None),
-    assignment_open: Optional[str] = Query(None),
-    db=Depends(get_db),
-):
-    if not _is_admin_token(token, db):
-        raise HTTPException(status_code=403)
-    
-    lang = detect_language(request)
-    trans = get_translations(lang)
-    
-    q = db.query(Task)
-    # Datumsvoreinstellung / -filter
-    # Unterscheide: kein date_range-Parameter (Standard: nächste 7 Tage)
-    # vs. explizit "Alle" gewählt (date_range="" in Query -> keine Beschränkung)
-    has_date_range_param = "date_range" in request.query_params
-    default_date_filter = date_range or ""
-    today = dt.date.today()
-    if date_range and not (date_from or date_to):
-        if date_range == "today":
-            date_from = today.isoformat()
-            date_to = today.isoformat()
-        elif date_range == "week":
-            start = today - dt.timedelta(days=today.weekday())
-            end = start + dt.timedelta(days=6)
-            date_from = start.isoformat()
-            date_to = end.isoformat()
-        elif date_range == "month":
-            start = today.replace(day=1)
-            if start.month == 12:
-                next_month = start.replace(year=start.year + 1, month=1, day=1)
-            else:
-                next_month = start.replace(month=start.month + 1, day=1)
-            end = next_month - dt.timedelta(days=1)
-            date_from = start.isoformat()
-            date_to = end.isoformat()
-        elif date_range == "next7":
-            date_from = today.isoformat()
-            date_to = (today + dt.timedelta(days=7)).isoformat()
-    if not date_from and not date_to:
-        # Fallback, wenn gar nichts gesetzt und kein explizites "Alle":
-        # Standard: nächste 7 Tage
-        if not has_date_range_param:
-            date_from = today.isoformat()
-            date_to = (today + dt.timedelta(days=7)).isoformat()
-            if not default_date_filter:
-                default_date_filter = "next7"
-    # Status-Filter robust aus Query-Params ableiten
-    qp = request.query_params
-    if "show_done" in qp:
-        show_done_val = 1 if qp.get("show_done") == "1" else 0
-    else:
-        show_done_val = 1  # Standard: erledigte anzeigen
-    if "show_open" in qp:
-        show_open_val = 1 if qp.get("show_open") == "1" else 0
-    else:
-        show_open_val = 1  # Standard: offene anzeigen
-
-    # Zuweisungs-Filter: "Zuweisung noch offen" (unassigned oder nicht accepted)
-    if "assignment_open" in qp:
-        assignment_open_val = qp.get("assignment_open") == "1"
-    else:
-        assignment_open_val = False
-
-    # Staff- und Apartment-Filter robust aus Strings parsen ("" = kein Filter)
-    staff_id_val: Optional[int] = None
-    if staff_id and str(staff_id).strip():
-        try:
-            staff_id_val = int(staff_id)
-        except ValueError:
-            staff_id_val = None
-    apartment_id_val: Optional[int] = None
-    if apartment_id is not None and str(apartment_id).strip() != "":
-        try:
-            apartment_id_val = int(apartment_id)
-        except ValueError:
-            apartment_id_val = None
-
-    if date_from:
-        q = q.filter(Task.date >= date_from)
-    if date_to:
-        q = q.filter(Task.date <= date_to)
-    if staff_id_val:
-        q = q.filter(Task.assigned_staff_id == staff_id_val)
-    if apartment_id_val is not None:
-        if apartment_id_val == 0:
-            q = q.filter(Task.apartment_id == None)  # manuelle Aufgaben
-        elif apartment_id_val:
-            q = q.filter(Task.apartment_id == apartment_id_val)
-    # Filter nach Status: erledigte und/oder offene Aufgaben
-    from sqlalchemy import or_
-    status_filters = []
-    if show_done_val:
-        status_filters.append(Task.status == "done")
-    if show_open_val:
-        status_filters.append(Task.status != "done")
-    if status_filters:
-        q = q.filter(or_(*status_filters))
-    else:
-        # Wenn beide Filter deaktiviert sind, zeige nichts
-        q = q.filter(Task.id == -1)  # Unmögliche Bedingung
-    # Filter nach Zuweisung offen (optional)
-    if assignment_open_val:
-        q = q.filter(or_(Task.assigned_staff_id == None, Task.assignment_status != "accepted"))
-
-    tasks = q.order_by(Task.date, Task.id).all()
-    staff = db.query(Staff).filter(Staff.active==True).all()
-    apts = db.query(Apartment).filter(Apartment.active==True).all()
-    apt_map = {a.id: a.name for a in apts}
-    bookings = db.query(Booking).all()
-    book_map = {b.id: (b.guest_name or "").strip() for b in bookings if b.guest_name}
-    booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0, 'guest_name': (b.guest_name or "").strip()} for b in bookings}
-    log.debug("📊 Created book_map with %d entries, %d have guest names", len(bookings), len([b for b in bookings if b.guest_name and b.guest_name.strip()]))
-    
-    # Timelog-Daten und Zusatzinformationen für jedes Task
-    timelog_map = {}
-    extras_map: Dict[int, Dict[str, bool]] = {}
-    for t in tasks:
-        # Summiere alle TimeLogs für diesen Task (nicht nur den letzten)
-        all_tls = db.query(TimeLog).filter(TimeLog.task_id==t.id).all()
-        total_minutes = 0
-        latest_tl = None
-        for tl in all_tls:
-            if tl.actual_minutes:
-                total_minutes += tl.actual_minutes
-            # Finde den neuesten TimeLog für started_at/ended_at
-            if not latest_tl or (tl.id and latest_tl.id and tl.id > latest_tl.id):
-                latest_tl = tl
-        
-        if latest_tl or total_minutes > 0:
-            timelog_map[t.id] = {
-                'actual_minutes': total_minutes if total_minutes > 0 else (latest_tl.actual_minutes if latest_tl and latest_tl.actual_minutes else None),
-                'started_at': latest_tl.started_at if latest_tl else None,
-                'ended_at': latest_tl.ended_at if latest_tl else None
-            }
-        try:
-            extras_map[t.id] = json.loads(t.extras_json or "{}") or {}
-        except Exception:
-            extras_map[t.id] = {}
-    
-    base_url = BASE_URL.rstrip("/")
-    if not base_url:
-        base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
-    # Prüfe, ob der Token zu einem Admin-Staff gehört (für Switch-Link)
-    token_staff = db.query(Staff).filter(Staff.magic_token==token, Staff.is_admin==True, Staff.active==True).first()
-    # Wenn Token einem Staff entspricht, Switch-Button ermöglichen
-    staff_self = db.query(Staff).filter(Staff.magic_token==token).first()
-    return templates.TemplateResponse(
-        "admin_home.html",
-        {
-            "request": request,
-            "token": token,
-            "tasks": tasks,
-            "staff": staff,
-            "apartments": apts,
-            "apt_map": apt_map,
-            "book_map": book_map,
-            "booking_details_map": booking_details_map,
-            "timelog_map": timelog_map,
-            "extras_map": extras_map,
-            "base_url": base_url,
-            "lang": lang,
-            "trans": trans,
-            "show_done": show_done_val,
-            "show_open": show_open_val,
-            "assignment_open": assignment_open_val,
-            "default_date_filter": default_date_filter,
-            "staff_self": staff_self,
-            "staff_id": staff_id_val,
-            "apartment_id": apartment_id_val,
-        },
-    )
-
-# ---------- Task Series Admin ----------
-@app.get("/admin/{token}/series")
-async def admin_series_list(request: Request, token: str, db=Depends(get_db)):
-    if not _is_admin_token(token, db): raise HTTPException(status_code=403)
-    series = db.query(TaskSeries).order_by(TaskSeries.active.desc(), TaskSeries.start_date.desc()).all()
-    apts = {a.id: a.name for a in db.query(Apartment).all()}
-    staff = db.query(Staff).order_by(Staff.name).all()
-    lang = detect_language(request); trans = get_translations(lang)
-    base_url = BASE_URL.rstrip("/") or (f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else ""))
-    return templates.TemplateResponse("admin_series.html", {"request": request, "token": token, "series": series, "apartments": apts, "staff": staff, "base_url": base_url, "lang": lang, "trans": trans})
-
-@app.post("/admin/{token}/series/add")
-async def admin_series_add(
-    token: str,
-    title: str = Form(...),
-    description: str = Form(""),
-    apartment_id_raw: str = Form(""),
-    staff_id_raw: str = Form(""),
-    planned_minutes: int = Form(60),
-    start_date: str = Form(...),
-    start_time: str = Form(""),
-    frequency: str = Form(...),
-    interval: int = Form(1),
-    byweekday: str = Form(""),
-    bymonthday: str = Form(""),
-    end_date: str = Form(""),
-    count: int | None = Form(None),
-    db=Depends(get_db)
-):
-    if not _is_admin_token(token, db): raise HTTPException(status_code=403)
-    apt_id = None
-    if apartment_id_raw.strip():
-        try:
-            aid = int(apartment_id_raw)
-            if aid > 0: apt_id = aid
-        except Exception: pass
-    staff_id = None
-    if staff_id_raw.strip():
-        try:
-            sid = int(staff_id_raw)
-            if sid > 0: staff_id = sid
-        except Exception: pass
-    s = TaskSeries(
-        title=title.strip(),
-        description=description.strip(),
-        apartment_id=apt_id,
-        staff_id=staff_id,
-        planned_minutes=planned_minutes,
-        start_date=start_date[:10],
-        start_time=start_time[:5] if start_time else "",
-        frequency=frequency,
-        interval=max(1,int(interval or 1)),
-        byweekday=byweekday.strip(),
-        bymonthday=bymonthday.strip(),
-        end_date=(end_date[:10] if end_date else None),
-        count=(int(count) if (str(count).strip().isdigit()) else None),
-        active=True,
-        created_at=now_iso()
-    )
-    db.add(s); db.commit()
-    # expand immediately a bit
-    expand_series_job(days_ahead=30)
-    try:
-        send_assignment_emails_job()
-    except Exception as e:
-        log.error("notify after series add failed: %s", e)
-    # korrekt auf die Seite mit deinem echten Token umleiten
-    return RedirectResponse(url=f"/admin/{token}/series", status_code=303)
-
-@app.post("/admin/{token}/series/toggle")
-async def admin_series_toggle(token: str, series_id: int = Form(...), db=Depends(get_db)):
-    if not _is_admin_token(token, db): raise HTTPException(status_code=403)
-    s = db.get(TaskSeries, series_id)
-    if not s: raise HTTPException(status_code=404)
-    s.active = not s.active
-    db.commit()
-    return RedirectResponse(url=f"/admin/{token}/series", status_code=303)
-
-@app.post("/admin/{token}/series/delete")
-async def admin_series_delete(token: str, series_id: int = Form(...), delete_future: int = Form(0), db=Depends(get_db)):
-    if not _is_admin_token(token, db): raise HTTPException(status_code=403)
-    s = db.get(TaskSeries, series_id)
-    if not s: raise HTTPException(status_code=404)
-    # optionally delete future occurrences
-    if delete_future:
-        today_s = today_iso()
-        q = db.query(Task).filter(Task.series_id==series_id, Task.date >= today_s)
-        for t in q.all():
-            db.delete(t)
-    db.delete(s)
-    db.commit()
-    return RedirectResponse(url=f"/admin/{token}/series", status_code=303)
-
-@app.post("/admin/{token}/series/update")
-async def admin_series_update(
-    token: str,
-    series_id: int = Form(...),
-    title: str = Form(...),
-    description: str = Form(""),
-    apartment_id_raw: str = Form(""),
-    staff_id_raw: str = Form(""),
-    planned_minutes: int = Form(60),
-    start_date: str = Form(...),
-    start_time: str = Form(""),
-    frequency: str = Form(...),
-    interval: int = Form(1),
-    byweekday: str = Form(""),
-    bymonthday: str = Form(""),
-    end_date: str = Form(""),
-    count: int | None = Form(None),
-    db=Depends(get_db)
-):
-    if not _is_admin_token(token, db):
-        raise HTTPException(status_code=403)
-    s = db.get(TaskSeries, series_id)
-    if not s:
-        raise HTTPException(status_code=404)
-    apt_id = None
-    if apartment_id_raw.strip():
-        try:
-            aid = int(apartment_id_raw)
-            if aid > 0:
-                apt_id = aid
-        except Exception:
-            pass
-    staff_id = None
-    if staff_id_raw.strip():
-        try:
-            sid = int(staff_id_raw)
-            if sid > 0:
-                staff_id = sid
-        except Exception:
-            pass
-    s.title = title.strip()
-    s.description = description.strip()
-    s.apartment_id = apt_id
-    s.staff_id = staff_id
-    s.planned_minutes = planned_minutes
-    s.start_date = start_date[:10]
-    s.start_time = start_time[:5] if start_time else ""
-    s.frequency = frequency
-    s.interval = max(1, int(interval or 1))
-    s.byweekday = byweekday.strip()
-    s.bymonthday = bymonthday.strip()
-    s.end_date = (end_date[:10] if end_date else None)
-    s.count = (int(count) if (str(count).strip().isdigit()) else None)
-    db.commit()
-    return RedirectResponse(url=f"/admin/{token}/series", status_code=303)
-
-@app.get("/admin/{token}/series/expand")
-async def admin_series_expand(token: str, days: int = 30):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
-    created = expand_series_job(days_ahead=days)
-    try:
-        if created:
-            send_assignment_emails_job()
-    except Exception as e:
-        log.error("notify after series expand failed: %s", e)
-    return PlainTextResponse(f"Created {created} tasks for next {days} days.")
-
-@app.get("/admin/{token}/staff")
-async def admin_staff(request: Request, token: str, db=Depends(get_db)):
-    if not _is_admin_token(token, db):
-        raise HTTPException(status_code=403)
-    lang = detect_language(request)
-    trans = get_translations(lang)
-    staff = db.query(Staff).order_by(Staff.name).all()
-    
-    # Berechne Stunden (geleistet & geplant) für jeden Mitarbeiter (vorletzter, letzter, aktueller Monat)
-    today = dt.date.today()
-    current_month = today.strftime("%Y-%m")
-    
-    # Berechne vorletzten und letzten Monat
-    if today.month >= 3:
-        last_month = (today.year, today.month - 1)
-        prev_last_month = (today.year, today.month - 2)
-    elif today.month == 2:
-        last_month = (today.year, 1)
-        prev_last_month = (today.year - 1, 12)
-    else:  # today.month == 1
-        last_month = (today.year - 1, 12)
-        prev_last_month = (today.year - 1, 11)
-    
-    last_month_str = f"{last_month[0]}-{last_month[1]:02d}"
-    prev_last_month_str = f"{prev_last_month[0]}-{prev_last_month[1]:02d}"
-
-    # Monatsgrenzen (für geplante Zeiten)
-    def month_range(year: int, month: int):
-        start = dt.date(year, month, 1)
-        if month == 12:
-            end = dt.date(year + 1, 1, 1) - dt.timedelta(days=1)
-        else:
-            end = dt.date(year, month + 1, 1) - dt.timedelta(days=1)
-        return start.isoformat(), end.isoformat()
-
-    prev_start, prev_end = month_range(prev_last_month[0], prev_last_month[1])
-    last_start, last_end = month_range(last_month[0], last_month[1])
-    curr_start, curr_end = month_range(today.year, today.month)
-    
-    staff_hours = {}
-    for s in staff:
-        # Hole alle TimeLog-Einträge für diesen Mitarbeiter mit actual_minutes
-        logs = db.query(TimeLog).filter(
-            TimeLog.staff_id == s.id,
-            TimeLog.actual_minutes != None
-        ).all()
-        
-        hours_data = {
-            'prev_last_month': 0.0,
-            'last_month': 0.0,
-            'current_month': 0.0,
-            'prev_last_planned': 0.0,
-            'last_planned': 0.0,
-            'current_planned': 0.0,
-            'prev_last_total': 0.0,
-            'last_total': 0.0,
-            'current_total': 0.0,
-        }
-        
-        for tl in logs:
-            if not tl.started_at:
-                continue
-            
-            # Extrahiere Monat aus started_at (Format: "yyyy-mm-dd HH:MM:SS")
-            month_str = tl.started_at[:7]  # "yyyy-mm"
-            minutes = int(tl.actual_minutes or 0)
-            hours = round(minutes / 60.0, 2)
-            
-            if month_str == prev_last_month_str:
-                hours_data['prev_last_month'] += hours
-            elif month_str == last_month_str:
-                hours_data['last_month'] += hours
-            elif month_str == current_month:
-                hours_data['current_month'] += hours
-        
-        # Geplante Zeiten aus Tasks (planned_minutes)
-        def planned_hours_for_range(start_iso: str, end_iso: str) -> float:
-            tasks = db.query(Task).filter(
-                Task.assigned_staff_id == s.id,
-                Task.date >= start_iso,
-                Task.date <= end_iso,
-            ).all()
-            minutes = sum(int(t.planned_minutes or 0) for t in tasks)
-            return round(minutes / 60.0, 2)
-
-        hours_data['prev_last_planned'] = planned_hours_for_range(prev_start, prev_end)
-        hours_data['last_planned'] = planned_hours_for_range(last_start, last_end)
-        hours_data['current_planned'] = planned_hours_for_range(curr_start, curr_end)
-
-        # Gesamtsummen (geleistet + geplant)
-        hours_data['prev_last_total'] = round(hours_data['prev_last_month'] + hours_data['prev_last_planned'], 2)
-        hours_data['last_total'] = round(hours_data['last_month'] + hours_data['last_planned'], 2)
-        hours_data['current_total'] = round(hours_data['current_month'] + hours_data['current_planned'], 2)
-
-        # Runde Ist-Zeiten auf 2 Dezimalstellen
-        hours_data['prev_last_month'] = round(hours_data['prev_last_month'], 2)
-        hours_data['last_month'] = round(hours_data['last_month'], 2)
-        hours_data['current_month'] = round(hours_data['current_month'], 2)
-        
-        staff_hours[s.id] = hours_data
-    
-    base_url = BASE_URL.rstrip("/")
-    if not base_url:
-        base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
-    return templates.TemplateResponse("admin_staff.html", {"request": request, "token": token, "staff": staff, "staff_hours": staff_hours, "current_month": current_month, "last_month": last_month_str, "prev_last_month": prev_last_month_str, "base_url": base_url, "lang": lang, "trans": trans})
-
-@app.post("/admin/{token}/staff/add")
-async def admin_staff_add(token: str, name: str = Form(...), email: str = Form(...), phone: str = Form(""), hourly_rate: float = Form(0.0), max_hours_per_month: int = Form(160), language: str = Form("de"), is_admin: int = Form(0), db=Depends(get_db)):
-    if not _is_admin_token(token, db): raise HTTPException(status_code=403)
-    email = (email or "").strip()
-    if not email or "@" not in email:
-        raise HTTPException(status_code=400, detail="E-Mail ist erforderlich")
-    if language not in ["de","en","fr","it","es","ro","ru","bg"]:
-        language = "de"
-    phone = (phone or "").strip()
-    s = Staff(name=name, email=email, phone=phone, hourly_rate=hourly_rate, max_hours_per_month=max_hours_per_month, magic_token=new_token(16), active=True, language=language, is_admin=bool(is_admin))
-    db.add(s); db.commit()
-    return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
-
-@app.post("/admin/{token}/staff/toggle")
-async def admin_staff_toggle(token: str, staff_id: int = Form(...), db=Depends(get_db)):
-    if not _is_admin_token(token, db): raise HTTPException(status_code=403)
-    s = db.get(Staff, staff_id); s.active = not s.active; db.commit()
-    return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
-
-@app.post("/admin/{token}/staff/update")
-async def admin_staff_update(
-    token: str,
-    staff_id: int = Form(...),
-    name: str = Form(...),
-    email: str = Form(...),
-    phone: str = Form(""),
-    hourly_rate: float = Form(0.0),
-    max_hours_per_month: int = Form(160),
-    language: str = Form("de"),
-    is_admin: int = Form(0),
-    db=Depends(get_db)
-):
-    if not _is_admin_token(token, db):
-        raise HTTPException(status_code=403)
-    s = db.get(Staff, staff_id)
-    if not s:
-        raise HTTPException(status_code=404, detail="Staff nicht gefunden")
-    email = (email or "").strip()
-    if not email or "@" not in email:
-        raise HTTPException(status_code=400, detail="Ungültige E-Mail")
-    if language not in ["de","en","fr","it","es","ro","ru","bg"]:
-        language = "de"
-    phone = (phone or "").strip()
-    s.name = name
-    s.email = email
-    s.phone = phone
-    s.hourly_rate = float(hourly_rate or 0)
-    s.max_hours_per_month = int(max_hours_per_month or 0)
-    s.language = language
-    s.is_admin = bool(is_admin)
-    db.commit()
-    return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
-
-@app.post("/admin/{token}/staff/delete")
-async def admin_staff_delete(token: str, staff_id: int = Form(...), db=Depends(get_db)):
-    if not _is_admin_token(token, db):
-        raise HTTPException(status_code=403)
-    s = db.get(Staff, staff_id)
-    if not s:
-        raise HTTPException(status_code=404, detail="Staff nicht gefunden")
-    # Entkopple Aufgaben
-    for t in db.query(Task).filter(Task.assigned_staff_id==s.id).all():
-        t.assigned_staff_id = None
-        t.assignment_status = None
-    # Lösche TimeLogs des Mitarbeiters
-    for tl in db.query(TimeLog).filter(TimeLog.staff_id==s.id).all():
-        db.delete(tl)
-    db.delete(s)
-    db.commit()
-    return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
-
-@app.post("/admin/{token}/task/assign")
-async def admin_task_assign(request: Request, token: str, task_id: int = Form(...), staff_id_raw: str = Form(""), db=Depends(get_db)):
-    if not _is_admin_token(token, db): raise HTTPException(status_code=403)
-    t = db.get(Task, task_id)
-    if not t:
-        raise HTTPException(status_code=404, detail="Task nicht gefunden")
-    prev_staff_id = t.assigned_staff_id
-    staff_id: Optional[int] = int(staff_id_raw) if staff_id_raw.strip() else None
-    t.assigned_staff_id = staff_id
-    # Setze assignment_status auf "pending" wenn ein MA zugewiesen wird, sonst None
-    if staff_id:
-        t.assignment_status = "pending"
-        # Markiere für Benachrichtigung
-        t.assign_notified_at = None
-    else:
-        t.assignment_status = None
-    db.commit()
-    # Sofortige Mail bei neuer/ändernder Zuweisung
-    try:
-        if staff_id and staff_id != prev_staff_id:
-            send_assignment_emails_job()
-    except Exception as e:
-        log.error("Immediate notify failed for task %s: %s", t.id, e)
-    # Behalte Filter-Parameter bei
-    referer = request.headers.get("referer", "")
-    if referer:
-        try:
-            from urllib.parse import urlparse, parse_qs, urlencode
-            parsed = urlparse(referer)
-            params = parse_qs(parsed.query)
-            query_parts = []
-            if params.get("show_done"):
-                query_parts.append(f"show_done={params['show_done'][0]}")
-            if params.get("show_open"):
-                query_parts.append(f"show_open={params['show_open'][0]}")
-            if query_parts:
-                return RedirectResponse(url=f"/admin/{token}?{'&'.join(query_parts)}", status_code=303)
-        except Exception:
-            pass
-    return RedirectResponse(url=f"/admin/{token}", status_code=303)
-
-@app.post("/admin/{token}/task/create")
-async def admin_task_create(
-    token: str,
-    date: str = Form(...),
-    apartment_id: str = Form(""),
-    planned_minutes: int = Form(90),
-    description: str = Form(""),
-    staff_id: str = Form(""),
-    db=Depends(get_db),
-):
-    if not _is_admin_token(token, db):
-        raise HTTPException(status_code=403)
-    
-    # Validierung
-    if not date or not date.strip():
-        raise HTTPException(status_code=400, detail="Datum ist erforderlich")
-    
-    # Apartment-ID optional - kann leer sein für manuelle Aufgaben
-    apartment_id_val: Optional[int] = None
-    apt_name = "Manuelle Aufgabe"
-    if apartment_id and apartment_id.strip():
-        try:
-            apartment_id_val = int(apartment_id)
-            if apartment_id_val > 0:
-                apt = db.get(Apartment, apartment_id_val)
-                if apt:
-                    apt_name = apt.name
-                else:
-                    apartment_id_val = None  # Ungültige Apartment-ID ignorieren
-            else:
-                apartment_id_val = None  # 0 oder negativ = keine Apartment
-        except (ValueError, TypeError):
-            apartment_id_val = None
-    
-    # Staff-ID optional
-    staff_id_val: Optional[int] = None
-    if staff_id and staff_id.strip():
-        try:
-            staff_id_val = int(staff_id)
-            staff = db.get(Staff, staff_id_val)
-            if not staff:
-                staff_id_val = None  # Ungültige Staff-ID ignorieren
-        except ValueError:
-            staff_id_val = None
-    
-    # Neue Aufgabe erstellen
-    new_task = Task(
-        date=date[:10],  # Nur Datum, ohne Zeit
-        apartment_id=apartment_id_val,  # Kann None sein für manuelle Aufgaben
-        planned_minutes=planned_minutes,
-        notes=(description[:2000] if description else None),  # Beschreibung als Notiz speichern
-        assigned_staff_id=staff_id_val,
-        assignment_status="pending" if staff_id_val else None,
-        status="open",
-        auto_generated=False  # Manuell erstellt
-    )
-    db.add(new_task)
-    db.commit()
-
-    log.info("✅ Manuell erstellte Aufgabe: %s für %s am %s", new_task.id, apt_name, date)
-
-    # Wenn ein MA ausgewählt wurde, direkt Benachrichtigung auslösen
-    if staff_id_val:
-        try:
-            send_assignment_emails_job()
-        except Exception as e:
-            log.error("Fehler beim Senden der Zuweisungs-Benachrichtigung für manuelle Aufgabe %s: %s", new_task.id, e)
-
-    return RedirectResponse(url=f"/admin/{token}", status_code=303)
-
-@app.post("/admin/{token}/task/delete")
-async def admin_task_delete(token: str, task_id: int = Form(...), db=Depends(get_db)):
-    if not _is_admin_token(token, db):
-        raise HTTPException(status_code=403)
-    t = db.get(Task, task_id)
-    if not t:
-        raise HTTPException(status_code=404, detail="Task nicht gefunden")
-    if t.auto_generated:
-        raise HTTPException(status_code=400, detail="Automatisch erzeugte Aufgaben können hier nicht gelöscht werden")
-    for tl in db.query(TimeLog).filter(TimeLog.task_id==t.id).all():
-        db.delete(tl)
-    db.delete(t)
-    db.commit()
-    return RedirectResponse(url=f"/admin/{token}", status_code=303)
-
-@app.post("/admin/{token}/task/update_manual")
-async def admin_task_update_manual(token: str, task_id: int = Form(...), date: str = Form(...), apartment_id: str = Form(""), planned_minutes: int = Form(90), description: str = Form(""), staff_id: str = Form(""), db=Depends(get_db)):
-    if not _is_admin_token(token, db):
-        raise HTTPException(status_code=403)
-    t = db.get(Task, task_id)
-    if not t:
-        raise HTTPException(status_code=404, detail="Task nicht gefunden")
-    if t.auto_generated:
-        raise HTTPException(status_code=400, detail="Automatisch erzeugte Aufgaben können hier nicht bearbeitet werden")
-    
-    # Validierung
-    if not date or not date.strip():
-        raise HTTPException(status_code=400, detail="Datum ist erforderlich")
-    
-    # Apartment-ID optional
-    apartment_id_val: Optional[int] = None
-    if apartment_id and apartment_id.strip():
-        try:
-            apartment_id_val = int(apartment_id)
-            if apartment_id_val > 0:
-                apt = db.get(Apartment, apartment_id_val)
-                if not apt:
-                    apartment_id_val = None
-            else:
-                apartment_id_val = None
-        except (ValueError, TypeError):
-            apartment_id_val = None
-    
-    # Staff-ID optional
-    staff_id_val: Optional[int] = None
-    prev_staff_id = t.assigned_staff_id
-    if staff_id and staff_id.strip():
-        try:
-            staff_id_val = int(staff_id)
-            staff = db.get(Staff, staff_id_val)
-            if not staff:
-                staff_id_val = None
-        except ValueError:
-            staff_id_val = None
-    
-    # Task aktualisieren
-    t.date = date[:10]
-    t.apartment_id = apartment_id_val
-    t.planned_minutes = planned_minutes
-    t.notes = (description[:2000] if description else None)
-    
-    # Zuweisung aktualisieren
-    t.assigned_staff_id = staff_id_val
-    if staff_id_val:
-        # Wenn ein MA zugewiesen wird, setze auf pending (außer wenn bereits accepted)
-        if t.assignment_status != "accepted":
-            t.assignment_status = "pending"
-    else:
-        # Wenn kein MA mehr zugewiesen, entferne Zuweisungsstatus
-        t.assignment_status = None
-    
-    db.commit()
-    
-    # Wenn ein neuer MA zugewiesen wurde (oder geändert), Benachrichtigung senden
-    if staff_id_val and staff_id_val != prev_staff_id:
-        try:
-            send_assignment_emails_job()
-        except Exception as e:
-            log.error("Fehler beim Senden der Zuweisungs-Benachrichtigung nach Update: %s", e)
-    
-    log.info("✅ Manuelle Aufgabe %s aktualisiert", t.id)
-    return RedirectResponse(url=f"/admin/{token}", status_code=303)
-
-@app.post("/admin/{token}/task/status")
-async def admin_task_status(token: str, task_id: int = Form(...), status: str = Form(...), db=Depends(get_db)):
-    if not _is_admin_token(token, db):
-        raise HTTPException(status_code=403)
-    allowed = {"open", "paused", "done"}
-    status = (status or "").strip().lower()
-    if status not in allowed:
-        raise HTTPException(status_code=400, detail="Ungültiger Status")
-    t = db.get(Task, task_id)
-    if not t:
-        raise HTTPException(status_code=404, detail="Task nicht gefunden")
-    # TimeLogs behandeln: offene Logs schließen, wenn nicht 'running'
-    tl = db.query(TimeLog).filter(TimeLog.task_id==t.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
-    if tl:
-        from datetime import datetime
-        fmt = "%Y-%m-%d %H:%M:%S"
-        tl.ended_at = now_iso()
-        try:
-            start = datetime.strptime(tl.started_at, fmt)
-            end = datetime.strptime(tl.ended_at, fmt)
-            elapsed = int((end-start).total_seconds()//60)
-            tl.actual_minutes = int(tl.actual_minutes or 0) + max(0, elapsed)
-        except Exception:
-            pass
-    t.status = status
-    db.commit()
-    return RedirectResponse(url=f"/admin/{token}", status_code=303)
-
-
-@app.post("/admin/{token}/task/extras")
-async def admin_task_extras(
-    request: Request,
-    token: str,
-    task_id: int = Form(...),
-    field: str = Form(...),
-    value: str = Form("0"),
-    redirect: str = Form(""),
-    db=Depends(get_db),
-):
-    if not _is_admin_token(token, db):
-        raise HTTPException(status_code=403)
-    allowed_fields = {"kurtaxe_registriert", "kurtaxe_bestaetigt", "checkin_vorbereitet", "kurtaxe_bezahlt", "baby_beds"}
-    field = (field or "").strip()
-    if field not in allowed_fields:
-        raise HTTPException(status_code=400, detail="Ungültiges Feld")
-    t = db.get(Task, task_id)
-    if not t:
-        raise HTTPException(status_code=404, detail="Task nicht gefunden")
-    try:
-        extras = json.loads(t.extras_json or "{}") or {}
-    except Exception:
-        extras = {}
-    value_str = (value or "").strip().lower()
-    if field == "baby_beds":
-        try:
-            beds = int(value_str)
-        except ValueError:
-            beds = 0
-        beds = max(0, min(2, beds))
-        extras[field] = beds
-        response_value = beds
-    else:
-        flag = value_str in {"1", "true", "yes", "on"}
-        extras[field] = flag
-        response_value = flag
-    t.extras_json = json.dumps(extras)
-    db.commit()
-    if (request.headers.get("x-requested-with") or "").lower() == "fetch":
-        return JSONResponse({"ok": True, "task_id": t.id, "field": field, "value": response_value})
-    target = redirect or request.headers.get("referer") or f"/admin/{token}"
-    return RedirectResponse(url=target, status_code=303)
-
-@app.get("/admin/{token}/apartments")
-async def admin_apartments(request: Request, token: str, db=Depends(get_db)):
-    if token != ADMIN_TOKEN:
-        raise HTTPException(status_code=403)
-    lang = detect_language(request)
-    trans = get_translations(lang)
-    apts = db.query(Apartment).order_by(Apartment.name).all()
-    return templates.TemplateResponse("admin_apartments.html", {"request": request, "token": token, "apartments": apts, "lang": lang, "trans": trans})
-
-@app.post("/admin/{token}/apartments/update")
-async def admin_apartments_update(token: str, apartment_id: int = Form(...), planned_minutes: int = Form(...), db=Depends(get_db)):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
-    a = db.get(Apartment, apartment_id)
-    a.planned_minutes = int(planned_minutes)
-    db.commit()
-    return RedirectResponse(url=f"/admin/{token}/apartments", status_code=303)
-
-@app.post("/admin/{token}/apartments/apply")
-async def admin_apartments_apply(token: str, apartment_id: int = Form(...), db=Depends(get_db)):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
-    a = db.get(Apartment, apartment_id)
-    if not a:
-        raise HTTPException(status_code=404, detail="Apartment nicht gefunden")
-    
-    # Get today's date
-    today_iso = dt.date.today().isoformat()
-    
-    # Update all tasks for this apartment that are today or in the future
-    tasks = db.query(Task).filter(
-        Task.apartment_id == apartment_id,
-        Task.date >= today_iso
-    ).all()
-    
-    updated = 0
-    for t in tasks:
-        t.planned_minutes = a.planned_minutes
-        # Benachrichtigung bei geänderter Dauer für zugewiesene (bündeln via Scheduler)
-        if t.assigned_staff_id and t.assignment_status != "rejected":
-            t.assign_notified_at = None
-        updated += 1
-    
-    db.commit()
-    log.info("Updated %d tasks for apartment %s to %d minutes", updated, a.name, a.planned_minutes)
-    return RedirectResponse(url=f"/admin/{token}/apartments", status_code=303)
-
-@app.get("/admin/{token}/import")
-async def admin_import(token: str, db=Depends(get_db)):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
-    await refresh_bookings_job()
-    return PlainTextResponse("Import done.")
-
-@app.get("/admin/{token}/test_whatsapp")
-async def admin_test_whatsapp(token: str, phone: str = Query(...), db=Depends(get_db)):
-    """Test WhatsApp-Versand"""
-    if token != ADMIN_TOKEN:
-        raise HTTPException(status_code=403)
-    
-    test_msg = "🧪 Test-Nachricht von Staff Planner"
-    
-    config_status = {
-        "TWILIO_ACCOUNT_SID": "✅ gesetzt" if TWILIO_ACCOUNT_SID else "❌ nicht gesetzt",
-        "TWILIO_AUTH_TOKEN": "✅ gesetzt" if TWILIO_AUTH_TOKEN else "❌ nicht gesetzt",
-        "TWILIO_WHATSAPP_FROM": TWILIO_WHATSAPP_FROM if TWILIO_WHATSAPP_FROM else "❌ nicht gesetzt",
-    }
-    
-    try:
-        from twilio.rest import Client
-        twilio_installed = "✅ installiert"
-    except ImportError:
-        twilio_installed = "❌ nicht installiert"
-        return PlainTextResponse(f"❌ Twilio Library nicht installiert")
-    
-    # Versuche Nachricht zu senden und hole Details
-    result = False
-    message_details = {}
-    normalized_phone = phone
-    whatsapp_to = ""
-    try:
-        # Normalisiere Telefonnummer wie in _send_whatsapp
-        normalized_phone = phone.strip().replace(" ", "").replace("-", "")
-        if not normalized_phone.startswith("+"):
-            if normalized_phone.startswith("0"):
-                normalized_phone = "+49" + normalized_phone[1:]
-            else:
-                normalized_phone = "+49" + normalized_phone
-        whatsapp_to = f"whatsapp:{normalized_phone}"
-        
-        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-        message_obj = client.messages.create(
-            body=test_msg,
-            from_=TWILIO_WHATSAPP_FROM,
-            to=whatsapp_to
-        )
-        message_details = {
-            "sid": message_obj.sid,
-            "status": getattr(message_obj, 'status', 'unknown'),
-            "error_code": getattr(message_obj, 'error_code', None),
-            "error_message": getattr(message_obj, 'error_message', None),
-            "price": getattr(message_obj, 'price', None),
-            "price_unit": getattr(message_obj, 'price_unit', None),
-        }
-        result = message_details['status'] in ['queued', 'sent', 'delivered']
-    except Exception as e:
-        message_details = {"error": str(e)}
-    
-    response_text = (
-        f"WhatsApp Test\n"
-        f"=============\n\n"
-        f"Telefonnummer (Eingabe): {phone}\n"
-        f"Telefonnummer (normalisiert): {normalized_phone}\n"
-        f"WhatsApp To: {whatsapp_to}\n\n"
-        f"Ergebnis: {'✅ Erfolgreich' if result else '❌ Fehlgeschlagen'}\n\n"
-        f"Message Details:\n"
-        f"- SID: {message_details.get('sid', 'N/A')}\n"
-        f"- Status: {message_details.get('status', 'N/A')}\n"
-        f"- Error Code: {message_details.get('error_code', 'N/A')}\n"
-        f"- Error Message: {message_details.get('error_message', 'N/A')}\n"
-        f"- Price: {message_details.get('price', 'N/A')} {message_details.get('price_unit', '')}\n\n"
-        f"Konfiguration:\n"
-        f"- Twilio Library: {twilio_installed}\n"
-        f"- Account SID: {config_status['TWILIO_ACCOUNT_SID']}\n"
-        f"- Auth Token: {config_status['TWILIO_AUTH_TOKEN']}\n"
-        f"- WhatsApp From: {config_status['TWILIO_WHATSAPP_FROM']}\n\n"
-        f"Hinweis: Wenn Status 'queued' ist, wurde die Nachricht an Twilio gesendet.\n"
-        f"Falls keine Nachricht ankommt, prüfe:\n"
-        f"1. Ist die Nummer bei Twilio WhatsApp Sandbox verifiziert?\n"
-        f"2. Ist TWILIO_WHATSAPP_FROM korrekt formatiert (whatsapp:+14155238886)?\n"
-        f"3. Prüfe Twilio Console für Delivery-Status: https://console.twilio.com/\n"
-    )
-    
-    return PlainTextResponse(response_text)
-
-@app.post("/webhook/twilio/status")
-async def twilio_status_webhook(request: Request):
-    """Webhook-Endpoint für Twilio Message-Status-Updates"""
-    try:
-        form_data = await request.form()
-        # Twilio sendet Status-Updates als Form-Data
-        message_sid = form_data.get("MessageSid", "")
-        message_status = form_data.get("MessageStatus", "")
-        to_number = form_data.get("To", "")
-        from_number = form_data.get("From", "")
-        error_code = form_data.get("ErrorCode", "")
-        error_message = form_data.get("ErrorMessage", "")
-        
-        # Entferne "whatsapp:" Präfix für bessere Lesbarkeit
-        to_clean = to_number.replace("whatsapp:", "") if to_number.startswith("whatsapp:") else to_number
-        from_clean = from_number.replace("whatsapp:", "") if from_number.startswith("whatsapp:") else from_number
-        
-        # Logge den Status-Update
-        if message_status == "delivered":
-            log.info("✅ WhatsApp DELIVERED: SID=%s, To=%s, From=%s", 
-                    message_sid, to_clean, from_clean)
-        elif message_status == "sent":
-            log.info("📤 WhatsApp SENT: SID=%s, To=%s, From=%s", 
-                    message_sid, to_clean, from_clean)
-        elif message_status == "failed":
-            log.error("❌ WhatsApp FAILED: SID=%s, To=%s, From=%s, ErrorCode=%s, ErrorMessage=%s", 
-                     message_sid, to_clean, from_clean, error_code, error_message)
-        elif message_status == "undelivered":
-            # Spezifische Fehlermeldungen für bekannte Error Codes
-            error_details = ""
-            if error_code == "63016":
-                error_details = " (24h-Fenster abgelaufen - Vorlage erforderlich oder Sandbox-Nummer nicht verifiziert)"
-            elif error_code == "63007":
-                error_details = " (Ungültige Telefonnummer)"
-            elif error_code == "63014":
-                error_details = " (Nachricht zu lang)"
-            elif error_code:
-                error_details = f" (Code: {error_code})"
-            
-            log.warning("⚠️ WhatsApp UNDELIVERED: SID=%s, To=%s, From=%s, ErrorCode=%s, ErrorMessage=%s%s", 
-                       message_sid, to_clean, from_clean, error_code, error_message or "(keine Details)", error_details)
-            
-            # Zusätzliche Warnung für 63016 mit Lösungshinweis
-            if error_code == "63016":
-                log.warning("💡 Lösung für 63016: 1) Im Sandbox-Modus: Nummer verifizieren (Join-Code senden) "
-                           "2) Im Production: WhatsApp-Vorlage verwenden für erste Nachricht")
-        else:
-            log.info("📱 WhatsApp Status Update: SID=%s, Status=%s, To=%s, From=%s", 
-                    message_sid, message_status, to_clean, from_clean)
-        
-        # Return 200 OK für Twilio
-        return Response(status_code=200)
-    except Exception as e:
-        log.error("Error processing Twilio webhook: %s", e, exc_info=True)
-        return Response(status_code=500)
-
-@app.post("/webhook/twilio/message")
-async def twilio_message_webhook(request: Request, db=Depends(get_db)):
-    """Webhook-Endpoint für eingehende WhatsApp-Nachrichten (Opt-In-Bestätigung)"""
-    try:
-        form_data = await request.form()
-        from_number = form_data.get("From", "")
-        message_body = form_data.get("Body", "").strip().upper()
-        
-        # Entferne "whatsapp:" Präfix
-        from_clean = from_number.replace("whatsapp:", "") if from_number.startswith("whatsapp:") else from_number
-        
-        log.info("📱 Incoming WhatsApp message from %s: %s", from_clean, message_body)
-        
-        # Suche Staff-Mitglied mit dieser Telefonnummer
-        staff = db.query(Staff).filter(Staff.phone.like(f"%{from_clean}%")).first()
-        
-        if staff:
-            # Normalisiere Telefonnummer für Vergleich
-            staff_phone = staff.phone.strip().replace(" ", "").replace("-", "")
-            if not staff_phone.startswith("+"):
-                if staff_phone.startswith("0"):
-                    staff_phone = "+49" + staff_phone[1:]
-                else:
-                    staff_phone = "+49" + staff_phone
-            
-            if staff_phone == from_clean:
-                # Prüfe ob Nachricht eine Opt-In-Bestätigung ist
-                # Typische Bestätigungen: "JA", "YES", "OK", "START", etc.
-                opt_in_keywords = ["JA", "YES", "OK", "START", "BEGINNEN", "ANFANGEN", "ZUSTIMMEN", "ACCEPT"]
-                if any(keyword in message_body for keyword in opt_in_keywords) or len(message_body) <= 3:
-                    # Markiere Opt-In als bestätigt
-                    if not staff.whatsapp_opt_in_confirmed:
-                        staff.whatsapp_opt_in_confirmed = True
-                        db.commit()
-                        log.info("✅ Opt-In confirmed for staff %d (%s) via WhatsApp message", staff.id, staff.name)
-                    else:
-                        log.debug("Opt-In already confirmed for staff %d", staff.id)
-                else:
-                    log.debug("Message from %s does not appear to be an Opt-In confirmation", from_clean)
-        else:
-            log.debug("No staff member found with phone number %s", from_clean)
-        
-        # Return 200 OK für Twilio (immer, auch wenn kein Staff gefunden)
-        return Response(status_code=200)
-    except Exception as e:
-        log.error("Error processing Twilio message webhook: %s", e, exc_info=True)
-        return Response(status_code=500)
-
-@app.get("/admin/{token}/notify_assignments")
-async def admin_notify_assignments(token: str):
-    if token != ADMIN_TOKEN:
-        raise HTTPException(status_code=403)
-    try:
-        report = send_assignment_emails_job()
-        if not report:
-            return PlainTextResponse("Keine offenen Zuweisungen zum Versenden.")
-        # Baue menschenlesbaren Report
-        lines = ["Benachrichtigungen gesendet:", ""]
-        for r in report:
-            lines.append(f"- {r['staff_name']} <{r['email']}>: {r['count']} Aufgaben")
-            for it in r['items']:
-                guest = f" · {it['guest']}" if it.get('guest') else ""
-                lines.append(f"  • {it['date']} · {it['apt']} · {it['desc']}{guest}")
-            lines.append("")
-        return PlainTextResponse("\n".join(lines).strip())
-    except Exception as e:
-        log.exception("Manual notify failed: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/admin/{token}/notify_whatsapp_existing")
-async def admin_notify_whatsapp_existing(token: str):
-    """Sende WhatsApp-Benachrichtigungen für bestehende Zuweisungen (auch wenn bereits per Email benachrichtigt)"""
-    if token != ADMIN_TOKEN:
-        raise HTTPException(status_code=403)
-    try:
-        report = send_whatsapp_for_existing_assignments()
-        if not report:
-            return PlainTextResponse("Keine bestehenden Zuweisungen mit Telefonnummern gefunden.")
-        # Baue menschenlesbaren Report
-        lines = ["WhatsApp-Benachrichtigungen für bestehende Zuweisungen:", ""]
-        for r in report:
-            lines.append(f"- {r['staff_name']} ({r['phone']}): {r['count']} Aufgaben")
-            for it in r['items']:
-                guest = f" · {it['guest']}" if it.get('guest') else ""
-                lines.append(f"  • {it['date']} · {it['apt']} · {it['desc']}{guest}")
-            lines.append("")
-        return PlainTextResponse("\n".join(lines).strip())
-    except Exception as e:
-        log.exception("WhatsApp notify existing failed: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/admin/{token}/cleanup_tasks")
-async def admin_cleanup_tasks(token: str, date: str, db=Depends(get_db)):
-    """Manuelles Löschen von Tasks an einem bestimmten Datum"""
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
-    
-    removed_count = 0
-    tasks = db.query(Task).filter(Task.date == date, Task.auto_generated == True).all()
-    
-    for t in tasks:
-        db.delete(t)
-        removed_count += 1
-        log.info("Removed task %d for date %s (apartment: %s)", t.id, date, t.apartment_id)
-    
-    db.commit()
-    return PlainTextResponse(f"Removed {removed_count} tasks for date {date}.")
-
-@app.get("/admin/{token}/cleanup")
-async def admin_cleanup(token: str, db=Depends(get_db)):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
-    
-    removed_count = 0
-    all_bookings = {b.id for b in db.query(Booking).all()}
-    log.info("🔍 Cleanup started. Checking %d tasks against %d bookings", db.query(Task).count(), len(all_bookings))
-    
-    # Finde ALLE ungültigen Tasks
-    for t in db.query(Task).all():
-        should_delete = False
-        reason = ""
-        
-        # Nur auto-generierte Tasks prüfen
-        if t.auto_generated and t.booking_id:
-            b = db.get(Booking, t.booking_id)
-            
-            # Wenn Buchung nicht mehr existiert
-            if not b or t.booking_id not in all_bookings:
-                should_delete = True
-                reason = f"booking {t.booking_id} does not exist"
-            # Wenn Buchung kein departure hat
-            elif not b.departure or not b.departure.strip():
-                should_delete = True
-                reason = f"booking {t.booking_id} has no departure"
-            # Wenn Buchung kein arrival hat
-            elif not b.arrival or not b.arrival.strip():
-                should_delete = True
-                reason = f"booking {t.booking_id} has no arrival"
-            # Wenn departure format ungültig
-            elif len(b.departure) != 10 or b.departure.count('-') != 2:
-                should_delete = True
-                reason = f"booking {t.booking_id} has invalid departure format"
-            # Wenn arrival format ungültig
-            elif len(b.arrival) != 10 or b.arrival.count('-') != 2:
-                should_delete = True
-                reason = f"booking {t.booking_id} has invalid arrival format"
-            # Wenn departure <= arrival
-            elif b.departure <= b.arrival:
-                should_delete = True
-                reason = f"booking {t.booking_id} departure <= arrival"
-        
-        if should_delete:
-            db.delete(t)
-            removed_count += 1
-            log.info("🗑️ Removing invalid task %d (date: %s, apt: %s, booking: %s) - %s", t.id, t.date, t.apartment_id, t.booking_id, reason)
-    
-    db.commit()
-    log.info("✅ Cleanup done. Removed %d invalid tasks", removed_count)
-    return PlainTextResponse(f"Cleanup done. Removed {removed_count} invalid tasks. Check logs for details.")
-
-@app.get("/admin/{token}/export")
-async def admin_export(token: str, month: str, db=Depends(get_db)):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
-    apts = db.query(Apartment).all()
-    apt_map = {a.id: a.name for a in apts}
-    rows = []
-    for t in db.query(Task).order_by(Task.date, Task.id).all():
-        if not t.date.startswith(month): continue
-        staff = db.get(Staff, t.assigned_staff_id) if t.assigned_staff_id else None
-        rate = float(staff.hourly_rate) if staff else 0.0
-        actual = 0
-        tl = db.query(TimeLog).filter(TimeLog.task_id==t.id, TimeLog.actual_minutes!=None).order_by(TimeLog.id.desc()).first()
-        if tl: actual = int(tl.actual_minutes)
-        cost = round((actual/60.0)*rate, 2)
-        rows.append({
-            "date": t.date,
-            "apartment_id": t.apartment_id,
-            "apartment_name": apt_map.get(t.apartment_id, ""),
-            "staff": staff.name if staff else "",
-            "planned_minutes": t.planned_minutes,
-            "actual_minutes": actual,
-            "hourly_rate": rate,
-            "cost_eur": cost,
-            "notes": t.notes,
-            "extras": t.extras_json,
-            "next_arrival": t.next_arrival or "",
-            "next_arrival_adults": t.next_arrival_adults or 0,
-            "next_arrival_children": t.next_arrival_children or 0,
-        })
-    headers = list(rows[0].keys()) if rows else ["date","apartment_id","apartment_name","staff","planned_minutes","actual_minutes","hourly_rate","cost_eur","notes","extras","next_arrival","next_arrival_adults","next_arrival_children"]
-    output = io.StringIO()
-    w = csv.DictWriter(output, fieldnames=headers)
-    w.writeheader()
-    for r in rows: w.writerow(r)
-    return StreamingResponse(iter([output.getvalue().encode('utf-8')]), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=report-{month}.csv"})
-
-# -------------------- Cleaner --------------------
-@app.get("/cleaner/{token}")
-async def cleaner_home(request: Request, token: str, show_done: int = 1, show_open: int = 1, db=Depends(get_db)):
-    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
-    if not s: raise HTTPException(status_code=403)
-    q = db.query(Task).filter(Task.assigned_staff_id==s.id)
-    # Abgelehnte Tasks ausblenden - zeige nur Tasks die nicht rejected sind
-    from sqlalchemy import or_
-    q = q.filter(or_(Task.assignment_status != "rejected", Task.assignment_status.is_(None)))
-    # Filter nach Status: erledigte und/oder offene Aufgaben
-    status_filters = []
-    if show_done:
-        status_filters.append(Task.status == "done")
-    if show_open:
-        status_filters.append(Task.status != "done")
-    if status_filters:
-        q = q.filter(or_(*status_filters))
-    else:
-        # Wenn beide Filter deaktiviert sind, zeige nichts
-        q = q.filter(Task.id == -1)  # Unmögliche Bedingung
-    tasks = q.order_by(Task.date, Task.id).all()
-    apts = db.query(Apartment).all()
-    apt_map = {a.id: a.name for a in apts}
-    bookings = db.query(Booking).all()
-    book_map = {b.id: (b.guest_name or "").strip() for b in bookings if b.guest_name}
-    booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0, 'guest_name': (b.guest_name or "").strip()} for b in bookings}
-    # Stunden: vorletzter, letzter, aktueller Monat
-    today = dt.date.today()
-    current_month_str = today.strftime("%Y-%m")
-    if today.month >= 3:
-        last_month = (today.year, today.month - 1)
-        prev_last_month = (today.year, today.month - 2)
-    elif today.month == 2:
-        last_month = (today.year, 1)
-        prev_last_month = (today.year - 1, 12)
-    else:  # today.month == 1
-        last_month = (today.year - 1, 12)
-        prev_last_month = (today.year - 1, 11)
-    last_month_str = f"{last_month[0]}-{last_month[1]:02d}"
-    prev_last_month_str = f"{prev_last_month[0]}-{prev_last_month[1]:02d}"
-
-    logs = db.query(TimeLog).filter(TimeLog.staff_id==s.id, TimeLog.actual_minutes!=None).all()
-    minutes_current = 0
-    minutes_last = 0
-    minutes_prev_last = 0
-    for tl in logs:
-        if not tl.started_at:
-            continue
-        m = tl.started_at[:7]
-        mins = int(tl.actual_minutes or 0)
-        if m == current_month_str:
-            minutes_current += mins
-        elif m == last_month_str:
-            minutes_last += mins
-        elif m == prev_last_month_str:
-            minutes_prev_last += mins
-    hours_current = round(minutes_current/60.0, 2)
-    hours_last = round(minutes_last/60.0, 2)
-    hours_prev_last = round(minutes_prev_last/60.0, 2)
-    used_hours = hours_current
-    run_map: Dict[int, str] = {}
-    for t in tasks:
-        tl = db.query(TimeLog).filter(TimeLog.task_id==t.id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
-        if tl:
-            run_map[t.id] = tl.started_at
-    has_running = any(t.status == 'running' for t in tasks)
-    warn_limit = used_hours > float(s.max_hours_per_month or 0)
-    # Timelog-Daten für jedes Task (für pausierte Aufgaben)
-    timelog_map = {}
-    for t in tasks:
-        tl = db.query(TimeLog).filter(TimeLog.task_id==t.id, TimeLog.staff_id==s.id).order_by(TimeLog.id.desc()).first()
-        if tl:
-            timelog_map[t.id] = {
-                'actual_minutes': tl.actual_minutes,
-                'started_at': tl.started_at,
-                'ended_at': tl.ended_at
-            }
-    extras_map: Dict[int, Dict[str, object]] = {}
-    for t in tasks:
-        try:
-            extras_map[t.id] = json.loads(t.extras_json or "{}") or {}
-        except Exception:
-            extras_map[t.id] = {}
-    lang = detect_language(request)
-    trans = get_translations(lang)
-    return templates.TemplateResponse("cleaner.html", {"request": request, "tasks": tasks, "used_hours": used_hours, "hours_prev_last": hours_prev_last, "hours_last": hours_last, "hours_current": hours_current, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "staff": s, "show_done": show_done, "show_open": show_open, "run_map": run_map, "timelog_map": timelog_map, "extras_map": extras_map, "warn_limit": warn_limit, "lang": lang, "trans": trans, "has_running": has_running})
-
-@app.post("/cleaner/{token}/start")
-async def cleaner_start(token: str, task_id: int = Form(...), show_done: Optional[int] = Form(None), show_open: Optional[int] = Form(None), db=Depends(get_db)):
-    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
-    if not s: raise HTTPException(status_code=403)
-    t = db.get(Task, task_id)
-    if not t: raise HTTPException(status_code=404, detail="Task nicht gefunden")
-    
-    # Beende alle offenen TimeLogs dieses Staff (außer für den aktuellen Task, falls er pausiert ist)
-    open_tls = db.query(TimeLog).filter(TimeLog.staff_id==s.id, TimeLog.ended_at==None, TimeLog.task_id!=task_id).all()
-    for open_tl in open_tls:
-        from datetime import datetime
-        open_tl.ended_at = now_iso()
-        fmt = "%Y-%m-%d %H:%M:%S"
-        try:
-            start = datetime.strptime(open_tl.started_at, fmt)
-            end = datetime.strptime(open_tl.ended_at, fmt)
-            elapsed = int((end-start).total_seconds()//60)
-            if open_tl.actual_minutes:
-                open_tl.actual_minutes += elapsed
-            else:
-                open_tl.actual_minutes = elapsed
-        except Exception:
-            pass
-        # Setze den Status der anderen Tasks auf 'open'
-        other_task = db.get(Task, open_tl.task_id)
-        if other_task and other_task.status == 'running':
-            other_task.status = 'open'
-    
-    # Prüfe ob bereits ein TimeLog für diesen Task existiert (pausierte Aufgabe)
-    existing_tl = db.query(TimeLog).filter(TimeLog.task_id==task_id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
-    if existing_tl:
-        # Setze started_at auf jetzt, damit die Zeit weiterläuft
-        existing_tl.started_at = now_iso()
-    else:
-        # Erstelle neues TimeLog für diesen Task
-        existing_tl = TimeLog(task_id=task_id, staff_id=s.id, started_at=now_iso(), ended_at=None, actual_minutes=None)
-        db.add(existing_tl)
-    
-    t.status = "running"
-    db.commit()
-    # Behalte Filter-Parameter bei
-    query_string = ""
-    if show_done is not None or show_open is not None:
-        query_parts = []
-        if show_done is not None:
-            query_parts.append(f"show_done={show_done}")
-        if show_open is not None:
-            query_parts.append(f"show_open={show_open}")
-        if query_parts:
-            query_string = "?" + "&".join(query_parts)
-    return RedirectResponse(url=f"/cleaner/{token}{query_string}", status_code=303)
-
-@app.post("/cleaner/{token}/stop")
-async def cleaner_stop(token: str, task_id: int = Form(...), show_done: Optional[int] = Form(None), show_open: Optional[int] = Form(None), db=Depends(get_db)):
-    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
-    if not s: raise HTTPException(status_code=403)
-    t = db.get(Task, task_id)
-    if not t: raise HTTPException(status_code=404, detail="Task nicht gefunden")
-    
-    tl = db.query(TimeLog).filter(TimeLog.task_id==task_id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
-    if tl:
-        from datetime import datetime
-        fmt = "%Y-%m-%d %H:%M:%S"
-        # Speichere aktuelle Zeit, aber lasse ended_at auf None für spätere Fortsetzung
-        # Berechne die bisherige Zeit
-        try:
-            start = datetime.strptime(tl.started_at, fmt)
-            now = datetime.now()
-            # Berechne bisherige Minuten und addiere zu eventuell bereits vorhandenen
-            current_elapsed = int((now - start).total_seconds() // 60)
-            if tl.actual_minutes:
-                tl.actual_minutes += current_elapsed
-            else:
-                tl.actual_minutes = current_elapsed
-            # Aktualisiere started_at auf jetzt, damit beim Weiterstarten die Zeit korrekt weiterläuft
-            tl.started_at = now_iso()
-            # Lassen ended_at auf None, damit wir wissen dass es pausiert ist
-        except Exception as e:
-            log.error("Error in cleaner_stop: %s", e)
-            pass
-    
-    t.status = "paused"  # Status auf "paused" setzen statt "open"
-    db.commit()
-    # Behalte Filter-Parameter bei
-    query_string = ""
-    if show_done is not None or show_open is not None:
-        query_parts = []
-        if show_done is not None:
-            query_parts.append(f"show_done={show_done}")
-        if show_open is not None:
-            query_parts.append(f"show_open={show_open}")
-        if query_parts:
-            query_string = "?" + "&".join(query_parts)
-    return RedirectResponse(url=f"/cleaner/{token}{query_string}", status_code=303)
-
-@app.post("/cleaner/{token}/done")
-async def cleaner_done(token: str, task_id: int = Form(...), show_done: Optional[int] = Form(None), show_open: Optional[int] = Form(None), db=Depends(get_db)):
-    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
-    if not s: raise HTTPException(status_code=403)
-    t = db.get(Task, task_id)
-    if not t: raise HTTPException(status_code=404, detail="Task nicht gefunden")
-    
-    # Beende TimeLog wenn noch offen
-    tl = db.query(TimeLog).filter(TimeLog.task_id==task_id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
-    if tl:
-        from datetime import datetime
-        fmt = "%Y-%m-%d %H:%M:%S"
-        tl.ended_at = now_iso()
-        try:
-            start = datetime.strptime(tl.started_at, fmt)
-            end = datetime.strptime(tl.ended_at, fmt)
-            finished = int((end-start).total_seconds()//60)
-            if tl.actual_minutes:
-                tl.actual_minutes += finished
-            else:
-                tl.actual_minutes = finished
-        except Exception:
-            pass
-    
-    t.status = "done"
-    db.commit()
-    # Behalte Filter-Parameter bei
-    query_string = ""
-    if show_done is not None or show_open is not None:
-        query_parts = []
-        if show_done is not None:
-            query_parts.append(f"show_done={show_done}")
-        if show_open is not None:
-            query_parts.append(f"show_open={show_open}")
-        if query_parts:
-            query_string = "?" + "&".join(query_parts)
-    return RedirectResponse(url=f"/cleaner/{token}{query_string}", status_code=303)
-
-@app.post("/cleaner/{token}/accept")
-async def cleaner_accept(token: str, task_id: int = Form(...), show_done: Optional[int] = Form(None), show_open: Optional[int] = Form(None), db=Depends(get_db)):
-    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
-    if not s: raise HTTPException(status_code=403)
-    t = db.get(Task, task_id)
-    if not t or t.assigned_staff_id != s.id:
-        raise HTTPException(status_code=404, detail="Task nicht gefunden oder nicht zugewiesen")
-    t.assignment_status = "accepted"
-    db.commit()
-    # Behalte Filter-Parameter bei
-    query_string = ""
-    if show_done is not None or show_open is not None:
-        query_parts = []
-        if show_done is not None:
-            query_parts.append(f"show_done={show_done}")
-        if show_open is not None:
-            query_parts.append(f"show_open={show_open}")
-        if query_parts:
-            query_string = "?" + "&".join(query_parts)
-    return RedirectResponse(url=f"/cleaner/{token}{query_string}", status_code=303)
-
-@app.post("/cleaner/{token}/reject")
-async def cleaner_reject(token: str, task_id: int = Form(...), show_done: Optional[int] = Form(None), show_open: Optional[int] = Form(None), db=Depends(get_db)):
-    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
-    if not s: raise HTTPException(status_code=403)
-    t = db.get(Task, task_id)
-    if not t or t.assigned_staff_id != s.id:
-        raise HTTPException(status_code=404, detail="Task nicht gefunden oder nicht zugewiesen")
-    t.assignment_status = "rejected"
-    db.commit()
-    # Behalte Filter-Parameter bei
-    query_string = ""
-    if show_done is not None or show_open is not None:
-        query_parts = []
-        if show_done is not None:
-            query_parts.append(f"show_done={show_done}")
-        if show_open is not None:
-            query_parts.append(f"show_open={show_open}")
-        if query_parts:
-            query_string = "?" + "&".join(query_parts)
-    return RedirectResponse(url=f"/cleaner/{token}{query_string}", status_code=303)
-
-@app.post("/cleaner/{token}/reopen")
-async def cleaner_reopen(token: str, task_id: int = Form(...), db=Depends(get_db)):
-    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
-    if not s: raise HTTPException(status_code=403)
-    t = db.get(Task, task_id)
-    tl = db.query(TimeLog).filter(TimeLog.task_id==task_id, TimeLog.staff_id==s.id).order_by(TimeLog.id.desc()).first()
-    if tl:
-        db.delete(tl)
-    t.status = "open"
-    db.commit()
-    return RedirectResponse(url=f"/cleaner/{token}?show_done=1", status_code=303)
-
-@app.post("/cleaner/{token}/note")
-async def cleaner_note(token: str, task_id: int = Form(...), note: str = Form(""), db=Depends(get_db)):
-    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
-    if not s: raise HTTPException(status_code=403)
-    t = db.get(Task, task_id)
-    t.notes = (note or "").strip()
-    db.commit()
-    return JSONResponse({"ok": True, "task_id": t.id, "note": t.notes})
-
-@app.post("/cleaner/{token}/task/create")
-async def cleaner_task_create(token: str, date: str = Form(...), planned_minutes: int = Form(90), description: str = Form(""), db=Depends(get_db)):
-    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
-    if not s:
-        raise HTTPException(status_code=403)
-    # Validierung
-    if not date or not date.strip():
-        raise HTTPException(status_code=400, detail="Datum ist erforderlich")
-    try:
-        _ = dt.datetime.strptime(date[:10], "%Y-%m-%d")
-    except Exception:
-        raise HTTPException(status_code=400, detail="Ungültiges Datum")
-    pm = int(planned_minutes or 0)
-    if pm <= 0:
-        pm = 30
-    # Manuelle Aufgabe, dem Cleaner selbst zugeordnet
-    t = Task(
-        date=date[:10],
-        apartment_id=None,
-        planned_minutes=pm,
-        notes=(description[:2000] if description else None),
-        assigned_staff_id=s.id,
-        assignment_status="accepted",
-        status="open",
-        auto_generated=False
-    )
-    db.add(t)
-    db.commit()
-    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
-
-@app.post("/cleaner/{token}/task/delete")
-async def cleaner_task_delete(token: str, task_id: int = Form(...), db=Depends(get_db)):
-    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
-    if not s:
-        raise HTTPException(status_code=403)
-    t = db.get(Task, task_id)
-    if not t or t.assigned_staff_id != s.id:
-        raise HTTPException(status_code=404, detail="Task nicht gefunden oder nicht zugewiesen")
-    if t.auto_generated:
-        raise HTTPException(status_code=400, detail="Automatisch erzeugte Aufgaben können hier nicht gelöscht werden")
-    # Timelogs für diesen Task entfernen
-    for tl in db.query(TimeLog).filter(TimeLog.task_id==t.id).all():
-        db.delete(tl)
-    db.delete(t)
-    db.commit()
-    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
-
-@app.get("/c/{token}/accept")
-async def cleaner_accept_get(token: str, task_id: int, db=Depends(get_db)):
-    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
-    if not s: raise HTTPException(status_code=403)
-    t = db.get(Task, task_id)
-    if not t or t.assigned_staff_id != s.id:
-        raise HTTPException(status_code=404, detail="Task nicht gefunden oder nicht zugewiesen")
-    t.assignment_status = "accepted"
-    db.commit()
-    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
-
-@app.get("/c/{token}/reject")
-async def cleaner_reject_get(token: str, task_id: int, db=Depends(get_db)):
-    s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
-    if not s: raise HTTPException(status_code=403)
-    t = db.get(Task, task_id)
-    if not t or t.assigned_staff_id != s.id:
-        raise HTTPException(status_code=404, detail="Task nicht gefunden oder nicht zugewiesen")
-    t.assignment_status = "rejected"
-    db.commit()
-    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
-
-def _is_admin_token(token: str, db) -> bool:
-    if token == ADMIN_TOKEN:
-        return True;
-    try:
-        s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True, Staff.is_admin==True).first()
-        return bool(s)
-    except Exception:
-        return False
-
-# ------------- Web Push Endpoints -------------
-@app.get("/push/public_key")
-async def push_public_key():
-    if not VAPID_PUBLIC_KEY:
-        return JSONResponse({"publicKey": ""})
-    return JSONResponse({"publicKey": VAPID_PUBLIC_KEY})
-
-@app.post("/push/subscribe")
-async def push_subscribe(request: Request, staff_token: Optional[str] = Query(None), db=Depends(get_db)):
-    data = await request.json()
-    endpoint = data.get("endpoint")
-    keys = data.get("keys", {})
-    p256dh = keys.get("p256dh", "")
-    auth = keys.get("auth", "")
-    if not endpoint or not p256dh or not auth:
-        raise HTTPException(status_code=400, detail="Invalid subscription")
-    staff_id = None
-    if staff_token:
-        s = db.query(Staff).filter(Staff.magic_token==staff_token).first()
-        if s: staff_id = s.id
-    # deduplicate
-    existing = db.query(PushSubscription).filter(PushSubscription.endpoint==endpoint).first()
-    ua = request.headers.get("user-agent", "")[:250]
-    now = now_iso()
-    if existing:
-        existing.p256dh = p256dh
-        existing.auth = auth
-        existing.user_agent = ua
-        if staff_id: existing.staff_id = staff_id
-    else:
-        sub = PushSubscription(staff_id=staff_id, endpoint=endpoint, p256dh=p256dh, auth=auth, user_agent=ua, created_at=now)
-        db.add(sub)
-    db.commit()
-    return JSONResponse({"ok": True})
-
-@app.post("/push/unsubscribe")
-async def push_unsubscribe(request: Request, db=Depends(get_db)):
-    data = await request.json()
-    endpoint = data.get("endpoint")
-    if not endpoint:
-        raise HTTPException(status_code=400, detail="Missing endpoint")
-    sub = db.query(PushSubscription).filter(PushSubscription.endpoint==endpoint).first()
-    if sub:
-        db.delete(sub)
-        db.commit()
-    return JSONResponse({"ok": True})
-
-def _send_webpush_to_subscription(sub: PushSubscription, payload: dict):
-    if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY:
-        log.warning("WebPush disabled: missing VAPID keys")
-        return False
-    try:
-        webpush(
-            subscription_info={
-                "endpoint": sub.endpoint,
-                "keys": {"p256dh": sub.p256dh, "auth": sub.auth},
-            },
-            data=json.dumps(payload),
-            vapid_private_key=VAPID_PRIVATE_KEY,
-            vapid_claims={"sub": VAPID_EMAIL},
-            ttl=60,
-        )
-        return True
-    except WebPushException as e:
-        log.warning("WebPush failed: %s", e)
-        return False
-
-@app.post("/admin/{token}/push/test")
-async def admin_push_test(token: str, staff_id: Optional[int] = Form(None), db=Depends(get_db)):
-    if not _is_admin_token(token, db):
-        raise HTTPException(status_code=403)
-    q = db.query(PushSubscription)
-    if staff_id:
-        q = q.filter(PushSubscription.staff_id==staff_id)
-    subs = q.all()
-    sent = 0
-    for sub in subs:
-        ok = _send_webpush_to_subscription(sub, {"title": "Test", "body": "Web Push funktioniert.", "url": f"/admin/{token}"})
-        if ok: sent += 1
-    return JSONResponse({"ok": True, "sent": sent})

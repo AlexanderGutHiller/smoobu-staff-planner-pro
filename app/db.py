@@ -4,10 +4,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 # Datenbankpfad-Priorität:
-# 1) Explizit via ENV DB_PATH (z. B. "/var/data/data.db" auf Render Disk)
+# 1) Explizit via ENV DB_PATH (z. B. "/var/data/data.db")
 # 2) Verzeichnis via ENV DATA_DIR (z. B. "/var/data" oder "/app/data")
 # 3) Fly.io Volume "/app/data" falls vorhanden
-# 4) Render Disk "/var/data" falls vorhanden
+# 4) "/var/data" falls vorhanden
 # 5) Fallback: aktuelles Verzeichnis
 env_db_path = (os.getenv("DB_PATH") or "").strip()
 if env_db_path:
