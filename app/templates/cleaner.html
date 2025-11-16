@@ -245,16 +245,9 @@ body { background-color: var(--background); }
 /* Harte Absicherung: wenn ein Task läuft, alle anderen Karten deaktivieren (Desktop) */
 .task-card:not(.running) { pointer-events: none; opacity: 0.5; }
 
-/* Mobile: Nur die laufende Aufgabe anzeigen, Scrollen verhindern */
+/* Mobile: Nur die laufende Aufgabe anzeigen, aber Scrollen erlauben,
+   damit alle Buttons (Stop/Fertig/Notiz) erreichbar bleiben */
 @media (max-width: 768px) {
-  html, body {
-    height: 100%;
-    overflow: hidden;
-  }
-  .mobile-view {
-    max-height: 100vh;
-    overflow: hidden;
-  }
   .mobile-view .task-card-mobile:not(.running) {
     display: none !important;
   }
