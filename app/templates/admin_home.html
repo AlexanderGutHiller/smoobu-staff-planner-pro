@@ -39,11 +39,24 @@
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     transform: translateY(-2px);
   }
-  .task-card.done { opacity: 0.6; }
-  .task-card.running { border-left: 4px solid var(--info); }
-  .task-card.paused { border-left: 4px solid var(--warning); }
-  .task-card.done { border-left: 4px solid var(--success); }
-  .task-card.open { border-left: 4px solid var(--muted); }
+         /* Status-Farben (überarbeitet für bessere Lesbarkeit) */
+         .task-card.open {
+           border-left: 4px solid var(--muted);
+           background-color: #ffffff; /* neutral */
+         }
+         .task-card.running {
+           border-left: 4px solid var(--info);
+           background-color: #e7f4ff; /* dezentes Blau */
+         }
+         .task-card.paused {
+           border-left: 4px solid var(--warning);
+           background-color: #fff8e1; /* warmes Gelb */
+         }
+         .task-card.done {
+           border-left: 4px solid var(--success);
+           background-color: #e9f7ef; /* sanftes Grün */
+           opacity: 0.9; /* weniger ausgegraut für Lesbarkeit */
+         }
   .task-card.assign-pending {
     border-left: 4px solid var(--warning);
     background-color: #fff8e1;
@@ -415,21 +428,7 @@ function setLanguage(lang) {
     {% endfor %}
   </select>
   
-  <h6 class="mb-2">{{ trans.status }}:</h6>
-  <div class="mb-3">
-    <div class="form-check">
-      <input class="form-check-input" type="checkbox" id="filterShowDoneMobile" {% if show_done %}checked{% endif %}>
-      <label class="form-check-label" for="filterShowDoneMobile">
-        {{ trans.erledigte_aufgaben }}
-      </label>
-    </div>
-    <div class="form-check">
-      <input class="form-check-input" type="checkbox" id="filterShowOpenMobile" {% if show_open %}checked{% endif %}>
-      <label class="form-check-label" for="filterShowOpenMobile">
-        {{ trans.offene_aufgaben }}
-      </label>
-    </div>
-  </div>
+  <!-- Status-Checkboxen auf Mobile entfernt (Duplikat) -->
 
   <div class="d-flex gap-2 mt-3">
     <button class="btn btn-outline-secondary btn-sm" type="button" onclick="resetMobileFilters()"><i class="bi bi-x-circle"></i> Reset</button>

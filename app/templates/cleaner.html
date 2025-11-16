@@ -38,8 +38,9 @@ body { background-color: var(--background); }
   transform: translateY(-2px);
 }
 .task-card.done {
-  opacity: 0.6;
   border-left: 4px solid var(--success);
+  background-color: #e9f7ef; /* sanftes Grün */
+  opacity: 0.95;
 }
 .task-card.disabled {
   opacity: 0.5;
@@ -47,11 +48,12 @@ body { background-color: var(--background); }
   background-color: #f8f9fa;
 }
 .task-card.paused {
-  border-left: 4px solid var(--info);
-  background-color: #e7f8ff;
+  border-left: 4px solid var(--warning);
+  background-color: #fff8e1; /* warmes Gelb */
 }
 .task-card.running {
   border-left: 4px solid var(--info);
+  background-color: #e7f4ff; /* dezentes Blau */
 }
 .task-card.assign-accepted {
   border-left: 4px solid var(--success);
