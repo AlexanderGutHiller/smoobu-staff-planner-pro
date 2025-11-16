@@ -220,10 +220,22 @@
     .btn { padding: 0.4rem 0.6rem; font-size: 0.8rem; }
     .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .desktop-view { display: none !important; } /* Desktop-Ansicht auf mobilen Geräten ausblenden */
-    .mobile-view { display: block !important; visibility: visible !important; opacity: 1 !important; }
+    .mobile-view { 
+      display: block !important; 
+      visibility: visible !important; 
+      opacity: 1 !important; 
+      position: relative !important;
+      z-index: 10 !important;
+    }
     .hide-on-mobile { display: none !important; }
     /* Lovable/iOS Fallback: Karten immer sichtbar erzwingen */
-    .task-card-mobile { display: block !important; visibility: visible !important; opacity: 1 !important; min-height: 50px !important; }
+    .task-card-mobile { 
+      display: block !important; 
+      visibility: visible !important; 
+      opacity: 1 !important; 
+      min-height: 50px !important;
+      margin-bottom: 1rem !important;
+    }
     .filter-input { width: 100%; margin-bottom: 0.5rem; }
     /* Bessere Bedienbarkeit auf iOS/iPhone */
     .mobile-filter-section select.form-select {
@@ -324,7 +336,7 @@
   
   @media (min-width: 769px) {
     .desktop-view { display: block; }
-    .mobile-view:not([style*="display: block"]) { display: none; }
+    .mobile-view { display: none; }
   }
 </style>
 </head>
@@ -1000,15 +1012,18 @@ function setLanguage(lang) {
 </div>
 
 <!-- Mobile View -->
-<div class="mobile-view" style="display: block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 1 !important;">
+<div class="mobile-view" id="mobile-view-container">
 <!-- Debug: Anzahl Tasks: {{ tasks|length }} -->
+<div style="background: #ff0000; color: white; padding: 20px; margin: 20px 0; border-radius: 5px; font-size: 18px; font-weight: bold; text-align: center; position: relative; z-index: 9999;">
+  🔴 MOBILE VIEW IST AKTIV - {{ tasks|length }} Tasks geladen
+</div>
 {% if tasks|length > 0 %}
-  <div style="background: red; color: white; padding: 10px; margin: 10px 0; border-radius: 5px;">
-    DEBUG: {{ tasks|length }} Tasks gefunden - Mobile View sollte sichtbar sein!
+  <div style="background: #00ff00; color: black; padding: 10px; margin: 10px 0; border-radius: 5px; font-weight: bold;">
+    ✅ {{ tasks|length }} Tasks gefunden - Mobile View sollte sichtbar sein!
   </div>
 {% else %}
-  <div style="background: orange; color: white; padding: 10px; margin: 10px 0; border-radius: 5px;">
-    DEBUG: Keine Tasks gefunden - Bitte Filter prüfen!
+  <div style="background: #ffa500; color: black; padding: 10px; margin: 10px 0; border-radius: 5px; font-weight: bold;">
+    ⚠️ Keine Tasks gefunden - Bitte Filter prüfen!
   </div>
 {% endif %}
 {% for t in tasks %}
