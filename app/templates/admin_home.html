@@ -220,10 +220,10 @@
     .btn { padding: 0.4rem 0.6rem; font-size: 0.8rem; }
     .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .desktop-view { display: none !important; } /* Desktop-Ansicht auf mobilen Geräten ausblenden */
-    .mobile-view { display: block !important; visibility: visible !important; }
+    .mobile-view { display: block !important; visibility: visible !important; opacity: 1 !important; }
     .hide-on-mobile { display: none !important; }
     /* Lovable/iOS Fallback: Karten immer sichtbar erzwingen */
-    .task-card-mobile { display: block !important; visibility: visible !important; opacity: 1 !important; }
+    .task-card-mobile { display: block !important; visibility: visible !important; opacity: 1 !important; min-height: 50px !important; }
     .filter-input { width: 100%; margin-bottom: 0.5rem; }
     /* Bessere Bedienbarkeit auf iOS/iPhone */
     .mobile-filter-section select.form-select {
@@ -1000,7 +1000,8 @@ function setLanguage(lang) {
 </div>
 
 <!-- Mobile View -->
-<div class="mobile-view">
+<div class="mobile-view" style="display: block !important; visibility: visible !important;">
+<!-- Debug: Anzahl Tasks: {{ tasks|length }} -->
 {% for t in tasks %}
 {% set tl = timelog_map.get(t.id, {}) %}
 {% set extras = extras_map.get(t.id, {}) %}
@@ -1034,63 +1035,6 @@ function setLanguage(lang) {
       {% endif %}
     </div>
   </div>
-  
-<script>
-  // Scroll-Position und Fokus nach Zuweisung erhalten
-  (function() {
-    document.addEventListener('DOMContentLoaded', function() {
-      try {
-        const anchorId = sessionStorage.getItem('adminAnchor');
-        const scrollY = sessionStorage.getItem('adminScrollY');
-        if (anchorId) {
-          // Versuche zuerst gespeicherten Anker, sonst Desktop/Mobile-Varianten
-          let el = document.getElementById(anchorId);
-          if (!el) {
-            const id = anchorId.replace(/^task-mobile-/, '').replace(/^task-/, '');
-            el = document.getElementById('task-' + id) || document.getElementById('task-mobile-' + id);
-          }
-          if (el) el.scrollIntoView({ behavior: 'auto', block: 'center' });
-        } else if (scrollY) {
-          window.scrollTo(0, parseInt(scrollY, 10) || 0);
-        }
-      } catch (e) {}
-      // Nach Wiederherstellung aufräumen
-      try {
-        sessionStorage.removeItem('adminAnchor');
-        sessionStorage.removeItem('adminScrollY');
-      } catch (e) {}
-    });
-    // Vor Submit von Zuweisungs-Formularen Position merken
-    function attachPreserveHandlers() {
-      const assignForms = document.querySelectorAll('form[action$="/task/assign"]');
-      assignForms.forEach(function(form) {
-        form.addEventListener('submit', function() {
-          try {
-            const taskInput = form.querySelector('input[name="task_id"]');
-            const taskId = taskInput ? taskInput.value : '';
-            sessionStorage.setItem('adminScrollY', String(window.scrollY));
-            const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-            sessionStorage.setItem('adminAnchor', taskId ? ((isMobile ? 'task-mobile-' : 'task-') + taskId) : '');
-          } catch (e) {}
-        }, { capture: true });
-      });
-      // Auch für Status/Extras-Formulare, damit die Ansicht nicht "verspringt"
-      const otherForms = document.querySelectorAll('form[action*="/task/status"], form[action*="/task/extras"]');
-      otherForms.forEach(function(form) {
-        form.addEventListener('submit', function() {
-          try {
-            const taskInput = form.querySelector('input[name="task_id"]');
-            const taskId = taskInput ? taskInput.value : '';
-            sessionStorage.setItem('adminScrollY', String(window.scrollY));
-            const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-            sessionStorage.setItem('adminAnchor', taskId ? ((isMobile ? 'task-mobile-' : 'task-') + taskId) : '');
-          } catch (e) {}
-        }, { capture: true });
-      });
-    }
-    attachPreserveHandlers();
-  })();
-</script>
 
   <div class="task-info-row">
     <span class="task-info-label">{{ trans.status }}:</span>
@@ -1236,6 +1180,61 @@ function setLanguage(lang) {
   </div>
 {% endif %}
 </div> <!-- Ende Mobile-Ansicht -->
+
+<script>
+  // Scroll-Position und Fokus nach Zuweisung erhalten (einmalig, außerhalb der Task-Schleife)
+  (function() {
+    document.addEventListener('DOMContentLoaded', function() {
+      try {
+        const anchorId = sessionStorage.getItem('adminAnchor');
+        const scrollY = sessionStorage.getItem('adminScrollY');
+        if (anchorId) {
+          // Versuche zuerst gespeicherten Anker, sonst Desktop/Mobile-Varianten
+          let el = document.getElementById(anchorId);
+          if (!el) {
+            const id = anchorId.replace(/^task-mobile-/, '').replace(/^task-/, '');
+            el = document.getElementById('task-' + id) || document.getElementById('task-mobile-' + id);
+          }
+          if (el) el.scrollIntoView({ behavior: 'auto', block: 'center' });
+        } else if (scrollY) {
+          window.scrollTo(0, parseInt(scrollY, 10) || 0);
+        }
+      } catch (e) {}
+      // Nach Wiederherstellung aufräumen
+      try {
+        sessionStorage.removeItem('adminAnchor');
+        sessionStorage.removeItem('adminScrollY');
+      } catch (e) {}
+      
+      // Vor Submit von Zuweisungs-Formularen Position merken
+      const assignForms = document.querySelectorAll('form[action$="/task/assign"]');
+      assignForms.forEach(function(form) {
+        form.addEventListener('submit', function() {
+          try {
+            const taskInput = form.querySelector('input[name="task_id"]');
+            const taskId = taskInput ? taskInput.value : '';
+            sessionStorage.setItem('adminScrollY', String(window.scrollY));
+            const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+            sessionStorage.setItem('adminAnchor', taskId ? ((isMobile ? 'task-mobile-' : 'task-') + taskId) : '');
+          } catch (e) {}
+        }, { capture: true });
+      });
+      // Auch für Status/Extras-Formulare, damit die Ansicht nicht "verspringt"
+      const otherForms = document.querySelectorAll('form[action*="/task/status"], form[action*="/task/extras"]');
+      otherForms.forEach(function(form) {
+        form.addEventListener('submit', function() {
+          try {
+            const taskInput = form.querySelector('input[name="task_id"]');
+            const taskId = taskInput ? taskInput.value : '';
+            sessionStorage.setItem('adminScrollY', String(window.scrollY));
+            const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+            sessionStorage.setItem('adminAnchor', taskId ? ((isMobile ? 'task-mobile-' : 'task-') + taskId) : '');
+          } catch (e) {}
+        }, { capture: true });
+      });
+    });
+  })();
+</script>
 
 <script>
 function resetMobileFilters(){
