@@ -2433,7 +2433,11 @@ async def cleaner_done(token: str, task_id: int = Form(...), show_done: Optional
         try:
             start = datetime.strptime(tl.started_at, fmt)
             end = datetime.strptime(tl.ended_at, fmt)
-            tl.actual_minutes = int((end-start).total_seconds()//60)
+            finished = int((end-start).total_seconds()//60)
+            if tl.actual_minutes:
+                tl.actual_minutes += finished
+            else:
+                tl.actual_minutes = finished
         except Exception:
             pass
     
