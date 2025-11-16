@@ -392,10 +392,10 @@
     <div class="d-flex gap-2 align-items-center">
       <label class="mb-0 small text-muted">{{ trans.apartment }}:</label>
       <select id="f-apt-desktop" name="apartment_id" class="form-select form-select-sm" style="width: auto;" onchange="document.getElementById('filterForm').submit()">
-        <option value="">{{ trans.all }}</option>
-        <option value="0" {% if not apartment_id %}selected{% endif %}>{{ trans.manuelle_aufgabe }}</option>
+        <option value="" {% if apartment_id is none %}selected{% endif %}>{{ trans.all }}</option>
+        <option value="0" {% if apartment_id is not none and apartment_id == 0 %}selected{% endif %}>{{ trans.manuelle_aufgabe }}</option>
         {% for apt in apartments %}
-          <option value="{{ apt.id }}" {% if apartment_id and apartment_id==apt.id %}selected{% endif %}>{{ apt.name }}</option>
+          <option value="{{ apt.id }}" {% if apartment_id is not none and apartment_id==apt.id %}selected{% endif %}>{{ apt.name }}</option>
         {% endfor %}
       </select>
     </div>
@@ -432,16 +432,16 @@ function setLanguage(lang) {
     </select>
     
     <h6 class="mb-2">{{ trans.apartment }}:</h6>
-    <select id="f-apt-mobile" name="apartment_id" class="form-select form-select-sm mb-3">
-      <option value="">{{ trans.all }}</option>
-      <option value="0" {% if not apartment_id %}selected{% endif %}>{{ trans.manuelle_aufgabe }}</option>
+    <select id="f-apt-mobile" name="apartment_id" class="form-select form-select-sm mb-3" onchange="document.getElementById('filterFormMobile').submit()">
+      <option value="" {% if apartment_id is none %}selected{% endif %}>{{ trans.all }}</option>
+      <option value="0" {% if apartment_id is not none and apartment_id == 0 %}selected{% endif %}>{{ trans.manuelle_aufgabe }}</option>
       {% for apt in apartments %}
-        <option value="{{ apt.id }}" {% if apartment_id and apartment_id==apt.id %}selected{% endif %}>{{ apt.name }}</option>
+        <option value="{{ apt.id }}" {% if apartment_id is not none and apartment_id==apt.id %}selected{% endif %}>{{ apt.name }}</option>
       {% endfor %}
     </select>
     
     <h6 class="mb-2">{{ trans.ma }}:</h6>
-    <select id="f-staff-mobile" name="staff_id" class="form-select form-select-sm mb-3">
+    <select id="f-staff-mobile" name="staff_id" class="form-select form-select-sm mb-3" onchange="document.getElementById('filterFormMobile').submit()">
       <option value="">{{ trans.all }}</option>
       {% for s in staff %}
         <option value="{{ s.id }}" {% if staff_id and staff_id==s.id %}selected{% endif %}>{{ s.name }}</option>
@@ -1117,6 +1117,7 @@ function resetMobileFilters(){
   if (!form) return;
   form.querySelectorAll('select').forEach(s => s.value = '');
   form.querySelectorAll('input[type=\"checkbox\"]').forEach(cb => cb.checked = true);
+  form.submit();
 }
 
 function handleExtraToggle(checkbox){

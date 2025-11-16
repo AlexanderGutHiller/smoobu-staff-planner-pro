@@ -1163,8 +1163,8 @@ async def admin_home(
     date_range: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-    staff_id: Optional[int] = Query(None),
-    apartment_id: Optional[int] = Query(None),
+    staff_id: Optional[str] = Query(None),
+    apartment_id: Optional[str] = Query(None),
     show_done: int = 1,
     show_open: int = 1,
     db=Depends(get_db),
@@ -1177,6 +1177,9 @@ async def admin_home(
     
     q = db.query(Task)
     # Datumsvoreinstellung / -filter
+    # Unterscheide: kein date_range-Parameter (Standard: nächste 7 Tage)
+    # vs. explizit "Alle" gewählt (date_range="" in Query -> keine Beschränkung)
+    has_date_range_param = "date_range" in request.query_params
     default_date_filter = date_range or ""
     today = dt.date.today()
     if date_range and not (date_from or date_to):
@@ -1201,22 +1204,38 @@ async def admin_home(
             date_from = today.isoformat()
             date_to = (today + dt.timedelta(days=7)).isoformat()
     if not date_from and not date_to:
-        # Fallback, wenn gar nichts gesetzt: nächste 7 Tage
-        date_from = today.isoformat()
-        date_to = (today + dt.timedelta(days=7)).isoformat()
-        if not default_date_filter:
-            default_date_filter = "next7"
+        # Fallback, wenn gar nichts gesetzt und kein explizites "Alle":
+        # Standard: nächste 7 Tage
+        if not has_date_range_param:
+            date_from = today.isoformat()
+            date_to = (today + dt.timedelta(days=7)).isoformat()
+            if not default_date_filter:
+                default_date_filter = "next7"
+    # Staff- und Apartment-Filter robust aus Strings parsen ("" = kein Filter)
+    staff_id_val: Optional[int] = None
+    if staff_id and str(staff_id).strip():
+        try:
+            staff_id_val = int(staff_id)
+        except ValueError:
+            staff_id_val = None
+    apartment_id_val: Optional[int] = None
+    if apartment_id is not None and str(apartment_id).strip() != "":
+        try:
+            apartment_id_val = int(apartment_id)
+        except ValueError:
+            apartment_id_val = None
+
     if date_from:
         q = q.filter(Task.date >= date_from)
     if date_to:
         q = q.filter(Task.date <= date_to)
-    if staff_id:
-        q = q.filter(Task.assigned_staff_id == staff_id)
-    if apartment_id is not None:
-        if apartment_id == 0:
+    if staff_id_val:
+        q = q.filter(Task.assigned_staff_id == staff_id_val)
+    if apartment_id_val is not None:
+        if apartment_id_val == 0:
             q = q.filter(Task.apartment_id == None)  # manuelle Aufgaben
-        elif apartment_id:
-            q = q.filter(Task.apartment_id == apartment_id)
+        elif apartment_id_val:
+            q = q.filter(Task.apartment_id == apartment_id_val)
     # Filter nach Status: erledigte und/oder offene Aufgaben
     from sqlalchemy import or_
     status_filters = []
@@ -1271,7 +1290,30 @@ async def admin_home(
     token_staff = db.query(Staff).filter(Staff.magic_token==token, Staff.is_admin==True, Staff.active==True).first()
     # Wenn Token einem Staff entspricht, Switch-Button ermöglichen
     staff_self = db.query(Staff).filter(Staff.magic_token==token).first()
-    return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "extras_map": extras_map, "base_url": base_url, "lang": lang, "trans": trans, "show_done": show_done, "show_open": show_open, "default_date_filter": default_date_filter, "staff_self": staff_self})
+    return templates.TemplateResponse(
+        "admin_home.html",
+        {
+            "request": request,
+            "token": token,
+            "tasks": tasks,
+            "staff": staff,
+            "apartments": apts,
+            "apt_map": apt_map,
+            "book_map": book_map,
+            "booking_details_map": booking_details_map,
+            "timelog_map": timelog_map,
+            "extras_map": extras_map,
+            "base_url": base_url,
+            "lang": lang,
+            "trans": trans,
+            "show_done": show_done,
+            "show_open": show_open,
+            "default_date_filter": default_date_filter,
+            "staff_self": staff_self,
+            "staff_id": staff_id_val,
+            "apartment_id": apartment_id_val,
+        },
+    )
 
 # ---------- Task Series Admin ----------
 @app.get("/admin/{token}/series")
@@ -1663,8 +1705,16 @@ async def admin_task_create(token: str, date: str = Form(...), apartment_id_raw:
     )
     db.add(new_task)
     db.commit()
-    
+
     log.info("✅ Manuell erstellte Aufgabe: %s für %s am %s", new_task.id, apt_name, date)
+
+    # Wenn ein MA ausgewählt wurde, direkt Benachrichtigung auslösen
+    if staff_id:
+        try:
+            send_assignment_emails_job()
+        except Exception as e:
+            log.error("Fehler beim Senden der Zuweisungs-Benachrichtigung für manuelle Aufgabe %s: %s", new_task.id, e)
+
     return RedirectResponse(url=f"/admin/{token}", status_code=303)
 
 @app.post("/admin/{token}/task/delete")

@@ -142,7 +142,7 @@ body { background-color: var(--background); }
 .task-info-row {
   display: flex;
   justify-content: space-between;
-  padding: 0.5rem 0;
+  padding: 0.35rem 0;              /* etwas kompakter, damit weniger vertikale Luft */
   border-bottom: 1px solid #f0f0f0;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -189,8 +189,9 @@ body { background-color: var(--background); }
 }
 .task-card { 
   width: 100% !important; 
-  margin: 0 !important;       /* keine zusätzlichen Außenabstände */
-  padding: 1rem;              /* Innenabstand bleibt für Optik */
+  margin: 0 !important;          /* keine zusätzlichen Außenabstände */
+  padding: 0.85rem 1rem;         /* leicht reduziertes Padding für kompaktere Karten */
+  border-radius: 0.75rem;
 }
 .container > .row.g-3 { width: 100% !important; }
 .row.g-3 > .col-12 { width: 100% !important; max-width: 100% !important; padding-left: 0 !important; padding-right: 0 !important; display: block; }
@@ -445,9 +446,9 @@ function setLanguage(lang) {
   {% endif %}
   
   {% if t.notes %}
-  <div class="task-info-row">
-    <span class="task-info-label"><i class="bi bi-sticky"></i> {{ trans.notiz }}:</span>
-    <span class="text-muted">{{ t.notes }}</span>
+  <div class="task-info-row" style="background:#fff7e6;border-radius:0.4rem;border:1px solid #ffe0b3;margin-top:0.4rem;">
+    <span class="task-info-label" style="color:#b26a00;"><i class="bi bi-sticky"></i> {{ trans.beschreibung if trans.beschreibung is defined else trans.notiz }}:</span>
+    <span class="fw-semibold" style="color:#b26a00;">{{ t.notes }}</span>
   </div>
   {% endif %}
     
