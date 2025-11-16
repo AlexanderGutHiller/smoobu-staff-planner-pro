@@ -367,17 +367,20 @@
 <form id="filterForm" class="desktop-view mb-3 hide-on-mobile" method="get" action="/admin/{{ token }}">
   <div class="d-flex gap-3 align-items-center flex-wrap">
     <div class="form-check">
-      <input class="form-check-input" type="checkbox" id="filterShowDone" name="show_done" value="1" {% if show_done %}checked{% endif %}>
+      <input class="form-check-input" type="checkbox" id="filterShowDone" value="1" {% if show_done %}checked{% endif %}>
       <label class="form-check-label" for="filterShowDone">
         {{ trans.erledigte_aufgaben }}
       </label>
     </div>
     <div class="form-check">
-      <input class="form-check-input" type="checkbox" id="filterShowOpen" name="show_open" value="1" {% if show_open %}checked{% endif %}>
+      <input class="form-check-input" type="checkbox" id="filterShowOpen" value="1" {% if show_open %}checked{% endif %}>
       <label class="form-check-label" for="filterShowOpen">
         {{ trans.offene_aufgaben }}
       </label>
     </div>
+    <!-- Hidden Felder tragen die eigentlichen Werte 0/1 -->
+    <input type="hidden" id="showDoneDesktop" name="show_done" value="{{ 1 if show_done else 0 }}">
+    <input type="hidden" id="showOpenDesktop" name="show_open" value="{{ 1 if show_open else 0 }}">
     <div class="d-flex gap-2 align-items-center">
       <label class="mb-0 small text-muted">{{ trans.date }}:</label>
       {% set date_default = default_date_filter or '' %}
@@ -450,17 +453,20 @@ function setLanguage(lang) {
 
     <!-- Status-Checkboxen Mobile: an Backend binden -->
     <div class="form-check mb-1">
-      <input class="form-check-input" type="checkbox" id="filterShowDoneMobile" name="show_done" value="1" {% if show_done %}checked{% endif %}>
+      <input class="form-check-input" type="checkbox" id="filterShowDoneMobile" value="1" {% if show_done %}checked{% endif %}>
       <label class="form-check-label" for="filterShowDoneMobile">
         {{ trans.erledigte_aufgaben }}
       </label>
     </div>
     <div class="form-check mb-3">
-      <input class="form-check-input" type="checkbox" id="filterShowOpenMobile" name="show_open" value="1" {% if show_open %}checked{% endif %}>
+      <input class="form-check-input" type="checkbox" id="filterShowOpenMobile" value="1" {% if show_open %}checked{% endif %}>
       <label class="form-check-label" for="filterShowOpenMobile">
         {{ trans.offene_aufgaben }}
       </label>
     </div>
+    <!-- Hidden Felder für Mobile-Form -->
+    <input type="hidden" id="showDoneMobileHidden" name="show_done" value="{{ 1 if show_done else 0 }}">
+    <input type="hidden" id="showOpenMobileHidden" name="show_open" value="{{ 1 if show_open else 0 }}">
     
     <div class="d-flex gap-2 mt-2">
       <button class="btn btn-outline-secondary btn-sm" type="button" onclick="resetMobileFilters()"><i class="bi bi-x-circle"></i> Reset</button>
@@ -542,7 +548,25 @@ function setLanguage(lang) {
         </span>
       {% endif %}
       <div class="flex-1">
-        <div class="task-apartment">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
+        {% if not t.apartment_id %}
+          <!-- Manuelle Aufgabe: Beschreibung prominent, Hinweis klein darunter -->
+          <div class="fw-semibold" style="font-size: 1rem;">
+            {{ t.notes or trans.manuelle_aufgabe }}
+          </div>
+          <div class="text-muted small">
+            {{ trans.manuelle_aufgabe }}
+          </div>
+        {% else %}
+          <!-- Normale Aufgabe mit Apartment im Vordergrund -->
+          <div class="task-apartment">
+            {{ apt_map.get(t.apartment_id, t.apartment_id) }}
+          </div>
+          {% if t.notes %}
+          <div class="text-muted small">
+            {{ t.notes[:80] }}{% if t.notes|length > 80 %}...{% endif %}
+          </div>
+          {% endif %}
+        {% endif %}
         {% if t.booking_id %}
           {% set guest_name = (book_map.get(t.booking_id) or booking_details_map.get(t.booking_id, {}).get('guest_name', '') or t.next_arrival_guest_name or '') %}
           {% if not guest_name or not guest_name.strip() %}
@@ -687,6 +711,21 @@ function setLanguage(lang) {
         </select>
       </form>
       {% if not t.auto_generated %}
+      <button 
+        class="btn btn-outline-secondary btn-sm"
+        type="button"
+        data-bs-toggle="modal"
+        data-bs-target="#editTaskModal"
+        data-task-id="{{ t.id }}"
+        data-task-date="{{ t.date }}"
+        data-task-apartment-id="{{ t.apartment_id or '' }}"
+        data-task-planned="{{ t.planned_minutes }}"
+        data-task-notes="{{ t.notes or '' }}"
+        data-task-staff-id="{{ t.assigned_staff_id or '' }}"
+        title="Aufgabe bearbeiten"
+      >
+        <i class="bi bi-pencil"></i>
+      </button>
       <form method="post" action="/admin/{{ token }}/task/delete" onsubmit="return confirm('Diesen manuellen Task löschen?');" class="d-inline">
         <input type="hidden" name="task_id" value="{{ t.id }}"/>
         <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
@@ -1309,7 +1348,21 @@ document.addEventListener('DOMContentLoaded', function() {
   function updateStatusFilters() {
     const desktopForm = document.getElementById('filterForm');
     const mobileForm = document.getElementById('filterFormMobile');
-    // Spiegeln: wenn Desktop geändert wurde, aktualisiere Mobile und umgekehrt
+    const hiddenDoneDesktop = document.getElementById('showDoneDesktop');
+    const hiddenOpenDesktop = document.getElementById('showOpenDesktop');
+    const hiddenDoneMobile = document.getElementById('showDoneMobileHidden');
+    const hiddenOpenMobile = document.getElementById('showOpenMobileHidden');
+
+    // aktuellen Zustand aus den Checkboxen ermitteln (egal ob Desktop oder Mobile)
+    const showDoneChecked = (filterShowDone && filterShowDone.checked) || (filterShowDoneMobile && filterShowDoneMobile.checked);
+    const showOpenChecked = (filterShowOpen && filterShowOpen.checked) || (filterShowOpenMobile && filterShowOpenMobile.checked);
+
+    // Hidden-Felder mit 0/1 befüllen
+    if (hiddenDoneDesktop) hiddenDoneDesktop.value = showDoneChecked ? '1' : '0';
+    if (hiddenOpenDesktop) hiddenOpenDesktop.value = showOpenChecked ? '1' : '0';
+    if (hiddenDoneMobile) hiddenDoneMobile.value = showDoneChecked ? '1' : '0';
+    if (hiddenOpenMobile) hiddenOpenMobile.value = showOpenChecked ? '1' : '0';
+    // Spiegeln: wenn Desktop geändert wurde, aktualisiere Mobile und umgekehrt (nur Anzeige)
     if (filterShowDone && filterShowDoneMobile) {
       filterShowDoneMobile.checked = filterShowDone.checked;
     }
