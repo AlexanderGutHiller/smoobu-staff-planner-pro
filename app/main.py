@@ -7,9 +7,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+from datetime import date as _date, datetime as _dt, timedelta as _td
 
 from .db import init_db, SessionLocal
-from .models import Booking, Staff, Apartment, Task, TimeLog
+from .models import Booking, Staff, Apartment, Task, TimeLog, TaskSeries
 from .services_smoobu import SmoobuClient
 from .utils import new_token, today_iso, now_iso
 from .sync import upsert_tasks_from_bookings
@@ -301,6 +302,147 @@ def date_wd_de(s: str, style: str = "short") -> str:
     wd_long  = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
     name = wd_long[d.weekday()] if style == "long" else wd_short[d.weekday()]
     return f"{name}, {d.strftime('%d.%m.%Y')}"
+def _parse_date(s: str) -> _date | None:
+    try:
+        return _dt.strptime(s, "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+def _add_months(d: _date, months: int) -> _date:
+    # simple month addition handling year wrap and end-of-month
+    y = d.year + (d.month - 1 + months) // 12
+    m = (d.month - 1 + months) % 12 + 1
+    # clamp day to last day of target month
+    import calendar
+    last_day = calendar.monthrange(y, m)[1]
+    day = min(d.day, last_day)
+    return _date(y, m, day)
+
+def _daterange_iter(start: _date, end: _date):
+    cur = start
+    while cur <= end:
+        yield cur
+        cur = cur + _td(days=1)
+
+def _expand_series_occurrences(series: TaskSeries, start_from: _date, until: _date) -> list[_date]:
+    """Return list of dates to generate between start_from and until inclusive."""
+    out: list[_date] = []
+    if not series.active:
+        return out
+    s0 = _parse_date(series.start_date)
+    if not s0:
+        return out
+    end_limit = _parse_date(series.end_date) if series.end_date else None
+    hard_until = min(until, end_limit) if end_limit else until
+    if hard_until < start_from:
+        return out
+    freq = (series.frequency or "").lower()
+    interval = max(1, int(series.interval or 1))
+    if freq == "weekly":
+        # determine weekdays
+        wd_map = {"mo":0,"tu":1,"we":2,"th":3,"fr":4,"sa":5,"su":6}
+        if series.byweekday:
+            wds = [wd_map.get(p.strip().lower()[:2]) for p in series.byweekday.split(",")]
+            wds = [w for w in wds if w is not None]
+            if not wds:
+                wds = [s0.weekday()]
+        else:
+            wds = [s0.weekday()]
+        # find the first week start aligned to interval
+        # compute week index since start
+        start_week_monday = s0 - _td(days=s0.weekday())
+        for d in _daterange_iter(max(start_from, s0), hard_until):
+            # check interval weeks from start
+            windex = ((d - start_week_monday).days // 7)
+            if windex % interval == 0 and d.weekday() in wds and d >= s0:
+                out.append(d)
+                if series.count and len(out) >= series.count:
+                    break
+    elif freq == "monthly":
+        # bymonthday list or default to start day
+        if series.bymonthday:
+            mdays = []
+            for p in series.bymonthday.split(","):
+                try:
+                    md = int(p.strip())
+                    if 1 <= md <= 31:
+                        mdays.append(md)
+                except Exception:
+                    pass
+            if not mdays:
+                mdays = [s0.day]
+        else:
+            mdays = [s0.day]
+        # iterate months from s0 to hard_until
+        cur = s0
+        # set cur to first month that reaches start_from
+        while cur < start_from:
+            cur = _add_months(cur, interval)
+        gen = 0
+        while cur <= hard_until:
+            import calendar
+            last_day = calendar.monthrange(cur.year, cur.month)[1]
+            for md in mdays:
+                day = min(md, last_day)
+                d = _date(cur.year, cur.month, day)
+                if d < s0 or d < start_from or d > hard_until:
+                    continue
+                out.append(d)
+                gen += 1
+                if series.count and gen >= series.count:
+                    return out
+            cur = _add_months(cur, interval)
+    elif freq == "yearly":
+        cur = s0
+        while cur < start_from:
+            cur = _date(cur.year + interval, cur.month, cur.day)
+        gen = 0
+        while cur <= hard_until:
+            if cur >= s0 and cur >= start_from:
+                out.append(cur)
+                gen += 1
+                if series.count and gen >= series.count:
+                    return out
+            cur = _date(cur.year + interval, cur.month, cur.day)
+    else:
+        # unsupported; fallback: single occurrence at start_date if in window
+        if s0 >= start_from and s0 <= hard_until:
+            out.append(s0)
+    return out
+
+def expand_series_job(days_ahead: int = 30):
+    """Generate tasks from active TaskSeries for the next days_ahead."""
+    with SessionLocal() as db:
+        horizon = _date.today() + _td(days=days_ahead)
+        series_list = db.query(TaskSeries).filter(TaskSeries.active==True).all()
+        created = 0
+        for ser in series_list:
+            # find last generated date for this series
+            last = db.query(Task).filter(Task.series_id==ser.id).order_by(Task.date.desc()).first()
+            start_from = _parse_date(last.date) + _td(days=1) if last else _parse_date(ser.start_date) or _date.today()
+            occ = _expand_series_occurrences(ser, start_from, horizon)
+            for d in occ:
+                # skip if task exists for same series+date
+                exists = db.query(Task).filter(Task.series_id==ser.id, Task.date==d.iso8601() if hasattr(d,'iso8601') else d.strftime("%Y-%m-%d")).first()
+                if exists:
+                    continue
+                t = Task(
+                    date=d.isoformat(),
+                    apartment_id=ser.apartment_id,
+                    planned_minutes=ser.planned_minutes or 60,
+                    notes=(ser.description or None),
+                    assigned_staff_id=ser.staff_id,
+                    assignment_status="pending" if ser.staff_id else None,
+                    status="open",
+                    auto_generated=False,
+                    series_id=ser.id,
+                    is_recurring=True
+                )
+                db.add(t)
+                created += 1
+        db.commit()
+        log.info("🗓️ Series expansion created %d tasks up to %s", created, horizon.isoformat())
+        return created
 
 def minutes_to_hhmm(minutes: Optional[int]) -> str:
     """Konvertiere Minuten in hh:mm Format"""
@@ -700,6 +842,8 @@ async def startup_event():
     scheduler.add_job(refresh_bookings_job, IntervalTrigger(minutes=REFRESH_INTERVAL_MINUTES))
     # Bündel-E-Mails für Zuweisungen alle 30 Minuten
     scheduler.add_job(send_assignment_emails_job, IntervalTrigger(minutes=30))
+    # Expand recurring TaskSeries daily
+    scheduler.add_job(expand_series_job, IntervalTrigger(hours=24))
     scheduler.start()
 
 def _daterange(days=60):
@@ -1063,6 +1207,100 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
     if not base_url:
         base_url = f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else "")
     return templates.TemplateResponse("admin_home.html", {"request": request, "token": token, "tasks": tasks, "staff": staff, "apartments": apts, "apt_map": apt_map, "book_map": book_map, "booking_details_map": booking_details_map, "timelog_map": timelog_map, "extras_map": extras_map, "base_url": base_url, "lang": lang, "trans": trans, "show_done": show_done, "show_open": show_open, "default_date_filter": default_date_filter})
+
+# ---------- Task Series Admin ----------
+@app.get("/admin/{token}/series")
+async def admin_series_list(request: Request, token: str, db=Depends(get_db)):
+    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    series = db.query(TaskSeries).order_by(TaskSeries.active.desc(), TaskSeries.start_date.desc()).all()
+    apts = {a.id: a.name for a in db.query(Apartment).all()}
+    staff = db.query(Staff).order_by(Staff.name).all()
+    lang = detect_language(request); trans = get_translations(lang)
+    base_url = BASE_URL.rstrip("/") or (f"{request.url.scheme}://{request.url.hostname}" + (f":{request.url.port}" if request.url.port else ""))
+    return templates.TemplateResponse("admin_series.html", {"request": request, "token": token, "series": series, "apartments": apts, "staff": staff, "base_url": base_url, "lang": lang, "trans": trans})
+
+@app.post("/admin/{token}/series/add")
+async def admin_series_add(
+    token: str,
+    title: str = Form(...),
+    description: str = Form(""),
+    apartment_id_raw: str = Form(""),
+    staff_id_raw: str = Form(""),
+    planned_minutes: int = Form(60),
+    start_date: str = Form(...),
+    start_time: str = Form(""),
+    frequency: str = Form(...),
+    interval: int = Form(1),
+    byweekday: str = Form(""),
+    bymonthday: str = Form(""),
+    end_date: str = Form(""),
+    count: int | None = Form(None),
+    db=Depends(get_db)
+):
+    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    apt_id = None
+    if apartment_id_raw.strip():
+        try:
+            aid = int(apartment_id_raw)
+            if aid > 0: apt_id = aid
+        except Exception: pass
+    staff_id = None
+    if staff_id_raw.strip():
+        try:
+            sid = int(staff_id_raw)
+            if sid > 0: staff_id = sid
+        except Exception: pass
+    s = TaskSeries(
+        title=title.strip(),
+        description=description.strip(),
+        apartment_id=apt_id,
+        staff_id=staff_id,
+        planned_minutes=planned_minutes,
+        start_date=start_date[:10],
+        start_time=start_time[:5] if start_time else "",
+        frequency=frequency,
+        interval=max(1,int(interval or 1)),
+        byweekday=byweekday.strip(),
+        bymonthday=bymonthday.strip(),
+        end_date=(end_date[:10] if end_date else None),
+        count=(int(count) if (str(count).strip().isdigit()) else None),
+        active=True,
+        created_at=now_iso()
+    )
+    db.add(s); db.commit()
+    # expand immediately a bit
+    expand_series_job(days_ahead=30)
+    return RedirectResponse(url=f"/admin/{{token}}/series", status_code=303)
+
+@app.post("/admin/{token}/series/toggle")
+async def admin_series_toggle(token: str, series_id: int = Form(...), db=Depends(get_db)):
+    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    s = db.get(TaskSeries, series_id)
+    if not s: raise HTTPException(status_code=404)
+    s.active = not s.active
+    db.commit()
+    return RedirectResponse(url=f"/admin/{{token}}/series", status_code=303)
+
+@app.post("/admin/{token}/series/delete")
+async def admin_series_delete(token: str, series_id: int = Form(...), delete_future: int = Form(0), db=Depends(get_db)):
+    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    s = db.get(TaskSeries, series_id)
+    if not s: raise HTTPException(status_code=404)
+    # optionally delete future occurrences
+    if delete_future:
+        today_s = today_iso()
+        q = db.query(Task).filter(Task.series_id==series_id, Task.date >= today_s)
+        for t in q.all():
+            db.delete(t)
+    db.delete(s)
+    db.commit()
+    return RedirectResponse(url=f"/admin/{{token}}/series", status_code=303)
+
+@app.get("/admin/{token}/series/expand")
+async def admin_series_expand(token: str, days: int = 30):
+    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    created = expand_series_job(days_ahead=days)
+    return PlainTextResponse(f"Created {created} tasks for next {days} days.")
 
 @app.get("/admin/{token}/staff")
 async def admin_staff(request: Request, token: str, db=Depends(get_db)):

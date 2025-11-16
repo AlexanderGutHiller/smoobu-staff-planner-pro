@@ -3,6 +3,25 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import String, Integer, Float, Boolean, ForeignKey, Text
 from .db import Base
 
+class TaskSeries(Base):
+    __tablename__ = "task_series"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(255), default="")
+    description: Mapped[str] = mapped_column(Text, default="")
+    apartment_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("apartments.id"), nullable=True)
+    staff_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("staff.id"))
+    planned_minutes: Mapped[int] = mapped_column(Integer, default=60)
+    start_date: Mapped[str] = mapped_column(String(10))  # yyyy-mm-dd
+    start_time: Mapped[str] = mapped_column(String(5), default="")  # optional HH:MM
+    frequency: Mapped[str] = mapped_column(String(16))  # 'weekly'|'monthly'|'yearly'
+    interval: Mapped[int] = mapped_column(Integer, default=1)  # every n units
+    byweekday: Mapped[str] = mapped_column(String(64), default="")  # e.g. "MO,TU" (for weekly)
+    bymonthday: Mapped[str] = mapped_column(String(64), default="")  # e.g. "1,15" (for monthly)
+    end_date: Mapped[str | None] = mapped_column(String(10), nullable=True)  # until yyyy-mm-dd
+    count: Mapped[int | None] = mapped_column(Integer, nullable=True)  # max occurrences
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[str] = mapped_column(String(19), default="")
+
 class Booking(Base):
     __tablename__ = "bookings"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
@@ -52,6 +71,8 @@ class Task(Base):
     assignment_status: Mapped[str | None] = mapped_column(String(16), nullable=True)  # pending|accepted|rejected
     status: Mapped[str] = mapped_column(String(16), default="open")  # open|running|done
     assign_notified_at: Mapped[str | None] = mapped_column(String(19), nullable=True)  # yyyy-mm-dd HH:MM:SS
+    series_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("task_series.id"))
+    is_recurring: Mapped[bool] = mapped_column(Boolean, default=False)
 
     auto_generated: Mapped[bool] = mapped_column(Boolean, default=True)
     booking_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
