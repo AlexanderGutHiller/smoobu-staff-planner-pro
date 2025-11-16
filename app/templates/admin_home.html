@@ -220,10 +220,10 @@
     .btn { padding: 0.4rem 0.6rem; font-size: 0.8rem; }
     .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .desktop-view { display: none !important; } /* Desktop-Ansicht auf mobilen Geräten ausblenden */
-    .mobile-view { display: block; }
+    .mobile-view { display: block !important; visibility: visible !important; }
     .hide-on-mobile { display: none !important; }
     /* Lovable/iOS Fallback: Karten immer sichtbar erzwingen */
-    .task-card-mobile { display: block !important; visibility: visible !important; }
+    .task-card-mobile { display: block !important; visibility: visible !important; opacity: 1 !important; }
     .filter-input { width: 100%; margin-bottom: 0.5rem; }
     /* Bessere Bedienbarkeit auf iOS/iPhone */
     .mobile-filter-section select.form-select {
@@ -1235,7 +1235,7 @@ function setLanguage(lang) {
     <p class="text-muted mt-3">{{ trans.keine_einsätze }}</p>
   </div>
 {% endif %}
-...</div> <!-- Ende Desktop-Ansicht -->
+</div> <!-- Ende Mobile-Ansicht -->
 
 <script>
 function resetMobileFilters(){
