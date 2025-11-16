@@ -1,4 +1,3 @@
-
 import os, json, datetime as dt, csv, io, logging
 from typing import List, Optional, Dict
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, Query
@@ -423,7 +422,7 @@ def expand_series_job(days_ahead: int = 30):
             occ = _expand_series_occurrences(ser, start_from, horizon)
             for d in occ:
                 # skip if task exists for same series+date
-                exists = db.query(Task).filter(Task.series_id==ser.id, Task.date==d.iso8601() if hasattr(d,'iso8601') else d.strftime("%Y-%m-%d")).first()
+                exists = db.query(Task).filter(Task.series_id==ser.id, Task.date==(d.isoformat())).first()
                 if exists:
                     continue
                 t = Task(
@@ -1138,7 +1137,7 @@ async def set_language(lang: str, redirect: str = "/"):
 # -------------------- Admin UI --------------------
 @app.get("/admin/{token}")
 async def admin_home(request: Request, token: str, date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None), staff_id: Optional[int] = Query(None), apartment_id: Optional[int] = Query(None), show_done: int = 1, show_open: int = 1, db=Depends(get_db)):
-    if token != ADMIN_TOKEN:
+    if not _is_admin_token(token, db):
         raise HTTPException(status_code=403)
     
     lang = detect_language(request)
@@ -1211,7 +1210,7 @@ async def admin_home(request: Request, token: str, date_from: Optional[str] = Qu
 # ---------- Task Series Admin ----------
 @app.get("/admin/{token}/series")
 async def admin_series_list(request: Request, token: str, db=Depends(get_db)):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    if not _is_admin_token(token, db): raise HTTPException(status_code=403)
     series = db.query(TaskSeries).order_by(TaskSeries.active.desc(), TaskSeries.start_date.desc()).all()
     apts = {a.id: a.name for a in db.query(Apartment).all()}
     staff = db.query(Staff).order_by(Staff.name).all()
@@ -1237,7 +1236,7 @@ async def admin_series_add(
     count: int | None = Form(None),
     db=Depends(get_db)
 ):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    if not _is_admin_token(token, db): raise HTTPException(status_code=403)
     apt_id = None
     if apartment_id_raw.strip():
         try:
@@ -1274,7 +1273,7 @@ async def admin_series_add(
 
 @app.post("/admin/{token}/series/toggle")
 async def admin_series_toggle(token: str, series_id: int = Form(...), db=Depends(get_db)):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    if not _is_admin_token(token, db): raise HTTPException(status_code=403)
     s = db.get(TaskSeries, series_id)
     if not s: raise HTTPException(status_code=404)
     s.active = not s.active
@@ -1283,7 +1282,7 @@ async def admin_series_toggle(token: str, series_id: int = Form(...), db=Depends
 
 @app.post("/admin/{token}/series/delete")
 async def admin_series_delete(token: str, series_id: int = Form(...), delete_future: int = Form(0), db=Depends(get_db)):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    if not _is_admin_token(token, db): raise HTTPException(status_code=403)
     s = db.get(TaskSeries, series_id)
     if not s: raise HTTPException(status_code=404)
     # optionally delete future occurrences
@@ -1304,7 +1303,7 @@ async def admin_series_expand(token: str, days: int = 30):
 
 @app.get("/admin/{token}/staff")
 async def admin_staff(request: Request, token: str, db=Depends(get_db)):
-    if token != ADMIN_TOKEN:
+    if not _is_admin_token(token, db):
         raise HTTPException(status_code=403)
     lang = detect_language(request)
     trans = get_translations(lang)
@@ -1371,21 +1370,21 @@ async def admin_staff(request: Request, token: str, db=Depends(get_db)):
     return templates.TemplateResponse("admin_staff.html", {"request": request, "token": token, "staff": staff, "staff_hours": staff_hours, "current_month": current_month, "last_month": last_month_str, "prev_last_month": prev_last_month_str, "base_url": base_url, "lang": lang, "trans": trans})
 
 @app.post("/admin/{token}/staff/add")
-async def admin_staff_add(token: str, name: str = Form(...), email: str = Form(...), phone: str = Form(""), hourly_rate: float = Form(0.0), max_hours_per_month: int = Form(160), language: str = Form("de"), db=Depends(get_db)):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+async def admin_staff_add(token: str, name: str = Form(...), email: str = Form(...), phone: str = Form(""), hourly_rate: float = Form(0.0), max_hours_per_month: int = Form(160), language: str = Form("de"), is_admin: int = Form(0), db=Depends(get_db)):
+    if not _is_admin_token(token, db): raise HTTPException(status_code=403)
     email = (email or "").strip()
     if not email or "@" not in email:
         raise HTTPException(status_code=400, detail="E-Mail ist erforderlich")
     if language not in ["de","en","fr","it","es","ro","ru","bg"]:
         language = "de"
     phone = (phone or "").strip()
-    s = Staff(name=name, email=email, phone=phone, hourly_rate=hourly_rate, max_hours_per_month=max_hours_per_month, magic_token=new_token(16), active=True, language=language)
+    s = Staff(name=name, email=email, phone=phone, hourly_rate=hourly_rate, max_hours_per_month=max_hours_per_month, magic_token=new_token(16), active=True, language=language, is_admin=bool(is_admin))
     db.add(s); db.commit()
     return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
 
 @app.post("/admin/{token}/staff/toggle")
 async def admin_staff_toggle(token: str, staff_id: int = Form(...), db=Depends(get_db)):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    if not _is_admin_token(token, db): raise HTTPException(status_code=403)
     s = db.get(Staff, staff_id); s.active = not s.active; db.commit()
     return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
 
@@ -1399,9 +1398,10 @@ async def admin_staff_update(
     hourly_rate: float = Form(0.0),
     max_hours_per_month: int = Form(160),
     language: str = Form("de"),
+    is_admin: int = Form(0),
     db=Depends(get_db)
 ):
-    if token != ADMIN_TOKEN:
+    if not _is_admin_token(token, db):
         raise HTTPException(status_code=403)
     s = db.get(Staff, staff_id)
     if not s:
@@ -1418,12 +1418,13 @@ async def admin_staff_update(
     s.hourly_rate = float(hourly_rate or 0)
     s.max_hours_per_month = int(max_hours_per_month or 0)
     s.language = language
+    s.is_admin = bool(is_admin)
     db.commit()
     return RedirectResponse(url=f"/admin/{token}/staff", status_code=303)
 
 @app.post("/admin/{token}/staff/delete")
 async def admin_staff_delete(token: str, staff_id: int = Form(...), db=Depends(get_db)):
-    if token != ADMIN_TOKEN:
+    if not _is_admin_token(token, db):
         raise HTTPException(status_code=403)
     s = db.get(Staff, staff_id)
     if not s:
@@ -1441,7 +1442,7 @@ async def admin_staff_delete(token: str, staff_id: int = Form(...), db=Depends(g
 
 @app.post("/admin/{token}/task/assign")
 async def admin_task_assign(request: Request, token: str, task_id: int = Form(...), staff_id_raw: str = Form(""), db=Depends(get_db)):
-    if token != ADMIN_TOKEN: raise HTTPException(status_code=403)
+    if not _is_admin_token(token, db): raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
     if not t:
         raise HTTPException(status_code=404, detail="Task nicht gefunden")
@@ -1482,7 +1483,7 @@ async def admin_task_assign(request: Request, token: str, task_id: int = Form(..
 
 @app.post("/admin/{token}/task/create")
 async def admin_task_create(token: str, date: str = Form(...), apartment_id_raw: str = Form(""), planned_minutes: int = Form(90), description: str = Form(""), staff_id_raw: str = Form(""), db=Depends(get_db)):
-    if token != ADMIN_TOKEN:
+    if not _is_admin_token(token, db):
         raise HTTPException(status_code=403)
     
     # Validierung
@@ -1536,7 +1537,7 @@ async def admin_task_create(token: str, date: str = Form(...), apartment_id_raw:
 
 @app.post("/admin/{token}/task/delete")
 async def admin_task_delete(token: str, task_id: int = Form(...), db=Depends(get_db)):
-    if token != ADMIN_TOKEN:
+    if not _is_admin_token(token, db):
         raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
     if not t:
@@ -1551,7 +1552,7 @@ async def admin_task_delete(token: str, task_id: int = Form(...), db=Depends(get
 
 @app.post("/admin/{token}/task/status")
 async def admin_task_status(token: str, task_id: int = Form(...), status: str = Form(...), db=Depends(get_db)):
-    if token != ADMIN_TOKEN:
+    if not _is_admin_token(token, db):
         raise HTTPException(status_code=403)
     allowed = {"open", "paused", "done"}
     status = (status or "").strip().lower()
@@ -1588,7 +1589,7 @@ async def admin_task_extras(
     redirect: str = Form(""),
     db=Depends(get_db),
 ):
-    if token != ADMIN_TOKEN:
+    if not _is_admin_token(token, db):
         raise HTTPException(status_code=403)
     allowed_fields = {"kurtaxe_registriert", "kurtaxe_bestaetigt", "checkin_vorbereitet", "kurtaxe_bezahlt", "baby_beds"}
     field = (field or "").strip()
@@ -2350,3 +2351,12 @@ async def cleaner_reject_get(token: str, task_id: int, db=Depends(get_db)):
     t.assignment_status = "rejected"
     db.commit()
     return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+
+def _is_admin_token(token: str, db) -> bool:
+    if token == ADMIN_TOKEN:
+        return True;
+    try:
+        s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True, Staff.is_admin==True).first()
+        return bool(s)
+    except Exception:
+        return False

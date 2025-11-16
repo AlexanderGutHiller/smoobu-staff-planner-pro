@@ -127,6 +127,10 @@ function setLanguage(lang) {
       <option value="bg">🇧🇬 Български</option>
     </select>
   </div>
+  <div class="col-12 col-md-auto form-check align-self-end ms-2">
+    <input class="form-check-input" type="checkbox" id="is_admin_add" name="is_admin" value="1">
+    <label class="form-check-label" for="is_admin_add">Admin-Rechte</label>
+  </div>
   <div class="col-12 col-md-auto d-flex"><button class="btn btn-primary w-100 align-self-end"><i class="bi bi-plus-lg"></i> Anlegen</button></div>
 </form>
 
@@ -159,7 +163,10 @@ function setLanguage(lang) {
       <span class="text-muted">-</span>
     {% endif %}
   </td>
-  <td>{{ 'Aktiv' if s.active else 'Inaktiv' }}</td>
+  <td>
+    {{ 'Aktiv' if s.active else 'Inaktiv' }}
+    {% if s.is_admin %}<span class="badge bg-dark ms-1">Admin</span>{% endif %}
+  </td>
   <td>
     {% set link = (base_url ~ '/cleaner/' ~ s.magic_token) %}
     <div class="input-group input-group-sm">
@@ -221,6 +228,10 @@ function setLanguage(lang) {
           <option value="ru" {% if s.language=='ru' %}selected{% endif %}>🇷🇺 Русский</option>
           <option value="bg" {% if s.language=='bg' %}selected{% endif %}>🇧🇬 Български</option>
         </select>
+      </div>
+      <div class="col-12 col-md-auto form-check align-self-end ms-2">
+        <input class="form-check-input" type="checkbox" id="is_admin_{{ s.id }}" name="is_admin" value="1" {% if s.is_admin %}checked{% endif %}>
+        <label class="form-check-label" for="is_admin_{{ s.id }}">Admin-Rechte</label>
       </div>
       <div class="col-12 col-md-auto d-flex">
         <button class="btn btn-success"><i class="bi bi-save"></i> Speichern</button>
@@ -325,6 +336,10 @@ function setLanguage(lang) {
             <option value="ru" {% if s.language=='ru' %}selected{% endif %}>🇷🇺 Русский</option>
             <option value="bg" {% if s.language=='bg' %}selected{% endif %}>🇧🇬 Български</option>
           </select>
+        </div>
+        <div class="col-12 form-check">
+          <input class="form-check-input" type="checkbox" id="is_admin_m{{ s.id }}" name="is_admin" value="1" {% if s.is_admin %}checked{% endif %}>
+          <label class="form-check-label" for="is_admin_m{{ s.id }}">Admin-Rechte</label>
         </div>
         <div class="col-12 d-flex gap-2">
           <button class="btn btn-success w-100" type="submit"><i class="bi bi-save"></i> Speichern</button>
