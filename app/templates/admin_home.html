@@ -378,6 +378,12 @@
         {{ trans.offene_aufgaben }}
       </label>
     </div>
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="filterAssignmentOpen" name="assignment_open" value="1" {% if assignment_open %}checked{% endif %}>
+      <label class="form-check-label" for="filterAssignmentOpen">
+        Zuweisung noch offen
+      </label>
+    </div>
     <!-- Hidden Felder tragen die eigentlichen Werte 0/1 -->
     <input type="hidden" id="showDoneDesktop" name="show_done" value="{{ 1 if show_done else 0 }}">
     <input type="hidden" id="showOpenDesktop" name="show_open" value="{{ 1 if show_open else 0 }}">
@@ -464,6 +470,12 @@ function setLanguage(lang) {
         {{ trans.offene_aufgaben }}
       </label>
     </div>
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" id="filterAssignmentOpenMobile" name="assignment_open" value="1" {% if assignment_open %}checked{% endif %}>
+      <label class="form-check-label" for="filterAssignmentOpenMobile">
+        Zuweisung noch offen
+      </label>
+    </div>
     <!-- Hidden Felder für Mobile-Form -->
     <input type="hidden" id="showDoneMobileHidden" name="show_done" value="{{ 1 if show_done else 0 }}">
     <input type="hidden" id="showOpenMobileHidden" name="show_open" value="{{ 1 if show_open else 0 }}">
@@ -547,19 +559,26 @@ function setLanguage(lang) {
           {% if _assign_class=='pending' %}Ausstehend{% elif _assign_class=='accepted' %}Angenommen{% else %}Abgelehnt{% endif %}
         </span>
       {% endif %}
+      {% set is_manual = (not t.auto_generated and not t.is_recurring) %}
       <div class="flex-1">
-        {% if not t.apartment_id %}
-          <!-- Manuelle Aufgabe: Beschreibung prominent, Hinweis klein darunter -->
+        {% if is_manual %}
+          <!-- Manuelle Aufgabe: Beschreibung im Vordergrund, Apartment klein/abgesetzt -->
           <div class="fw-semibold" style="font-size: 1rem;">
             {{ t.notes or trans.manuelle_aufgabe }}
           </div>
-          <div class="text-muted small">
+          {% if t.apartment_id %}
+          <div class="text-muted small fst-italic">
+            {{ apt_map.get(t.apartment_id, t.apartment_id) }}
+          </div>
+          {% else %}
+          <div class="text-muted small fst-italic">
             {{ trans.manuelle_aufgabe }}
           </div>
+          {% endif %}
         {% else %}
-          <!-- Normale Aufgabe mit Apartment im Vordergrund -->
+          <!-- Normale Aufgabe: Apartment im Vordergrund, Beschreibung klein darunter -->
           <div class="task-apartment">
-            {{ apt_map.get(t.apartment_id, t.apartment_id) }}
+            {{ apt_map.get(t.apartment_id, t.apartment_id) if t.apartment_id else trans.manuelle_aufgabe }}
           </div>
           {% if t.notes %}
           <div class="text-muted small">

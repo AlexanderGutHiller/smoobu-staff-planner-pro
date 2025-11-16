@@ -1167,6 +1167,7 @@ async def admin_home(
     apartment_id: Optional[str] = Query(None),
     show_done: Optional[str] = Query(None),
     show_open: Optional[str] = Query(None),
+    assignment_open: Optional[str] = Query(None),
     db=Depends(get_db),
 ):
     if not _is_admin_token(token, db):
@@ -1222,6 +1223,12 @@ async def admin_home(
     else:
         show_open_val = 1  # Standard: offene anzeigen
 
+    # Zuweisungs-Filter: "Zuweisung noch offen" (unassigned oder nicht accepted)
+    if "assignment_open" in qp:
+        assignment_open_val = qp.get("assignment_open") == "1"
+    else:
+        assignment_open_val = False
+
     # Staff- und Apartment-Filter robust aus Strings parsen ("" = kein Filter)
     staff_id_val: Optional[int] = None
     if staff_id and str(staff_id).strip():
@@ -1259,6 +1266,10 @@ async def admin_home(
     else:
         # Wenn beide Filter deaktiviert sind, zeige nichts
         q = q.filter(Task.id == -1)  # Unmögliche Bedingung
+    # Filter nach Zuweisung offen (optional)
+    if assignment_open_val:
+        q = q.filter(or_(Task.assigned_staff_id == None, Task.assignment_status != "accepted"))
+
     tasks = q.order_by(Task.date, Task.id).all()
     staff = db.query(Staff).filter(Staff.active==True).all()
     apts = db.query(Apartment).filter(Apartment.active==True).all()
@@ -1319,6 +1330,7 @@ async def admin_home(
             "trans": trans,
             "show_done": show_done_val,
             "show_open": show_open_val,
+            "assignment_open": assignment_open_val,
             "default_date_filter": default_date_filter,
             "staff_self": staff_self,
             "staff_id": staff_id_val,
@@ -1705,7 +1717,15 @@ async def admin_task_assign(request: Request, token: str, task_id: int = Form(..
     return RedirectResponse(url=f"/admin/{token}", status_code=303)
 
 @app.post("/admin/{token}/task/create")
-async def admin_task_create(token: str, date: str = Form(...), apartment_id_raw: str = Form(""), planned_minutes: int = Form(90), description: str = Form(""), staff_id_raw: str = Form(""), db=Depends(get_db)):
+async def admin_task_create(
+    token: str,
+    date: str = Form(...),
+    apartment_id: str = Form(""),
+    planned_minutes: int = Form(90),
+    description: str = Form(""),
+    staff_id: str = Form(""),
+    db=Depends(get_db),
+):
     if not _is_admin_token(token, db):
         raise HTTPException(status_code=403)
     
@@ -1714,41 +1734,41 @@ async def admin_task_create(token: str, date: str = Form(...), apartment_id_raw:
         raise HTTPException(status_code=400, detail="Datum ist erforderlich")
     
     # Apartment-ID optional - kann leer sein für manuelle Aufgaben
-    apartment_id: Optional[int] = None
+    apartment_id_val: Optional[int] = None
     apt_name = "Manuelle Aufgabe"
-    if apartment_id_raw and apartment_id_raw.strip():
+    if apartment_id and apartment_id.strip():
         try:
-            apartment_id = int(apartment_id_raw)
-            if apartment_id > 0:
-                apt = db.get(Apartment, apartment_id)
+            apartment_id_val = int(apartment_id)
+            if apartment_id_val > 0:
+                apt = db.get(Apartment, apartment_id_val)
                 if apt:
                     apt_name = apt.name
                 else:
-                    apartment_id = None  # Ungültige Apartment-ID ignorieren
+                    apartment_id_val = None  # Ungültige Apartment-ID ignorieren
             else:
-                apartment_id = None  # 0 oder negativ = keine Apartment
+                apartment_id_val = None  # 0 oder negativ = keine Apartment
         except (ValueError, TypeError):
-            apartment_id = None
+            apartment_id_val = None
     
     # Staff-ID optional
-    staff_id: Optional[int] = None
-    if staff_id_raw and staff_id_raw.strip():
+    staff_id_val: Optional[int] = None
+    if staff_id and staff_id.strip():
         try:
-            staff_id = int(staff_id_raw)
-            staff = db.get(Staff, staff_id)
+            staff_id_val = int(staff_id)
+            staff = db.get(Staff, staff_id_val)
             if not staff:
-                staff_id = None  # Ungültige Staff-ID ignorieren
+                staff_id_val = None  # Ungültige Staff-ID ignorieren
         except ValueError:
-            staff_id = None
+            staff_id_val = None
     
     # Neue Aufgabe erstellen
     new_task = Task(
         date=date[:10],  # Nur Datum, ohne Zeit
-        apartment_id=apartment_id,  # Kann None sein für manuelle Aufgaben
+        apartment_id=apartment_id_val,  # Kann None sein für manuelle Aufgaben
         planned_minutes=planned_minutes,
         notes=(description[:2000] if description else None),  # Beschreibung als Notiz speichern
-        assigned_staff_id=staff_id,
-        assignment_status="pending" if staff_id else None,
+        assigned_staff_id=staff_id_val,
+        assignment_status="pending" if staff_id_val else None,
         status="open",
         auto_generated=False  # Manuell erstellt
     )
@@ -1758,7 +1778,7 @@ async def admin_task_create(token: str, date: str = Form(...), apartment_id_raw:
     log.info("✅ Manuell erstellte Aufgabe: %s für %s am %s", new_task.id, apt_name, date)
 
     # Wenn ein MA ausgewählt wurde, direkt Benachrichtigung auslösen
-    if staff_id:
+    if staff_id_val:
         try:
             send_assignment_emails_job()
         except Exception as e:
