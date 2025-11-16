@@ -155,9 +155,24 @@ function setLanguage(lang) {
   <td>
     {% if staff_hours.get(s.id) %}
       <div class="small">
-        <div><strong>{{ prev_last_month }}:</strong> {{ '%.2f'|format(staff_hours[s.id].prev_last_month) }} {{ trans.stunden }}</div>
-        <div><strong>{{ last_month }}:</strong> {{ '%.2f'|format(staff_hours[s.id].last_month) }} {{ trans.stunden }}</div>
-        <div><strong>{{ current_month }}:</strong> {{ '%.2f'|format(staff_hours[s.id].current_month) }} {{ trans.stunden }}</div>
+        <div>
+          <strong>{{ prev_last_month }}:</strong>
+          {{ '%.2f'|format(staff_hours[s.id].prev_last_month) }}h
+          · <span class="text-muted">geplant: {{ '%.2f'|format(staff_hours[s.id].prev_last_planned) }}h</span>
+          · <span class="fw-semibold">gesamt: {{ '%.2f'|format(staff_hours[s.id].prev_last_total) }}h</span>
+        </div>
+        <div>
+          <strong>{{ last_month }}:</strong>
+          {{ '%.2f'|format(staff_hours[s.id].last_month) }}h
+          · <span class="text-muted">geplant: {{ '%.2f'|format(staff_hours[s.id].last_planned) }}h</span>
+          · <span class="fw-semibold">gesamt: {{ '%.2f'|format(staff_hours[s.id].last_total) }}h</span>
+        </div>
+        <div>
+          <strong>{{ current_month }}:</strong>
+          {{ '%.2f'|format(staff_hours[s.id].current_month) }}h
+          · <span class="text-muted">geplant: {{ '%.2f'|format(staff_hours[s.id].current_planned) }}h</span>
+          · <span class="fw-semibold">gesamt: {{ '%.2f'|format(staff_hours[s.id].current_total) }}h</span>
+        </div>
       </div>
     {% else %}
       <span class="text-muted">-</span>
@@ -283,9 +298,24 @@ function setLanguage(lang) {
   <div class="staff-info-row">
     <span class="staff-info-label">{{ trans.geleistete_stunden }}:</span>
     <span class="small">
-      <div><strong>{{ prev_last_month }}:</strong> {{ '%.2f'|format(staff_hours[s.id].prev_last_month) }} {{ trans.stunden }}</div>
-      <div><strong>{{ last_month }}:</strong> {{ '%.2f'|format(staff_hours[s.id].last_month) }} {{ trans.stunden }}</div>
-      <div><strong>{{ current_month }}:</strong> {{ '%.2f'|format(staff_hours[s.id].current_month) }} {{ trans.stunden }}</div>
+      <div>
+        <strong>{{ prev_last_month }}:</strong>
+        {{ '%.2f'|format(staff_hours[s.id].prev_last_month) }}h
+        · <span class="text-muted">geplant: {{ '%.2f'|format(staff_hours[s.id].prev_last_planned) }}h</span>
+        · <span class="fw-semibold">gesamt: {{ '%.2f'|format(staff_hours[s.id].prev_last_total) }}h</span>
+      </div>
+      <div>
+        <strong>{{ last_month }}:</strong>
+        {{ '%.2f'|format(staff_hours[s.id].last_month) }}h
+        · <span class="text-muted">geplant: {{ '%.2f'|format(staff_hours[s.id].last_planned) }}h</span>
+        · <span class="fw-semibold">gesamt: {{ '%.2f'|format(staff_hours[s.id].last_total) }}h</span>
+      </div>
+      <div>
+        <strong>{{ current_month }}:</strong>
+        {{ '%.2f'|format(staff_hours[s.id].current_month) }}h
+        · <span class="text-muted">geplant: {{ '%.2f'|format(staff_hours[s.id].current_planned) }}h</span>
+        · <span class="fw-semibold">gesamt: {{ '%.2f'|format(staff_hours[s.id].current_total) }}h</span>
+      </div>
     </span>
   </div>
   {% else %}

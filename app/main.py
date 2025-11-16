@@ -1165,8 +1165,8 @@ async def admin_home(
     date_to: Optional[str] = Query(None),
     staff_id: Optional[str] = Query(None),
     apartment_id: Optional[str] = Query(None),
-    show_done: int = 1,
-    show_open: int = 1,
+    show_done: Optional[str] = Query(None),
+    show_open: Optional[str] = Query(None),
     db=Depends(get_db),
 ):
     if not _is_admin_token(token, db):
@@ -1211,6 +1211,17 @@ async def admin_home(
             date_to = (today + dt.timedelta(days=7)).isoformat()
             if not default_date_filter:
                 default_date_filter = "next7"
+    # Status-Filter robust aus Query-Params ableiten
+    qp = request.query_params
+    if "show_done" in qp:
+        show_done_val = 1 if qp.get("show_done") == "1" else 0
+    else:
+        show_done_val = 1  # Standard: erledigte anzeigen
+    if "show_open" in qp:
+        show_open_val = 1 if qp.get("show_open") == "1" else 0
+    else:
+        show_open_val = 1  # Standard: offene anzeigen
+
     # Staff- und Apartment-Filter robust aus Strings parsen ("" = kein Filter)
     staff_id_val: Optional[int] = None
     if staff_id and str(staff_id).strip():
@@ -1239,9 +1250,9 @@ async def admin_home(
     # Filter nach Status: erledigte und/oder offene Aufgaben
     from sqlalchemy import or_
     status_filters = []
-    if show_done:
+    if show_done_val:
         status_filters.append(Task.status == "done")
-    if show_open:
+    if show_open_val:
         status_filters.append(Task.status != "done")
     if status_filters:
         q = q.filter(or_(*status_filters))
@@ -1306,8 +1317,8 @@ async def admin_home(
             "base_url": base_url,
             "lang": lang,
             "trans": trans,
-            "show_done": show_done,
-            "show_open": show_open,
+            "show_done": show_done_val,
+            "show_open": show_open_val,
             "default_date_filter": default_date_filter,
             "staff_self": staff_self,
             "staff_id": staff_id_val,
@@ -1483,7 +1494,7 @@ async def admin_staff(request: Request, token: str, db=Depends(get_db)):
     trans = get_translations(lang)
     staff = db.query(Staff).order_by(Staff.name).all()
     
-    # Berechne Stunden für jeden Mitarbeiter (vorletzter, letzter, aktueller Monat)
+    # Berechne Stunden (geleistet & geplant) für jeden Mitarbeiter (vorletzter, letzter, aktueller Monat)
     today = dt.date.today()
     current_month = today.strftime("%Y-%m")
     
@@ -1500,6 +1511,19 @@ async def admin_staff(request: Request, token: str, db=Depends(get_db)):
     
     last_month_str = f"{last_month[0]}-{last_month[1]:02d}"
     prev_last_month_str = f"{prev_last_month[0]}-{prev_last_month[1]:02d}"
+
+    # Monatsgrenzen (für geplante Zeiten)
+    def month_range(year: int, month: int):
+        start = dt.date(year, month, 1)
+        if month == 12:
+            end = dt.date(year + 1, 1, 1) - dt.timedelta(days=1)
+        else:
+            end = dt.date(year, month + 1, 1) - dt.timedelta(days=1)
+        return start.isoformat(), end.isoformat()
+
+    prev_start, prev_end = month_range(prev_last_month[0], prev_last_month[1])
+    last_start, last_end = month_range(last_month[0], last_month[1])
+    curr_start, curr_end = month_range(today.year, today.month)
     
     staff_hours = {}
     for s in staff:
@@ -1512,7 +1536,13 @@ async def admin_staff(request: Request, token: str, db=Depends(get_db)):
         hours_data = {
             'prev_last_month': 0.0,
             'last_month': 0.0,
-            'current_month': 0.0
+            'current_month': 0.0,
+            'prev_last_planned': 0.0,
+            'last_planned': 0.0,
+            'current_planned': 0.0,
+            'prev_last_total': 0.0,
+            'last_total': 0.0,
+            'current_total': 0.0,
         }
         
         for tl in logs:
@@ -1531,7 +1561,26 @@ async def admin_staff(request: Request, token: str, db=Depends(get_db)):
             elif month_str == current_month:
                 hours_data['current_month'] += hours
         
-        # Runde auf 2 Dezimalstellen
+        # Geplante Zeiten aus Tasks (planned_minutes)
+        def planned_hours_for_range(start_iso: str, end_iso: str) -> float:
+            tasks = db.query(Task).filter(
+                Task.assigned_staff_id == s.id,
+                Task.date >= start_iso,
+                Task.date <= end_iso,
+            ).all()
+            minutes = sum(int(t.planned_minutes or 0) for t in tasks)
+            return round(minutes / 60.0, 2)
+
+        hours_data['prev_last_planned'] = planned_hours_for_range(prev_start, prev_end)
+        hours_data['last_planned'] = planned_hours_for_range(last_start, last_end)
+        hours_data['current_planned'] = planned_hours_for_range(curr_start, curr_end)
+
+        # Gesamtsummen (geleistet + geplant)
+        hours_data['prev_last_total'] = round(hours_data['prev_last_month'] + hours_data['prev_last_planned'], 2)
+        hours_data['last_total'] = round(hours_data['last_month'] + hours_data['last_planned'], 2)
+        hours_data['current_total'] = round(hours_data['current_month'] + hours_data['current_planned'], 2)
+
+        # Runde Ist-Zeiten auf 2 Dezimalstellen
         hours_data['prev_last_month'] = round(hours_data['prev_last_month'], 2)
         hours_data['last_month'] = round(hours_data['last_month'], 2)
         hours_data['current_month'] = round(hours_data['current_month'], 2)

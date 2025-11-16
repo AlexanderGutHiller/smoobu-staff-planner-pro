@@ -139,20 +139,20 @@
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
-    padding: 1rem;
-    text-align: center;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
   
   .stats-card-value {
-    font-size: 1.75rem;
-    font-weight: 700;
+  font-size: 1.1rem;
+  font-weight: 600;
     color: var(--primary);
-    margin: 0.5rem 0;
+  margin: 0.1rem 0;
   }
   
   .stats-card-label {
-    font-size: 0.875rem;
+  font-size: 0.8rem;
     color: var(--muted);
   }
   
@@ -217,7 +217,7 @@
   /* Mobile Optimierungen */
   @media (max-width: 768px) {
     .container { padding-left: 10px; padding-right: 10px; }
-    .btn { padding: 0.5rem 0.75rem; font-size: 0.875rem; }
+    .btn { padding: 0.4rem 0.6rem; font-size: 0.8rem; }
     .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .desktop-view { display: block; } /* Zeige Desktop-Karten auch mobil (Lovable/iOS Fix) */
     .mobile-view { display: block; }
@@ -295,9 +295,9 @@
     
     .mobile-filter-section {
       background: white;
-      padding: 1rem;
+      padding: 0.75rem;
       border-radius: 8px;
-      margin-bottom: 1rem;
+      margin-bottom: 0.75rem;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
   }
@@ -423,7 +423,7 @@ function setLanguage(lang) {
   <form id="filterFormMobile" method="get" action="/admin/{{ token }}">
     <h6 class="mb-2">{{ trans.date }}:</h6>
     {% set date_default = default_date_filter or '' %}
-    <select id="f-date-mobile" name="date_range" class="form-select form-select-sm mb-3">
+    <select id="f-date-mobile" name="date_range" class="form-select form-select-sm mb-3" onchange="document.getElementById('filterFormMobile').submit()">
       <option value="" {% if date_default=='' %}selected{% endif %}>{{ trans.all }}</option>
       <option value="today" {% if date_default=='today' %}selected{% endif %}>{{ trans.today }}</option>
       <option value="week" {% if date_default=='week' %}selected{% endif %}>{{ trans.week }}</option>
@@ -1357,32 +1357,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }, { passive: false });
   }
 
-  // Initial anwenden der Filter (iOS Safari Fall-Back)
-  document.addEventListener('DOMContentLoaded', function(){
-    try {
-      applyFilter();
-      applyCardFilter();
-      // Fallback: Wenn auf Mobile keine Karten sichtbar sind, zeige Desktop-View zusätzlich
-      const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-      if (isMobile) {
-        setTimeout(function(){
-          const mobileCards = Array.from(document.querySelectorAll('.task-card-mobile'));
-          const desktopCardWrappers = Array.from(document.querySelectorAll('#task-cards-view .col-md-6, #task-cards-view .col-lg-4'));
-          const anyMobileVisible = mobileCards.some(c => c.offsetParent !== null);
-          const anyDesktopVisible = desktopCardWrappers.some(w => w.offsetParent !== null);
-          
-          if (!anyMobileVisible && !anyDesktopVisible) {
-            // Harte Wiederherstellung: Alle Karten einblenden
-            desktopCardWrappers.forEach(w => { w.style.display = ''; });
-            mobileCards.forEach(c => { c.style.display = ''; });
-            // Sicherheitshalber auch die Desktop-Section einblenden
-            const desktop = document.querySelector('.desktop-view');
-            if (desktop) desktop.style.display = 'block';
-          }
-        }, 200);
-      }
-    } catch(e) {}
-  });
 });
 </script>
 
