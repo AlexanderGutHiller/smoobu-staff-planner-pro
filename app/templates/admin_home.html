@@ -805,7 +805,18 @@ function setLanguage(lang) {
 <tr class="{% if t.assignment_status == 'rejected' %}table-danger{% elif t.status == 'done' %}table-secondary{% elif t.status == 'running' or t.status == 'paused' %}table-info{% elif t.assigned_staff_id %}table-success{% else %}table-warning{% endif %}" data-date="{{ t.date }}">
   <td data-col="date">{{ t.date | date_wd_de('short') }}</td>
   <td data-col="apt">
-    <div class="task-apartment-name">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
+    {% if not t.auto_generated and not t.apartment_id %}
+      {# Manuelle Aufgabe ohne Apartment: Beschreibung im Vordergrund #}
+      <div class="task-apartment-name fw-bold" style="font-size: 1.05rem;">{{ t.notes or trans.manuelle_aufgabe }}</div>
+      <div class="small text-muted fst-italic" style="font-size: 0.85rem;">{{ trans.manuelle_aufgabe }}</div>
+    {% elif not t.auto_generated and t.apartment_id %}
+      {# Manuelle Aufgabe mit Apartment: Beschreibung im Vordergrund, Apartment klein/kursiv #}
+      <div class="task-apartment-name fw-bold" style="font-size: 1.05rem;">{{ t.notes or trans.manuelle_aufgabe }}</div>
+      <div class="small text-muted fst-italic" style="font-size: 0.85rem;">{{ apt_map.get(t.apartment_id, t.apartment_id) }}</div>
+    {% else %}
+      {# Normale Aufgabe: Apartment im Vordergrund #}
+      <div class="task-apartment-name">{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}</div>
+    {% endif %}
     {% if t.booking_id %}
       {% set guest_name = (book_map.get(t.booking_id) or booking_details_map.get(t.booking_id, {}).get('guest_name', '') or t.next_arrival_guest_name or '') %}
       {% if not guest_name or not guest_name.strip() %}
@@ -929,6 +940,22 @@ function setLanguage(lang) {
     </form>
     <div style="display: flex; gap: 0.25rem; align-items: center;">
       {% if not t.auto_generated %}
+        <button 
+          class="btn btn-outline-secondary btn-sm"
+          type="button"
+          style="padding: 0.15rem 0.4rem; font-size: 0.7rem;"
+          data-bs-toggle="modal"
+          data-bs-target="#editTaskModal"
+          data-task-id="{{ t.id }}"
+          data-task-date="{{ t.date }}"
+          data-task-apartment-id="{{ t.apartment_id or '' }}"
+          data-task-planned="{{ t.planned_minutes }}"
+          data-task-notes="{{ t.notes or '' }}"
+          data-task-staff-id="{{ t.assigned_staff_id or '' }}"
+          title="Aufgabe bearbeiten"
+        >
+          <i class="bi bi-pencil"></i>
+        </button>
         <form method="post" action="/admin/{{ token }}/task/delete" onsubmit="return confirm('Diesen manuellen Task löschen?');" class="d-inline">
           <input type="hidden" name="task_id" value="{{ t.id }}"/>
           <button class="btn btn-outline-danger btn-sm" style="padding: 0.15rem 0.4rem; font-size: 0.7rem;" title="Löschen"><i class="bi bi-trash"></i></button>
@@ -1330,6 +1357,55 @@ function handleExtraSelect(selectEl){
       </form>
     </div>
   </div>
+<!-- Modal für manuelle Aufgabe bearbeiten -->
+<div class="modal fade" id="editTaskModal" tabindex="-1" aria-labelledby="editTaskModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editTaskModalLabel">Aufgabe bearbeiten</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="/admin/{{ token }}/task/update_manual" id="editTaskForm">
+        <input type="hidden" name="task_id" id="edit-task-id">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="edit-task-date" class="form-label">{{ trans.date }} *</label>
+            <input type="date" class="form-control" id="edit-task-date" name="date" required>
+          </div>
+          <div class="mb-3">
+            <label for="edit-task-apartment" class="form-label">{{ trans.apartment }}</label>
+            <select class="form-select" id="edit-task-apartment" name="apartment_id">
+              <option value="">{{ trans.manuelle_aufgabe }}</option>
+              {% for apt in apartments %}
+                <option value="{{ apt.id }}">{{ apt.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="edit-task-description" class="form-label">{{ trans.beschreibung }}</label>
+            <textarea class="form-control" id="edit-task-description" name="description" rows="3" placeholder="{{ trans.tätigkeit }}"></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="edit-task-duration" class="form-label">{{ trans.dauer }} *</label>
+            <input type="number" class="form-control" id="edit-task-duration" name="planned_minutes" min="1" value="90" required>
+          </div>
+          <div class="mb-3">
+            <label for="edit-task-staff" class="form-label">{{ trans.ma }}</label>
+            <select class="form-select" id="edit-task-staff" name="staff_id">
+              <option value="">{{ trans.all }}</option>
+              {% for s in staff %}
+                <option value="{{ s.id }}">{{ s.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans.abbrechen }}</button>
+          <button type="submit" class="btn btn-primary">{{ trans.speichern if trans.speichern is defined else 'Speichern' }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -1358,6 +1434,30 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
+  // Edit Task Modal: Daten aus Button-Attributen in Formular laden
+  const editModal = document.getElementById('editTaskModal');
+  if (editModal) {
+    editModal.addEventListener('show.bs.modal', function(event) {
+      const button = event.relatedTarget; // Button, der das Modal geöffnet hat
+      if (!button) return;
+      
+      const taskId = button.getAttribute('data-task-id');
+      const taskDate = button.getAttribute('data-task-date');
+      const taskApartmentId = button.getAttribute('data-task-apartment-id');
+      const taskPlanned = button.getAttribute('data-task-planned');
+      const taskNotes = button.getAttribute('data-task-notes');
+      const taskStaffId = button.getAttribute('data-task-staff-id');
+      
+      // Formularfelder befüllen
+      document.getElementById('edit-task-id').value = taskId || '';
+      document.getElementById('edit-task-date').value = taskDate || '';
+      document.getElementById('edit-task-apartment').value = taskApartmentId || '';
+      document.getElementById('edit-task-duration').value = taskPlanned || '90';
+      document.getElementById('edit-task-description').value = taskNotes || '';
+      document.getElementById('edit-task-staff').value = taskStaffId || '';
+    });
+  }
+  
   // Status-Filter-Checkboxen: URL aktualisieren bei Änderung
   const filterShowDone = document.getElementById('filterShowDone');
   const filterShowOpen = document.getElementById('filterShowOpen');
@@ -1371,16 +1471,28 @@ document.addEventListener('DOMContentLoaded', function() {
     const hiddenOpenDesktop = document.getElementById('showOpenDesktop');
     const hiddenDoneMobile = document.getElementById('showDoneMobileHidden');
     const hiddenOpenMobile = document.getElementById('showOpenMobileHidden');
+    const filterAssignmentOpen = document.getElementById('filterAssignmentOpen');
+    const filterAssignmentOpenMobile = document.getElementById('filterAssignmentOpenMobile');
 
     // aktuellen Zustand aus den Checkboxen ermitteln (egal ob Desktop oder Mobile)
     const showDoneChecked = (filterShowDone && filterShowDone.checked) || (filterShowDoneMobile && filterShowDoneMobile.checked);
     const showOpenChecked = (filterShowOpen && filterShowOpen.checked) || (filterShowOpenMobile && filterShowOpenMobile.checked);
+    const assignmentOpenChecked = (filterAssignmentOpen && filterAssignmentOpen.checked) || (filterAssignmentOpenMobile && filterAssignmentOpenMobile.checked);
 
     // Hidden-Felder mit 0/1 befüllen
     if (hiddenDoneDesktop) hiddenDoneDesktop.value = showDoneChecked ? '1' : '0';
     if (hiddenOpenDesktop) hiddenOpenDesktop.value = showOpenChecked ? '1' : '0';
     if (hiddenDoneMobile) hiddenDoneMobile.value = showDoneChecked ? '1' : '0';
     if (hiddenOpenMobile) hiddenOpenMobile.value = showOpenChecked ? '1' : '0';
+    
+    // "Zuweisung noch offen" Checkbox synchronisieren
+    if (filterAssignmentOpen && filterAssignmentOpenMobile) {
+      filterAssignmentOpenMobile.checked = filterAssignmentOpen.checked;
+    }
+    if (filterAssignmentOpenMobile && filterAssignmentOpen && !filterAssignmentOpenMobile.matches(':focus')) {
+      filterAssignmentOpen.checked = filterAssignmentOpenMobile.checked;
+    }
+    
     // Spiegeln: wenn Desktop geändert wurde, aktualisiere Mobile und umgekehrt (nur Anzeige)
     if (filterShowDone && filterShowDoneMobile) {
       filterShowDoneMobile.checked = filterShowDone.checked;
@@ -1450,6 +1562,15 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   if (filterShowOpenMobile) {
     filterShowOpenMobile.addEventListener('change', updateStatusFilters);
+  }
+  
+  const filterAssignmentOpen = document.getElementById('filterAssignmentOpen');
+  const filterAssignmentOpenMobile = document.getElementById('filterAssignmentOpenMobile');
+  if (filterAssignmentOpen) {
+    filterAssignmentOpen.addEventListener('change', updateStatusFilters);
+  }
+  if (filterAssignmentOpenMobile) {
+    filterAssignmentOpenMobile.addEventListener('change', updateStatusFilters);
   }
 
   // iOS Safari: sichere Label-Klicks für die Mobile-Checkboxen ab

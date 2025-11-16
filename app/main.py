@@ -1801,6 +1801,74 @@ async def admin_task_delete(token: str, task_id: int = Form(...), db=Depends(get
     db.commit()
     return RedirectResponse(url=f"/admin/{token}", status_code=303)
 
+@app.post("/admin/{token}/task/update_manual")
+async def admin_task_update_manual(token: str, task_id: int = Form(...), date: str = Form(...), apartment_id: str = Form(""), planned_minutes: int = Form(90), description: str = Form(""), staff_id: str = Form(""), db=Depends(get_db)):
+    if not _is_admin_token(token, db):
+        raise HTTPException(status_code=403)
+    t = db.get(Task, task_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Task nicht gefunden")
+    if t.auto_generated:
+        raise HTTPException(status_code=400, detail="Automatisch erzeugte Aufgaben können hier nicht bearbeitet werden")
+    
+    # Validierung
+    if not date or not date.strip():
+        raise HTTPException(status_code=400, detail="Datum ist erforderlich")
+    
+    # Apartment-ID optional
+    apartment_id_val: Optional[int] = None
+    if apartment_id and apartment_id.strip():
+        try:
+            apartment_id_val = int(apartment_id)
+            if apartment_id_val > 0:
+                apt = db.get(Apartment, apartment_id_val)
+                if not apt:
+                    apartment_id_val = None
+            else:
+                apartment_id_val = None
+        except (ValueError, TypeError):
+            apartment_id_val = None
+    
+    # Staff-ID optional
+    staff_id_val: Optional[int] = None
+    prev_staff_id = t.assigned_staff_id
+    if staff_id and staff_id.strip():
+        try:
+            staff_id_val = int(staff_id)
+            staff = db.get(Staff, staff_id_val)
+            if not staff:
+                staff_id_val = None
+        except ValueError:
+            staff_id_val = None
+    
+    # Task aktualisieren
+    t.date = date[:10]
+    t.apartment_id = apartment_id_val
+    t.planned_minutes = planned_minutes
+    t.notes = (description[:2000] if description else None)
+    
+    # Zuweisung aktualisieren
+    t.assigned_staff_id = staff_id_val
+    if staff_id_val:
+        # Wenn ein MA zugewiesen wird, setze auf pending (außer wenn bereits accepted)
+        if t.assignment_status != "accepted":
+            t.assignment_status = "pending"
+    else:
+        # Wenn kein MA mehr zugewiesen, entferne Zuweisungsstatus
+        t.assignment_status = None
+    
+    db.commit()
+    
+    # Wenn ein neuer MA zugewiesen wurde (oder geändert), Benachrichtigung senden
+    if staff_id_val and staff_id_val != prev_staff_id:
+        try:
+            send_assignment_emails_job()
+        except Exception as e:
+            log.error("Fehler beim Senden der Zuweisungs-Benachrichtigung nach Update: %s", e)
+    
+    log.info("✅ Manuelle Aufgabe %s aktualisiert", t.id)
+    return RedirectResponse(url=f"/admin/{token}", status_code=303)
+
 @app.post("/admin/{token}/task/status")
 async def admin_task_status(token: str, task_id: int = Form(...), status: str = Form(...), db=Depends(get_db)):
     if not _is_admin_token(token, db):
