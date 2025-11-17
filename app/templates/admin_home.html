@@ -1081,7 +1081,7 @@ function setLanguage(lang) {
 </div>
 
 <!-- Mobile View Container (Tasks) -->
-<div class="mobile-view" id="mobile-view-container" style="display: block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 9999 !important; width: 100% !important; height: auto !important; overflow: visible !important; background: #f0f0f0 !important; padding: 20px !important; margin-top: 20px !important;">
+<div class="mobile-view" id="mobile-view-container" style="display: block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 99999 !important; width: 100% !important; height: auto !important; min-height: 200px !important; overflow: visible !important; background: #f0f0f0 !important; padding: 20px !important; margin-top: 20px !important; border: 10px solid red !important;">
 <!-- DEBUG: Mobile-Tasks-Container ist sichtbar -->
 <div style="background: red; color: white; padding: 20px; margin: 10px; font-size: 24px; font-weight: bold; text-align: center; border: 5px solid yellow; z-index: 99999 !important; position: relative !important;">
   🔴 MOBILE TASKS CONTAINER - Tasks: {{ tasks|length }}
@@ -1275,14 +1275,13 @@ function setLanguage(lang) {
         const mobileView = document.getElementById('mobile-view-container');
         const desktopView = document.querySelector('.desktop-view');
         if (mobileView) {
-          mobileView.style.display = 'block';
-          mobileView.style.visibility = 'visible';
-          mobileView.style.opacity = '1';
-          mobileView.style.position = 'relative';
-          mobileView.style.zIndex = '1';
-          mobileView.style.width = '100%';
-          mobileView.style.height = 'auto';
-          mobileView.style.overflow = 'visible';
+          // AGGRESSIV: Setze ALLE Styles direkt
+          mobileView.style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 99999 !important; width: 100% !important; height: auto !important; min-height: 200px !important; overflow: visible !important; background: #f0f0f0 !important; padding: 20px !important; margin-top: 20px !important; border: 10px solid red !important;';
+          // Stelle sicher, dass alle Mobile-Karten sichtbar sind
+          const mobileCards = document.querySelectorAll('.task-card-mobile');
+          mobileCards.forEach(function(card) {
+            card.style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important; min-height: 50px !important; margin-bottom: 1rem !important;';
+          });
         }
         if (desktopView) {
           desktopView.style.display = 'none';
