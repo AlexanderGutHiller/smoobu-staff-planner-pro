@@ -147,7 +147,14 @@ async def admin_home(
     bookings = db.query(Booking).all()
     book_map = {b.id: (b.guest_name or "").strip() for b in bookings if b.guest_name}
     booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0, 'guest_name': (b.guest_name or "").strip()} for b in bookings}
-    log.debug("📊 Created book_map with %d entries, %d have guest names", len(bookings), len([b for b in bookings if b.guest_name and b.guest_name.strip()]))
+    # booking_map: indexiert nach apartment_id für die nächste Anreise
+    booking_map = {}
+    for b in bookings:
+        if b.apartment_id:
+            # Wenn noch kein Booking für dieses Apartment oder dieses ist früher
+            if b.apartment_id not in booking_map or (b.arrival_date and booking_map[b.apartment_id].arrival_date and b.arrival_date < booking_map[b.apartment_id].arrival_date):
+                booking_map[b.apartment_id] = b
+    log.debug("📊 Created book_map with %d entries, %d have guest names, booking_map with %d entries", len(bookings), len([b for b in bookings if b.guest_name and b.guest_name.strip()]), len(booking_map))
     
     # Timelog-Daten und Zusatzinformationen für jedes Task
     timelog_map = {}
@@ -193,6 +200,7 @@ async def admin_home(
             "apt_map": apt_map,
             "book_map": book_map,
             "booking_details_map": booking_details_map,
+            "booking_map": booking_map,
             "timelog_map": timelog_map,
             "extras_map": extras_map,
             "base_url": base_url,
