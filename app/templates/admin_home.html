@@ -357,6 +357,53 @@
     }
   }
 </style>
+<script>
+  // KRITISCH: Mobile-Ansicht SOFORT erzwingen (vor DOMContentLoaded)
+  (function() {
+    function forceMobile() {
+      if (window.innerWidth <= 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        const style = document.createElement('style');
+        style.textContent = `
+          .mobile-view, #mobile-view-container { 
+            display: block !important; 
+            visibility: visible !important; 
+            opacity: 1 !important; 
+            position: relative !important;
+            z-index: 9999 !important;
+            width: 100% !important;
+            height: auto !important;
+            overflow: visible !important;
+          }
+          .desktop-view { 
+            display: none !important; 
+            visibility: hidden !important;
+            opacity: 0 !important;
+            height: 0 !important;
+            overflow: hidden !important;
+            position: absolute !important;
+            left: -9999px !important;
+          }
+          .task-card-mobile { 
+            display: block !important; 
+            visibility: visible !important; 
+            opacity: 1 !important; 
+            min-height: 50px !important;
+            margin-bottom: 1rem !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', forceMobile);
+    } else {
+      forceMobile();
+    }
+    setTimeout(forceMobile, 0);
+    setTimeout(forceMobile, 50);
+    setTimeout(forceMobile, 100);
+  })();
+</script>
 </head>
 <body class="bg-light"><div class="container py-4">
 <div class="d-flex justify-content-end mb-2">
@@ -480,7 +527,7 @@ function setLanguage(lang) {
 <!-- Mobile Filter Section (gleiche Parameter wie Desktop, submit per JS) -->
 <div class="mobile-view mobile-filter-section">
   <form id="filterFormMobile" method="get" action="/admin/{{ token }}">
-    <h6 class="mb-2">{{ trans.date }}:</h6>
+  <h6 class="mb-2">{{ trans.date }}:</h6>
     {% set date_default = default_date_filter or '' %}
     <select id="f-date-mobile" name="date_range" class="form-select form-select-sm mb-3" onchange="document.getElementById('filterFormMobile').submit()">
       <option value="" {% if date_default=='' %}selected{% endif %}>{{ trans.all }}</option>
@@ -488,24 +535,24 @@ function setLanguage(lang) {
       <option value="week" {% if date_default=='week' %}selected{% endif %}>{{ trans.week }}</option>
       <option value="month" {% if date_default=='month' %}selected{% endif %}>{{ trans.month }}</option>
       <option value="next7" {% if date_default=='next7' %}selected{% endif %}>{{ trans.next7 }}</option>
-    </select>
-    
-    <h6 class="mb-2">{{ trans.apartment }}:</h6>
+  </select>
+  
+  <h6 class="mb-2">{{ trans.apartment }}:</h6>
     <select id="f-apt-mobile" name="apartment_id" class="form-select form-select-sm mb-3" onchange="document.getElementById('filterFormMobile').submit()">
       <option value="" {% if apartment_id is none %}selected{% endif %}>{{ trans.all }}</option>
       <option value="0" {% if apartment_id is not none and apartment_id == 0 %}selected{% endif %}>{{ trans.manuelle_aufgabe }}</option>
-      {% for apt in apartments %}
+    {% for apt in apartments %}
         <option value="{{ apt.id }}" {% if apartment_id is not none and apartment_id==apt.id %}selected{% endif %}>{{ apt.name }}</option>
-      {% endfor %}
-    </select>
-    
-    <h6 class="mb-2">{{ trans.ma }}:</h6>
+    {% endfor %}
+  </select>
+  
+  <h6 class="mb-2">{{ trans.ma }}:</h6>
     <select id="f-staff-mobile" name="staff_id" class="form-select form-select-sm mb-3" onchange="document.getElementById('filterFormMobile').submit()">
-      <option value="">{{ trans.all }}</option>
-      {% for s in staff %}
+    <option value="">{{ trans.all }}</option>
+    {% for s in staff %}
         <option value="{{ s.id }}" {% if staff_id and staff_id==s.id %}selected{% endif %}>{{ s.name }}</option>
-      {% endfor %}
-    </select>
+    {% endfor %}
+  </select>
 
     <!-- Status-Checkboxen Mobile: an Backend binden -->
     <div class="form-check mb-1">
@@ -531,14 +578,14 @@ function setLanguage(lang) {
     <input type="hidden" id="showOpenMobileHidden" name="show_open" value="{{ 1 if show_open else 0 }}">
     
     <div class="d-flex gap-2 mt-2">
-      <button class="btn btn-outline-secondary btn-sm" type="button" onclick="resetMobileFilters()"><i class="bi bi-x-circle"></i> Reset</button>
+    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="resetMobileFilters()"><i class="bi bi-x-circle"></i> Reset</button>
       <button class="btn btn-primary btn-sm" type="submit" onclick="updateMobileHiddenFields(); return true;"><i class="bi bi-funnel"></i> {{ trans.apply if trans.apply is defined else 'Filter anwenden' }}</button>
-    </div>
+  </div>
   </form>
 </div>
 
 <!-- Desktop View -->
-<div class="desktop-view">
+<div class="desktop-view" style="display: none !important; visibility: hidden !important; opacity: 0 !important; height: 0 !important; overflow: hidden !important; position: absolute !important; left: -9999px !important;">
   <!-- Kompakte Gesamt-Statistik in EINER Kachel -->
   <div class="row g-3 mb-3">
     <div class="col-12">
@@ -896,15 +943,15 @@ function setLanguage(lang) {
   <td data-col="planned"><span class="time-planned">{{ t.planned_minutes | minutes_to_hhmm }}</span></td>
   <td class="status-cell">
     <div class="status-badge-wrapper">
-      {% if t.status == 'done' %}
-        <span class="badge bg-success"><i class="bi bi-check-circle"></i> {{ trans.erledigt }}</span>
-      {% elif t.status == 'running' %}
-        <span class="badge bg-primary"><i class="bi bi-play-circle"></i> {{ trans.läuft }}</span>
-      {% elif t.status == 'paused' %}
-        <span class="badge bg-info"><i class="bi bi-pause-circle"></i> {{ trans.pausiert }}</span>
-      {% else %}
-        <span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> {{ trans.offen }}</span>
-      {% endif %}
+    {% if t.status == 'done' %}
+      <span class="badge bg-success"><i class="bi bi-check-circle"></i> {{ trans.erledigt }}</span>
+    {% elif t.status == 'running' %}
+      <span class="badge bg-primary"><i class="bi bi-play-circle"></i> {{ trans.läuft }}</span>
+    {% elif t.status == 'paused' %}
+      <span class="badge bg-info"><i class="bi bi-pause-circle"></i> {{ trans.pausiert }}</span>
+    {% else %}
+      <span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> {{ trans.offen }}</span>
+    {% endif %}
     </div>
     <form method="post" action="/admin/{{ token }}/task/status" class="d-inline">
       <input type="hidden" name="task_id" value="{{ t.id }}"/>
@@ -947,18 +994,18 @@ function setLanguage(lang) {
   <td>
     {% set tl = timelog_map.get(t.id, {}) %}
     <div class="task-time-comparison">
-      {% if tl.actual_minutes %}
+    {% if tl.actual_minutes %}
         <span class="time-actual {% if tl.actual_minutes > t.planned_minutes %}text-danger{% elif tl.actual_minutes > t.planned_minutes * 0.8 %}text-warning{% else %}text-success{% endif %}">
           {{ tl.actual_minutes | minutes_to_hhmm }}
-        </span>
-        {% if tl.actual_minutes > t.planned_minutes %}
+      </span>
+      {% if tl.actual_minutes > t.planned_minutes %}
           <span class="time-over">+{{ (tl.actual_minutes - t.planned_minutes) | minutes_to_hhmm }}</span>
-        {% endif %}
-      {% elif tl.started_at and not tl.ended_at %}
-        <span class="badge bg-warning text-dark" style="font-size: 0.7rem;"><i class="bi bi-clock"></i> {{ trans.läuft }}</span>
-      {% else %}
-        <span class="text-muted" style="font-size: 0.8rem;">-</span>
       {% endif %}
+    {% elif tl.started_at and not tl.ended_at %}
+        <span class="badge bg-warning text-dark" style="font-size: 0.7rem;"><i class="bi bi-clock"></i> {{ trans.läuft }}</span>
+    {% else %}
+        <span class="text-muted" style="font-size: 0.8rem;">-</span>
+    {% endif %}
     </div>
   </td>
   <td data-col="next">
@@ -989,7 +1036,7 @@ function setLanguage(lang) {
       </select>
     </form>
     <div style="display: flex; gap: 0.25rem; align-items: center;">
-      {% if not t.auto_generated %}
+    {% if not t.auto_generated %}
         <button 
           class="btn btn-outline-secondary btn-sm"
           type="button"
@@ -1007,19 +1054,19 @@ function setLanguage(lang) {
           <i class="bi bi-pencil"></i>
         </button>
         <form method="post" action="/admin/{{ token }}/task/delete" onsubmit="return confirm('Diesen manuellen Task löschen?');" class="d-inline">
-          <input type="hidden" name="task_id" value="{{ t.id }}"/>
+        <input type="hidden" name="task_id" value="{{ t.id }}"/>
           <button class="btn btn-outline-danger btn-sm" style="padding: 0.15rem 0.4rem; font-size: 0.7rem;" title="Löschen"><i class="bi bi-trash"></i></button>
-        </form>
-      {% endif %}
-      {% if t.assigned_staff_id %}
-        {% if t.assignment_status == 'pending' %}
+      </form>
+    {% endif %}
+    {% if t.assigned_staff_id %}
+      {% if t.assignment_status == 'pending' %}
           <span class="badge bg-warning text-dark" style="font-size: 0.65rem;"><i class="bi bi-hourglass-split"></i> {{ trans.pending }}</span>
-        {% elif t.assignment_status == 'accepted' %}
+      {% elif t.assignment_status == 'accepted' %}
           <span class="badge bg-success" style="font-size: 0.65rem;"><i class="bi bi-check-circle"></i> {{ trans.accepted }}</span>
-        {% elif t.assignment_status == 'rejected' %}
+      {% elif t.assignment_status == 'rejected' %}
           <span class="badge bg-danger" style="font-size: 0.65rem;"><i class="bi bi-x-circle"></i> {{ trans.rejected }}</span>
-        {% endif %}
       {% endif %}
+    {% endif %}
     </div>
   </td>
   <td><small style="color: #6c757d; font-size: 0.75rem;">#{{ t.id }}</small></td>
@@ -1030,7 +1077,7 @@ function setLanguage(lang) {
 </div>
 
 <!-- Mobile View -->
-<div class="mobile-view" id="mobile-view-container">
+<div class="mobile-view" id="mobile-view-container" style="display: block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 1 !important; width: 100% !important; height: auto !important; overflow: visible !important;">
 {% for t in tasks %}
 {% set tl = timelog_map.get(t.id, {}) %}
 {% set extras = extras_map.get(t.id, {}) %}
@@ -1064,7 +1111,7 @@ function setLanguage(lang) {
       {% endif %}
     </div>
   </div>
-
+  
   <div class="task-info-row">
     <span class="task-info-label">{{ trans.status }}:</span>
     <span>
@@ -1310,8 +1357,8 @@ function setLanguage(lang) {
             sessionStorage.setItem('adminAnchor', taskId ? ((isMobile ? 'task-mobile-' : 'task-') + taskId) : '');
           } catch (e) {}
         }, { capture: true });
-      });
-    });
+  });
+});
   })();
 </script>
 
@@ -1458,8 +1505,8 @@ function handleExtraSelect(selectEl){
           <button type="submit" class="btn btn-primary">{{ trans.erstellen }}</button>
         </div>
       </form>
-    </div>
   </div>
+</div>
 
 <script>
 // Heutiges Datum als Standard setzen beim Öffnen des Modals
