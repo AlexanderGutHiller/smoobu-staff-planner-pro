@@ -526,11 +526,7 @@ function setLanguage(lang) {
 
 <!-- Mobile Filter Section (gleiche Parameter wie Desktop, submit per JS) -->
 <div class="mobile-view mobile-filter-section">
-  <!-- DEBUG: Filter-Sektion ist sichtbar -->
-  <div style="background: lime; color: black; padding: 15px; margin: 10px; font-size: 20px; font-weight: bold; text-align: center; border: 5px solid blue; z-index: 99999 !important;">
-    🟢 FILTER-SEKTION SICHTBAR
-  </div>
-  <form id="filterFormMobile" method="get" action="/admin/{{ token }}">
+ <form id="filterFormMobile" method="get" action="/admin/{{ token }}">
   <h6 class="mb-2">{{ trans.date }}:</h6>
     {% set date_default = default_date_filter or '' %}
     <select id="f-date-mobile" name="date_range" class="form-select form-select-sm mb-3" onchange="document.getElementById('filterFormMobile').submit()">
@@ -589,16 +585,12 @@ function setLanguage(lang) {
 </div>
 
 <!-- Mobile View Container (Tasks) - WICHTIG: VOR Desktop-View, damit nicht verdeckt wird -->
-<div class="mobile-view" id="mobile-view-container" style="display: block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 99999 !important; width: 100% !important; height: auto !important; min-height: 200px !important; overflow: visible !important; background: #f0f0f0 !important; padding: 20px !important; margin-top: 20px !important; border: 10px solid red !important;">
-<!-- DEBUG: Mobile-Tasks-Container ist sichtbar -->
-<div style="background: red; color: white; padding: 20px; margin: 10px; font-size: 24px; font-weight: bold; text-align: center; border: 5px solid yellow; z-index: 99999 !important; position: relative !important;">
-  🔴 MOBILE TASKS CONTAINER - Tasks: {{ tasks|length }}
-</div>
+<div class="mobile-view" id="mobile-view-container">
 {% for t in tasks %}
 {% set tl = timelog_map.get(t.id, {}) %}
 {% set extras = extras_map.get(t.id, {}) %}
 {% set baby_beds = extras.get('baby_beds', 0) %}
-<div id="task-mobile-{{ t.id }}" class="task-card-mobile {% if not t.assigned_staff_id %}unassigned{% endif %} {% if t.assignment_status=='rejected' %}rejected{% elif t.assignment_status=='pending' %}pending{% elif t.assignment_status=='accepted' %}accepted{% endif %} {% if t.status=='done' %}done{% elif t.status=='running' %}running{% elif t.status=='paused' %}paused{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id==t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}" style="display: block !important; visibility: visible !important; opacity: 1 !important; min-height: 50px !important; margin-bottom: 1rem !important;">
+<div id="task-mobile-{{ t.id }}" class="task-card-mobile {% if not t.assigned_staff_id %}unassigned{% endif %} {% if t.assignment_status=='rejected' %}rejected{% elif t.assignment_status=='pending' %}pending{% elif t.assignment_status=='accepted' %}accepted{% endif %} {% if t.status=='done' %}done{% elif t.status=='running' %}running{% elif t.status=='paused' %}paused{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id==t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}">
   <div class="task-card-header">
     <div>
       {% if not t.assigned_staff_id %}
@@ -799,10 +791,9 @@ function setLanguage(lang) {
 </div>
 {% endfor %}
 {% if not tasks %}
-  <div class="text-center py-5" style="background: orange; color: black; padding: 30px; margin: 20px; border: 5px solid red; font-size: 20px; font-weight: bold;">
+  <div class="text-center py-5">
     <i class="bi bi-inbox" style="font-size: 4rem; color: #dee2e6;"></i>
-    <p class="mt-3" style="font-size: 24px; font-weight: bold;">{{ trans.keine_einsätze }}</p>
-    <p style="font-size: 18px;">KEINE TASKS GEFUNDEN - Filter prüfen!</p>
+    <p class="text-muted mt-3">{{ trans.keine_einsätze }}</p>
   </div>
 {% endif %}
 </div> <!-- Ende Mobile-Ansicht -->
@@ -1325,15 +1316,6 @@ function setLanguage(lang) {
           desktopView.style.position = 'absolute';
           desktopView.style.left = '-9999px';
         }
-        // Stelle sicher, dass alle Mobile-Karten sichtbar sind
-        const mobileCards = document.querySelectorAll('.task-card-mobile');
-        mobileCards.forEach(function(card) {
-          card.style.display = 'block';
-          card.style.visibility = 'visible';
-          card.style.opacity = '1';
-          card.style.minHeight = '50px';
-          card.style.marginBottom = '1rem';
-        });
       }
     }
     // Sofort beim Laden
