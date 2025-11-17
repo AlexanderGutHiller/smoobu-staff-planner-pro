@@ -530,7 +530,7 @@ def _send_email(to_email: str, subject: str, body_text: str, body_html: str | No
     except Exception as e:
         log.error("Email send failed to %s: %s", to_email, e)
 
-def _send_whatsapp(to_phone: str, message: str, use_template: bool = False):
+def _send_whatsapp(to_phone: str, message: str | dict, use_template: bool = False):
     """Sende WhatsApp-Nachricht über Twilio
     
     Args:
@@ -570,16 +570,20 @@ def _send_whatsapp(to_phone: str, message: str, use_template: bool = False):
         
         # Verwende WhatsApp-Vorlage (Content SID) wenn gewünscht und konfiguriert
         if use_template and TWILIO_WHATSAPP_CONTENT_SID:
-            # Verwende Content SID mit Content Variables (Opt-In-Vorlage)
-            # Die Nachricht wird als Variable übergeben (normalerweise {{1}} in der Vorlage)
+            # message sollte hier ein dict mit Template-Variablen sein, nicht ein String
+            if isinstance(message, dict):
+                content_vars = message
+            else:
+                # Fallback: wenn message ein String ist, verwende Variable 1 (für Opt-In)
+                content_vars = {"1": message}
             message_obj = client.messages.create(
                 content_sid=TWILIO_WHATSAPP_CONTENT_SID,
-                content_variables=json.dumps({"1": message}),  # Variable 1 enthält die Nachricht
+                content_variables=json.dumps(content_vars),
                 from_=TWILIO_WHATSAPP_FROM,
                 to=whatsapp_to,
                 status_callback=status_callback_url
             )
-            log.info("📱 Using WhatsApp template (Content SID: %s)", TWILIO_WHATSAPP_CONTENT_SID)
+            log.info("📱 Using WhatsApp template (Content SID: %s, vars: %s)", TWILIO_WHATSAPP_CONTENT_SID, list(content_vars.keys()))
         else:
             # Freie Nachricht (nur innerhalb 24h-Fenster möglich)
             message_obj = client.messages.create(
@@ -611,7 +615,7 @@ def _send_whatsapp(to_phone: str, message: str, use_template: bool = False):
         log.error("WhatsApp send failed to %s: %s", to_phone, e, exc_info=True)
         return False
 
-def _send_whatsapp_with_opt_in(to_phone: str, message: str, staff_id: Optional[int] = None, db=None):
+def _send_whatsapp_with_opt_in(to_phone: str, message: str | dict, staff_id: Optional[int] = None, db=None):
     """Sende WhatsApp-Nachricht mit Opt-In-Check
     
     Wenn Opt-In noch nicht bestätigt wurde, wird nur die Opt-In-Vorlage gesendet.
@@ -647,12 +651,14 @@ def _send_whatsapp_with_opt_in(to_phone: str, message: str, staff_id: Optional[i
             # KEINE normale Nachricht senden, da Opt-In noch nicht bestätigt wurde
             return False
     
-    # Opt-In wurde bestätigt - sende normale Nachricht
-    log.info("📱 Opt-In confirmed for %s, sending normal message", to_phone)
-    return _send_whatsapp(to_phone, message, use_template=False)
+    # Opt-In wurde bestätigt - sende Template-Nachricht
+    log.info("📱 Opt-In confirmed for %s, sending template message", to_phone)
+    # Wenn message ein dict ist, verwende Template, sonst normale Nachricht
+    use_template = isinstance(message, dict)
+    return _send_whatsapp(to_phone, message, use_template=use_template)
 
 def build_assignment_whatsapp_message(lang: str, staff_name: str, items: list, base_url: str) -> str:
-    """Erstelle WhatsApp-Nachricht für Zuweisungen"""
+    """Erstellt eine WhatsApp-Nachricht (für nicht-Template-Versand)"""
     trans = get_translations(lang)
     msg = f"*{trans.get('zuweisung', 'Zuweisung')} · {staff_name}*\n\n"
     for i, it in enumerate(items, 1):
@@ -663,6 +669,47 @@ def build_assignment_whatsapp_message(lang: str, staff_name: str, items: list, b
         msg += f"✅ {it['accept']}\n"
         msg += f"❌ {it['reject']}\n\n"
     return msg
+
+def build_assignment_whatsapp_template_vars(item: dict) -> dict:
+    """Erstellt Template-Variablen für WhatsApp-Template 'staffplanning'
+    
+    Template erwartet:
+    {{1}} = employee name
+    {{2}} = room name
+    {{3}} = room number
+    {{4}} = date (YYYY-MM-DD)
+    {{5}} = number of guests
+    {{6}} = category / assignment type
+    {{7}} = accept URL
+    {{8}} = reject URL
+    """
+    import re
+    # Extrahiere Raum-Nummer aus Raum-Name (z.B. "Romantik (9)" -> "9")
+    room_name = item.get('apt', '') or 'Manuelle Aufgabe'
+    room_number = ''
+    if '(' in room_name and ')' in room_name:
+        # Extrahiere Nummer aus Klammern
+        match = re.search(r'\(([^)]+)\)', room_name)
+        if match:
+            room_number = match.group(1)
+        # Entferne Klammern aus Raum-Name
+        room_name = re.sub(r'\s*\([^)]+\)\s*', '', room_name).strip()
+    else:
+        room_number = ''
+    
+    # Anzahl Gäste (direkt aus item oder 0)
+    guest_count = str(item.get('guest_count', 0) or 0)
+    
+    return {
+        "1": item.get('staff_name', ''),  # employee name
+        "2": room_name,  # room name (ohne Nummer)
+        "3": room_number,  # room number
+        "4": item.get('date', ''),  # date (YYYY-MM-DD)
+        "5": guest_count,  # number of guests
+        "6": item.get('desc', 'Activity'),  # category / assignment type
+        "7": item.get('accept', ''),  # accept URL
+        "8": item.get('reject', ''),  # reject URL
+    }
 
 def build_assignment_email(lang: str, staff_name: str, items: list, base_url: str) -> tuple[str, str, str]:
     trans = get_translations(lang)
@@ -748,11 +795,19 @@ def send_assignment_emails_job():
                 desc = (t.notes or "").strip() or get_translations(lang).get('tätigkeit','Tätigkeit')
                 accept_link = f"{base_url}/c/{token}/accept?task_id={t.id}"
                 reject_link = f"{base_url}/c/{token}/reject?task_id={t.id}"
+                # Berechne Gäste-Anzahl für Template
+                guest_count = 0
+                if t.booking_id:
+                    b = db.get(Booking, t.booking_id)
+                    if b:
+                        guest_count = (b.adults or 0) + (b.children or 0)
+                
                 items.append({
                     'date': t.date,
                     'apt': apt_name,
                     'desc': desc,
                     'guest': guest_str,
+                    'guest_count': guest_count,  # Für Template-Variable {{5}}
                     'accept': accept_link,
                     'reject': reject_link,
                 })
@@ -764,12 +819,15 @@ def send_assignment_emails_job():
                 phone = getattr(staff, 'phone', None) or ""
                 if phone and phone.strip():
                     log.info("📱 Sending WhatsApp to %s for staff %s (%d tasks)", phone, staff.name, len(items))
-                    whatsapp_msg = build_assignment_whatsapp_message(lang, staff.name, items, base_url)
-                    result = _send_whatsapp_with_opt_in(phone, whatsapp_msg, staff_id=sid, db=db)
-                    if result:
-                        log.info("✅ WhatsApp queued/sent to %s (staff: %s) - Delivery status will be logged via webhook", phone, staff.name)
-                    else:
-                        log.warning("❌ WhatsApp send failed to %s (staff: %s) - check logs above for details", phone, staff.name)
+                    # Sende für jeden Task eine separate WhatsApp-Nachricht mit Template
+                    for item in items:
+                        item['staff_name'] = staff.name  # Füge staff_name zu item hinzu
+                        template_vars = build_assignment_whatsapp_template_vars(item)
+                        result = _send_whatsapp_with_opt_in(phone, template_vars, staff_id=sid, db=db)
+                        if result:
+                            log.info("✅ WhatsApp template sent to %s for task %s", phone, item.get('date', ''))
+                        else:
+                            log.warning("❌ WhatsApp template failed to %s for task %s", phone, item.get('date', ''))
                 else:
                     log.debug("No phone number for staff %s, skipping WhatsApp", staff.name)
             except Exception as e:
@@ -843,11 +901,19 @@ def send_whatsapp_for_existing_assignments():
                 desc = (t.notes or "").strip() or get_translations(lang).get('tätigkeit','Tätigkeit')
                 accept_link = f"{base_url}/c/{token}/accept?task_id={t.id}"
                 reject_link = f"{base_url}/c/{token}/reject?task_id={t.id}"
+                # Berechne Gäste-Anzahl für Template
+                guest_count = 0
+                if t.booking_id:
+                    b = db.get(Booking, t.booking_id)
+                    if b:
+                        guest_count = (b.adults or 0) + (b.children or 0)
+                
                 items.append({
                     'date': t.date,
                     'apt': apt_name,
                     'desc': desc,
                     'guest': guest_str,
+                    'guest_count': guest_count,  # Für Template-Variable {{5}}
                     'accept': accept_link,
                     'reject': reject_link,
                 })
@@ -855,12 +921,15 @@ def send_whatsapp_for_existing_assignments():
             # Nur WhatsApp senden (keine Email)
             try:
                 log.info("📱 Sending WhatsApp to %s for staff %s (%d existing tasks)", phone, staff.name, len(items))
-                whatsapp_msg = build_assignment_whatsapp_message(lang, staff.name, items, base_url)
-                result = _send_whatsapp_with_opt_in(phone, whatsapp_msg, staff_id=sid, db=db)
-                if result:
-                    log.info("✅ WhatsApp queued/sent to %s (staff: %s) - Delivery status will be logged via webhook", phone, staff.name)
-                else:
-                    log.warning("❌ WhatsApp send failed to %s (staff: %s) - check logs above for details", phone, staff.name)
+                # Sende für jeden Task eine separate WhatsApp-Nachricht mit Template
+                for item in items:
+                    item['staff_name'] = staff.name  # Füge staff_name zu item hinzu
+                    template_vars = build_assignment_whatsapp_template_vars(item)
+                    result = _send_whatsapp_with_opt_in(phone, template_vars, staff_id=sid, db=db)
+                    if result:
+                        log.info("✅ WhatsApp template sent to %s for task %s", phone, item.get('date', ''))
+                    else:
+                        log.warning("❌ WhatsApp template failed to %s for task %s", phone, item.get('date', ''))
             except Exception as e:
                 log.error("WhatsApp notification error for staff %s: %s", staff.name, e, exc_info=True)
             
