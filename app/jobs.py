@@ -158,13 +158,16 @@ def _send_whatsapp(to_phone: str, message: str | dict, use_template: bool = Fals
                 phone = "+49" + phone
         whatsapp_to = f"whatsapp:{phone}"
         client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-        log.info("📱 Sending WhatsApp: from=%s, to=%s, message_length=%d, use_template=%s", 
-                 TWILIO_WHATSAPP_FROM, whatsapp_to, len(message), use_template)
+        log.info("📱 Sending WhatsApp: from=%s, to=%s, message_length=%d, use_template=%s, template_sid=%s", 
+                 TWILIO_WHATSAPP_FROM, whatsapp_to, len(message), use_template, template_sid)
+        log.info("📱 Loaded TWILIO_WHATSAPP_CONTENT_SID from config: %s", TWILIO_WHATSAPP_CONTENT_SID)
         status_callback_url = None
         if BASE_URL:
             status_callback_url = f"{BASE_URL.rstrip('/')}/webhook/twilio/status"
         # Verwende spezifisches Template-SID falls angegeben, sonst Standard-Template
         content_sid_to_use = template_sid or TWILIO_WHATSAPP_CONTENT_SID
+        log.info("📱 Using template SID: %s (template_sid param: %s, config default: %s)", 
+                 content_sid_to_use, template_sid, TWILIO_WHATSAPP_CONTENT_SID)
         if use_template and content_sid_to_use:
             # message sollte hier ein dict mit Template-Variablen sein, nicht ein String
             if isinstance(message, dict):
