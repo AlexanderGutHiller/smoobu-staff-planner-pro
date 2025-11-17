@@ -1026,39 +1026,15 @@ function setLanguage(lang) {
 <table id="task-table" class="table table-sm table-hover bg-white align-middle">
 <thead>
   <tr>
-    <th>{{ trans.date }}<br>
-      <select id="f-date-table" class="form-select form-select-sm filter-input" onchange="syncTableFilterToMain('date_range', this.value)">
-        {% set date_default = default_date_filter or '' %}
-        <option value="" {% if date_default=='' %}selected{% endif %}>{{ trans.all }}</option>
-        <option value="today" {% if date_default=='today' %}selected{% endif %}>{{ trans.today }}</option>
-        <option value="week" {% if date_default=='week' %}selected{% endif %}>{{ trans.week }}</option>
-        <option value="month" {% if date_default=='month' %}selected{% endif %}>{{ trans.month }}</option>
-        <option value="next7" {% if date_default=='next7' %}selected{% endif %}>{{ trans.next7 }}</option>
-      </select>
-    </th>
-    <th>{{ trans.apartment }}<br>
-      <select id="f-apt-table" class="form-select form-select-sm filter-input" onchange="syncTableFilterToMain('apartment_id', this.value)">
-        <option value="" {% if apartment_id is none %}selected{% endif %}>{{ trans.all }}</option>
-        <option value="0" {% if apartment_id is not none and apartment_id == 0 %}selected{% endif %}>{{ trans.manuelle_aufgabe }}</option>
-        {% for apt in apartments %}
-          <option value="{{ apt.id }}" {% if apartment_id is not none and apartment_id==apt.id %}selected{% endif %}>{{ apt.name }}</option>
-        {% endfor %}
-      </select>
-    </th>
+    <th>{{ trans.date }}</th>
+    <th>{{ trans.apartment }}</th>
     <th>{{ trans.planned }}</th>
     <th>{{ trans.status }}</th>
     <th>{{ trans.checklist }}</th>
     <th>{{ trans.babybetten }}</th>
     <th>{{ trans.actual }}</th>
     <th>{{ trans.next_arrival }}</th>
-    <th>{{ trans.ma }}<br>
-      <select id="f-staff-table" class="form-select form-select-sm filter-input" onchange="syncTableFilterToMain('staff_id', this.value)">
-        <option value="">{{ trans.all }}</option>
-        {% for s in staff %}
-          <option value="{{ s.id }}" {% if staff_id and staff_id==s.id %}selected{% endif %}>{{ s.name }}</option>
-        {% endfor %}
-      </select>
-    </th>
+    <th>{{ trans.ma }}</th>
     <th>#</th>
   </tr>
 </thead>
@@ -1626,20 +1602,6 @@ document.addEventListener('DOMContentLoaded', function() {
   const savedView = window.localStorage.getItem('adminViewMode') || 'cards';
   applyView(savedView);
   
-  // Beim Laden: Tabellenansicht-Filter mit Desktop-Filtern synchronisieren
-  if (savedView === 'table') {
-    setTimeout(function() {
-      if (fDateTable && fDateDesktop) {
-        fDateTable.value = fDateDesktop.value;
-      }
-      if (fAptTable && fAptDesktop) {
-        fAptTable.value = fAptDesktop.value;
-      }
-      if (fStaffTable && fStaffDesktop) {
-        fStaffTable.value = fStaffDesktop.value;
-      }
-    }, 100);
-  }
 
   if (btnViewCards) {
     btnViewCards.addEventListener('click', function() {
@@ -1654,51 +1616,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
-  // Tabellenansicht-Filter: Synchronisierung mit Hauptfilter-Formular
-  function syncTableFilterToMain(paramName, value) {
-    const desktopForm = document.getElementById('filterForm');
-    if (!desktopForm) return;
-    
-    // Parameter im Formular setzen
-    let input = desktopForm.querySelector(`[name="${paramName}"]`);
-    if (!input) {
-      // Hidden Input erstellen, falls nicht vorhanden
-      input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = paramName;
-      desktopForm.appendChild(input);
-    }
-    input.value = value;
-    
-    // Formular absenden
-    desktopForm.submit();
-  }
-  
-  // Tabellenansicht-Filter beim Laden mit Hauptfilter synchronisieren
-  const fDateTable = document.getElementById('f-date-table');
-  const fAptTable = document.getElementById('f-apt-table');
-  const fStaffTable = document.getElementById('f-staff-table');
-  const fDateDesktop = document.getElementById('f-date-desktop');
-  const fAptDesktop = document.getElementById('f-apt-desktop');
-  const fStaffDesktop = document.getElementById('f-staff-desktop');
-  
-  // Beim Wechsel zur Tabellenansicht: Filterwerte vom Desktop-Formular übernehmen
-  if (btnViewTable) {
-    btnViewTable.addEventListener('click', function() {
-      // Kurze Verzögerung, damit die Ansicht zuerst gewechselt wird
-      setTimeout(function() {
-        if (fDateTable && fDateDesktop) {
-          fDateTable.value = fDateDesktop.value;
-        }
-        if (fAptTable && fAptDesktop) {
-          fAptTable.value = fAptDesktop.value;
-        }
-        if (fStaffTable && fStaffDesktop) {
-          fStaffTable.value = fStaffDesktop.value;
-        }
-      }, 50);
-    });
-  }
   
   // Desktop Checkboxen: Nur change-Event (click wird automatisch zu change)
   if (filterShowDone) {
