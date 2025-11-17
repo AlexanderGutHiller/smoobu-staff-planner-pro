@@ -924,9 +924,8 @@ function setLanguage(lang) {
     const hash = window.location.hash;
     if (hash && hash.startsWith('#task-')) {
       const taskId = hash.replace('#task-', '');
-      // Versuche beide möglichen ID-Formate
-      let el = document.getElementById('task-' + taskId) || 
-               document.getElementById('cleaner-task-' + taskId);
+      // Suche Task-Karte mit ID
+      let el = document.getElementById('task-' + taskId);
       if (el) {
         // Warte kurz, damit die Seite vollständig geladen ist
         setTimeout(function() {
