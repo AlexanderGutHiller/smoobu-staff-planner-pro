@@ -391,7 +391,8 @@ async def cleaner_accept_get(token: str, task_id: int, db=Depends(get_db)):
         raise HTTPException(status_code=404, detail="Task nicht gefunden oder nicht zugewiesen")
     t.assignment_status = "accepted"
     db.commit()
-    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+    # Weiterleitung mit Anchor zur Task-Karte
+    return RedirectResponse(url=f"/cleaner/{token}#task-{task_id}", status_code=303)
 
 
 
@@ -405,6 +406,7 @@ async def cleaner_reject_get(token: str, task_id: int, db=Depends(get_db)):
         raise HTTPException(status_code=404, detail="Task nicht gefunden oder nicht zugewiesen")
     t.assignment_status = "rejected"
     db.commit()
-    return RedirectResponse(url=f"/cleaner/{token}", status_code=303)
+    # Weiterleitung mit Anchor zur Task-Karte
+    return RedirectResponse(url=f"/cleaner/{token}#task-{task_id}", status_code=303)
 
 
