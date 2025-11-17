@@ -341,10 +341,29 @@ def build_assignment_whatsapp_template_vars(item: dict) -> dict:
     if not accept_url or not reject_url:
         log.warning("⚠️ URLs missing in template vars - accept: %s, reject: %s", accept_url, reject_url)
     
+    # Direkter Link zur Aufgabe (mit Auto-Scroll via #task-{id})
+    task_link = item.get('task_link', '')
+    if not task_link:
+        # Fallback: Wenn kein task_link vorhanden, erstelle aus accept_url
+        accept_url_fallback = item.get('accept', '')
+        if accept_url_fallback:
+            # Extrahiere task_id aus accept URL und erstelle task_link
+            import re
+            match = re.search(r'task_id=(\d+)', accept_url_fallback)
+            if match:
+                task_id = match.group(1)
+                # Extrahiere base_url und token aus accept_url
+                base_match = re.search(r'(https?://[^/]+)', accept_url_fallback)
+                token_match = re.search(r'/c/([^/]+)/', accept_url_fallback)
+                if base_match and token_match:
+                    base = base_match.group(1)
+                    token = token_match.group(1)
+                    task_link = f"{base}/cleaner/{token}#task-{task_id}"
+    
     # Erstelle Variablen-Dict - Twilio erwartet String-Keys ("1", "2", etc.)
     template_vars = {
         "1": staff_name,  # employee name
-        "2": str(room_name or ''),  # room name (ohne Nummer)
+        "2": str(task_link or ''),  # Link zur Aufgabe (mit Auto-Scroll)
         "3": str(room_number or ''),  # room number
         "4": date_str,  # date (YYYY-MM-DD)
         "5": guest_count_str,  # number of guests
@@ -697,6 +716,8 @@ def send_assignment_emails_job():
                 desc = (t.notes or "").strip() or _get_translations(lang).get('tätigkeit','Tätigkeit')
                 accept_link = f"{base_url}/c/{token}/accept?task_id={t.id}"
                 reject_link = f"{base_url}/c/{token}/reject?task_id={t.id}"
+                # Direkter Link zur Aufgabe mit Auto-Scroll
+                task_link = f"{base_url}/cleaner/{token}#task-{t.id}"
                 # Berechne Gäste-Anzahl für Template
                 guest_count = 0
                 if t.booking_id:
@@ -715,6 +736,7 @@ def send_assignment_emails_job():
                     'guest_count': guest_count,  # Für Template-Variable {{5}}
                     'accept': accept_link,
                     'reject': reject_link,
+                    'task_link': task_link,  # Direkter Link zur Aufgabe
                 })
             subject, body_text, body_html = build_assignment_email(lang, staff.name, items, base_url)
             _send_email(staff.email, subject, body_text, body_html)
