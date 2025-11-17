@@ -226,6 +226,8 @@
       opacity: 0 !important;
       height: 0 !important;
       overflow: hidden !important;
+      position: absolute !important;
+      left: -9999px !important;
     }
     /* Mobile-Ansicht IMMER anzeigen */
     .mobile-view { 
@@ -233,10 +235,10 @@
       visibility: visible !important; 
       opacity: 1 !important; 
       position: relative !important;
-      z-index: 99999 !important;
+      z-index: 1 !important;
       width: 100% !important;
       height: auto !important;
-      min-height: 100px !important;
+      min-height: auto !important;
       overflow: visible !important;
     }
     .hide-on-mobile { display: none !important; }
@@ -1028,20 +1030,7 @@ function setLanguage(lang) {
 </div>
 
 <!-- Mobile View -->
-<div class="mobile-view" id="mobile-view-container" style="display: block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 99999 !important; background: yellow !important; padding: 20px !important; border: 5px solid red !important;">
-<!-- Debug: Anzahl Tasks: {{ tasks|length }} -->
-<div style="background: #ff0000; color: white; padding: 30px; margin: 20px 0; border-radius: 10px; font-size: 24px; font-weight: bold; text-align: center; position: relative; z-index: 99999; border: 5px solid black;">
-  🔴 MOBILE VIEW IST AKTIV - {{ tasks|length }} Tasks geladen
-</div>
-{% if tasks|length > 0 %}
-  <div style="background: #00ff00; color: black; padding: 15px; margin: 10px 0; border-radius: 5px; font-weight: bold; font-size: 18px;">
-    ✅ {{ tasks|length }} Tasks gefunden - Mobile View sollte sichtbar sein!
-  </div>
-{% else %}
-  <div style="background: #ffa500; color: black; padding: 15px; margin: 10px 0; border-radius: 5px; font-weight: bold; font-size: 18px;">
-    ⚠️ Keine Tasks gefunden - Bitte Filter prüfen!
-  </div>
-{% endif %}
+<div class="mobile-view" id="mobile-view-container">
 {% for t in tasks %}
 {% set tl = timelog_map.get(t.id, {}) %}
 {% set extras = extras_map.get(t.id, {}) %}
