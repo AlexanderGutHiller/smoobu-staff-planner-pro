@@ -214,12 +214,20 @@
   #task-table th:nth-child(9), #task-table td:nth-child(9) { width: 140px; } /* Staff */
   #task-table th:nth-child(10), #task-table td:nth-child(10) { width: 50px; text-align: center; } /* ID */
   
-  /* Mobile Optimierungen */
-  @media (max-width: 768px) {
+  /* Mobile Optimierungen - WICHTIG: Diese Regeln müssen VOR der Desktop-Media-Query stehen */
+  @media screen and (max-width: 768px) {
     .container { padding-left: 10px; padding-right: 10px; }
     .btn { padding: 0.4rem 0.6rem; font-size: 0.8rem; }
     .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .desktop-view { display: none !important; } /* Desktop-Ansicht auf mobilen Geräten ausblenden */
+    /* Desktop-Ansicht KOMPLETT ausblenden auf Mobile */
+    .desktop-view { 
+      display: none !important; 
+      visibility: hidden !important;
+      opacity: 0 !important;
+      height: 0 !important;
+      overflow: hidden !important;
+    }
+    /* Mobile-Ansicht IMMER anzeigen */
     .mobile-view { 
       display: block !important; 
       visibility: visible !important; 
@@ -229,6 +237,7 @@
       width: 100% !important;
       height: auto !important;
       min-height: 100px !important;
+      overflow: visible !important;
     }
     .hide-on-mobile { display: none !important; }
     /* Lovable/iOS Fallback: Karten immer sichtbar erzwingen */
@@ -337,9 +346,13 @@
     }
   }
   
-  @media (min-width: 769px) {
+  /* Desktop-Ansicht - nur auf großen Bildschirmen */
+  @media screen and (min-width: 769px) {
     .desktop-view { display: block; }
-    .mobile-view { display: none; }
+    .mobile-view { 
+      display: none !important; 
+      visibility: hidden !important;
+    }
   }
 </style>
 </head>
