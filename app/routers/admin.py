@@ -148,11 +148,13 @@ async def admin_home(
     book_map = {b.id: (b.guest_name or "").strip() for b in bookings if b.guest_name}
     booking_details_map = {b.id: {'adults': b.adults or 0, 'children': b.children or 0, 'guest_name': (b.guest_name or "").strip()} for b in bookings}
     # booking_map: indexiert nach apartment_id für die nächste Anreise
-    # Erstelle ein Dictionary mit apartment_id als Key und Booking-Objekt als Value
-    # Für jedes Apartment wird das nächste (früheste) Booking verwendet
+    # Erstelle ein Dictionary mit apartment_id als Key und Booking-Info als Value
+    # Für jedes Apartment wird das nächste (früheste zukünftige) Booking verwendet
+    from datetime import date
+    today_str = date.today().strftime("%Y-%m-%d")
     booking_map = {}
     for b in bookings:
-        if b.apartment_id:
+        if b.apartment_id and b.arrival and b.arrival >= today_str:  # Nur zukünftige Anreisen
             # Berechne guests aus adults + children
             guests = (b.adults or 0) + (b.children or 0)
             # Erstelle ein dict-ähnliches Objekt für das Template
@@ -165,7 +167,7 @@ async def admin_home(
             # Wenn noch kein Booking für dieses Apartment oder dieses ist früher
             if b.apartment_id not in booking_map:
                 booking_map[b.apartment_id] = booking_info
-            elif b.arrival and booking_map[b.apartment_id].get('arrival_date') and b.arrival < booking_map[b.apartment_id]['arrival_date']:
+            elif b.arrival < booking_map[b.apartment_id]['arrival_date']:
                 booking_map[b.apartment_id] = booking_info
     log.debug("📊 Created book_map with %d entries, %d have guest names, booking_map with %d entries", len(bookings), len([b for b in bookings if b.guest_name and b.guest_name.strip()]), len(booking_map))
     
