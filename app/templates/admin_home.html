@@ -357,53 +357,6 @@
     }
   }
 </style>
-<script>
-  // KRITISCH: Mobile-Ansicht SOFORT erzwingen (vor DOMContentLoaded)
-  (function() {
-    function forceMobile() {
-      if (window.innerWidth <= 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        const style = document.createElement('style');
-        style.textContent = `
-          .mobile-view, #mobile-view-container { 
-            display: block !important; 
-            visibility: visible !important; 
-            opacity: 1 !important; 
-            position: relative !important;
-            z-index: 9999 !important;
-            width: 100% !important;
-            height: auto !important;
-            overflow: visible !important;
-          }
-          .desktop-view { 
-            display: none !important; 
-            visibility: hidden !important;
-            opacity: 0 !important;
-            height: 0 !important;
-            overflow: hidden !important;
-            position: absolute !important;
-            left: -9999px !important;
-          }
-          .task-card-mobile { 
-            display: block !important; 
-            visibility: visible !important; 
-            opacity: 1 !important; 
-            min-height: 50px !important;
-            margin-bottom: 1rem !important;
-          }
-        `;
-        document.head.appendChild(style);
-      }
-    }
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', forceMobile);
-    } else {
-      forceMobile();
-    }
-    setTimeout(forceMobile, 0);
-    setTimeout(forceMobile, 50);
-    setTimeout(forceMobile, 100);
-  })();
-</script>
 </head>
 <body class="bg-light"><div class="container py-4">
 <div class="d-flex justify-content-end mb-2">
