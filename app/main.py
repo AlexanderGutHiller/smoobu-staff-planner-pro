@@ -711,19 +711,36 @@ def build_assignment_whatsapp_template_vars(item: dict) -> dict:
         room_number = ''
     
     # Anzahl Gäste (direkt aus item oder 0)
-    guest_count = item.get('guest_count', 0) or 0
-    guest_count_str = str(guest_count) if guest_count else "0"
+    guest_count = item.get('guest_count', 0)
+    if guest_count is None:
+        guest_count = 0
+    guest_count_str = str(int(guest_count)) if guest_count else "0"
     
-    # Stelle sicher, dass alle Werte Strings sind und nicht None
+    # Stelle sicher, dass alle Werte Strings sind und nicht None/leer
+    # Twilio erwartet, dass alle Variablen vorhanden sind, auch wenn sie leer sind
+    staff_name = str(item.get('staff_name', '') or '').strip()
+    date_str = str(item.get('date', '') or '').strip()
+    desc_str = str(item.get('desc', 'Activity') or 'Activity').strip()
+    accept_url = str(item.get('accept', '') or '').strip()
+    reject_url = str(item.get('reject', '') or '').strip()
+    
+    # Validierung: Alle erforderlichen Felder müssen vorhanden sein
+    if not staff_name:
+        log.warning("⚠️ staff_name is empty in template vars for item: %s", item.get('date', 'unknown'))
+    if not date_str:
+        log.warning("⚠️ date is empty in template vars for item: %s", item.get('staff_name', 'unknown'))
+    if not accept_url or not reject_url:
+        log.warning("⚠️ URLs missing in template vars - accept: %s, reject: %s", accept_url, reject_url)
+    
     return {
-        "1": str(item.get('staff_name', '') or ''),  # employee name
+        "1": staff_name,  # employee name
         "2": str(room_name or ''),  # room name (ohne Nummer)
         "3": str(room_number or ''),  # room number
-        "4": str(item.get('date', '') or ''),  # date (YYYY-MM-DD)
+        "4": date_str,  # date (YYYY-MM-DD)
         "5": guest_count_str,  # number of guests
-        "6": str(item.get('desc', 'Activity') or 'Activity'),  # category / assignment type
-        "7": str(item.get('accept', '') or ''),  # accept URL
-        "8": str(item.get('reject', '') or ''),  # reject URL
+        "6": desc_str,  # category / assignment type
+        "7": accept_url,  # accept URL
+        "8": reject_url,  # reject URL
     }
 
 def build_assignment_email(lang: str, staff_name: str, items: list, base_url: str) -> tuple[str, str, str]:
