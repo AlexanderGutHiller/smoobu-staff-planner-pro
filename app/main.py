@@ -530,7 +530,7 @@ def _send_email(to_email: str, subject: str, body_text: str, body_html: str | No
     except Exception as e:
         log.error("Email send failed to %s: %s", to_email, e)
 
-def _send_whatsapp(to_phone: str, message: str | dict, use_template: bool = False):
+def _send_whatsapp(to_phone: str, message: str | dict, use_template: bool = False, template_sid: str | None = None):
     """Sende WhatsApp-Nachricht über Twilio
     
     Args:
@@ -568,8 +568,10 @@ def _send_whatsapp(to_phone: str, message: str | dict, use_template: bool = Fals
         if BASE_URL:
             status_callback_url = f"{BASE_URL.rstrip('/')}/webhook/twilio/status"
         
+        # Verwende spezifisches Template-SID falls angegeben, sonst Standard-Template
+        content_sid_to_use = template_sid or TWILIO_WHATSAPP_CONTENT_SID
         # Verwende WhatsApp-Vorlage (Content SID) wenn gewünscht und konfiguriert
-        if use_template and TWILIO_WHATSAPP_CONTENT_SID:
+        if use_template and content_sid_to_use:
             # message sollte hier ein dict mit Template-Variablen sein, nicht ein String
             if isinstance(message, dict):
                 content_vars = message
@@ -597,13 +599,13 @@ def _send_whatsapp(to_phone: str, message: str | dict, use_template: bool = Fals
             content_variables_json = json.dumps(content_vars_str, ensure_ascii=False)
             
             message_obj = client.messages.create(
-                content_sid=TWILIO_WHATSAPP_CONTENT_SID,
+                content_sid=content_sid_to_use,
                 content_variables=content_variables_json,
                 from_=TWILIO_WHATSAPP_FROM,
                 to=whatsapp_to,
                 status_callback=status_callback_url
             )
-            log.info("📱 Using WhatsApp template (Content SID: %s, vars: %s)", TWILIO_WHATSAPP_CONTENT_SID, list(content_vars_str.keys()))
+            log.info("📱 Using WhatsApp template (Content SID: %s, vars: %s)", content_sid_to_use, list(content_vars_str.keys()))
         else:
             # Freie Nachricht (nur innerhalb 24h-Fenster möglich)
             message_obj = client.messages.create(

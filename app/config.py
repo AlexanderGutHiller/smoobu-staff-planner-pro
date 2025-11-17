@@ -21,6 +21,9 @@ SMTP_FROM = os.getenv("SMTP_FROM", "")
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
 TWILIO_WHATSAPP_FROM = os.getenv("TWILIO_WHATSAPP_FROM", "")
+# Template für Assignment-Nachrichten (altes Template)
+TWILIO_WHATSAPP_CONTENT_SID_OLD = os.getenv("TWILIO_WHATSAPP_CONTENT_SID_OLD", "")
+# Template für Assignment-Nachrichten (neues Template - temporär aktiv)
 TWILIO_WHATSAPP_CONTENT_SID = os.getenv("TWILIO_WHATSAPP_CONTENT_SID", "")
 
 # App Info
