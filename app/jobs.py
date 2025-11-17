@@ -342,7 +342,6 @@ def build_assignment_whatsapp_template_vars(item: dict) -> dict:
         log.warning("⚠️ URLs missing in template vars - accept: %s, reject: %s", accept_url, reject_url)
     
     # Direkter Link zur Aufgabe (mit Auto-Scroll via #task-{id})
-    import re
     task_link = item.get('task_link', '')
     if not task_link:
         # Fallback: Wenn kein task_link vorhanden, erstelle aus accept_url
