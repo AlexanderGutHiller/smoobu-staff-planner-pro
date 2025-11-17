@@ -170,14 +170,21 @@ def _send_whatsapp(to_phone: str, message: str | dict, use_template: bool = Fals
             else:
                 # Fallback: wenn message ein String ist, verwende Variable 1 (für Opt-In)
                 content_vars = {"1": message}
+            
+            # Stelle sicher, dass alle Werte Strings sind (Twilio erwartet Strings)
+            content_vars_str = {str(k): str(v) if v is not None else "" for k, v in content_vars.items()}
+            
+            # Debug: Logge die Variablen
+            log.info("📱 Template variables: %s", json.dumps(content_vars_str))
+            
             message_obj = client.messages.create(
                 content_sid=TWILIO_WHATSAPP_CONTENT_SID,
-                content_variables=json.dumps(content_vars),
+                content_variables=json.dumps(content_vars_str),
                 from_=TWILIO_WHATSAPP_FROM,
                 to=whatsapp_to,
                 status_callback=status_callback_url
             )
-            log.info("📱 Using WhatsApp template (Content SID: %s, vars: %s)", TWILIO_WHATSAPP_CONTENT_SID, list(content_vars.keys()))
+            log.info("📱 Using WhatsApp template (Content SID: %s, vars: %s)", TWILIO_WHATSAPP_CONTENT_SID, list(content_vars_str.keys()))
         else:
             message_obj = client.messages.create(
                 body=message,
@@ -288,17 +295,19 @@ def build_assignment_whatsapp_template_vars(item: dict) -> dict:
         room_number = ''
     
     # Anzahl Gäste (direkt aus item oder 0)
-    guest_count = str(item.get('guest_count', 0) or 0)
+    guest_count = item.get('guest_count', 0) or 0
+    guest_count_str = str(guest_count) if guest_count else "0"
     
+    # Stelle sicher, dass alle Werte Strings sind und nicht None
     return {
-        "1": item.get('staff_name', ''),  # employee name
-        "2": room_name,  # room name (ohne Nummer)
-        "3": room_number,  # room number
-        "4": item.get('date', ''),  # date (YYYY-MM-DD)
-        "5": guest_count,  # number of guests
-        "6": item.get('desc', 'Activity'),  # category / assignment type
-        "7": item.get('accept', ''),  # accept URL
-        "8": item.get('reject', ''),  # reject URL
+        "1": str(item.get('staff_name', '') or ''),  # employee name
+        "2": str(room_name or ''),  # room name (ohne Nummer)
+        "3": str(room_number or ''),  # room number
+        "4": str(item.get('date', '') or ''),  # date (YYYY-MM-DD)
+        "5": guest_count_str,  # number of guests
+        "6": str(item.get('desc', 'Activity') or 'Activity'),  # category / assignment type
+        "7": str(item.get('accept', '') or ''),  # accept URL
+        "8": str(item.get('reject', '') or ''),  # reject URL
     }
 
 def build_assignment_email(lang: str, staff_name: str, items: list, base_url: str) -> tuple[str, str, str]:
