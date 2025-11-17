@@ -852,7 +852,11 @@ def send_assignment_emails_job():
                 if t.booking_id:
                     b = db.get(Booking, t.booking_id)
                     if b:
-                        guest_count = (b.adults or 0) + (b.children or 0)
+                        # Stelle sicher, dass adults und children nicht None sind
+                        adults = b.adults if b.adults is not None else 0
+                        children = b.children if b.children is not None else 0
+                        guest_count = adults + children
+                        log.debug("📊 Guest count for task %d: adults=%d, children=%d, total=%d", t.id, adults, children, guest_count)
                 
                 items.append({
                     'date': t.date,
@@ -958,7 +962,11 @@ def send_whatsapp_for_existing_assignments():
                 if t.booking_id:
                     b = db.get(Booking, t.booking_id)
                     if b:
-                        guest_count = (b.adults or 0) + (b.children or 0)
+                        # Stelle sicher, dass adults und children nicht None sind
+                        adults = b.adults if b.adults is not None else 0
+                        children = b.children if b.children is not None else 0
+                        guest_count = adults + children
+                        log.debug("📊 Guest count for task %d: adults=%d, children=%d, total=%d", t.id, adults, children, guest_count)
                 
                 items.append({
                     'date': t.date,
