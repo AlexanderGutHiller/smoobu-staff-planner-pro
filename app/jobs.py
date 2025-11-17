@@ -207,6 +207,11 @@ def _send_whatsapp(to_phone: str, message: str | dict, use_template: bool = Fals
         return False
 
 def _send_whatsapp_with_opt_in(to_phone: str, message: str | dict, staff_id: Optional[int] = None, db=None):
+    """Sende WhatsApp-Nachricht mit Opt-In-Check
+    
+    WICHTIG: Templates können immer gesendet werden (auch ohne Opt-In-Bestätigung).
+    Nur freie Nachrichten (Strings) benötigen Opt-In-Bestätigung.
+    """
     opt_in_sent = False
     opt_in_confirmed = False
     if staff_id and db:
@@ -214,6 +219,16 @@ def _send_whatsapp_with_opt_in(to_phone: str, message: str | dict, staff_id: Opt
         if staff:
             opt_in_sent = getattr(staff, 'whatsapp_opt_in_sent', False)
             opt_in_confirmed = getattr(staff, 'whatsapp_opt_in_confirmed', False)
+    
+    # Wenn message ein dict ist, handelt es sich um ein Template
+    is_template = isinstance(message, dict)
+    
+    # Templates können immer gesendet werden (auch ohne Opt-In-Bestätigung)
+    if is_template:
+        log.info("📱 Sending WhatsApp template to %s (templates don't require opt-in confirmation)", to_phone)
+        return _send_whatsapp(to_phone, message, use_template=True)
+    
+    # Für freie Nachrichten (Strings) benötigen wir Opt-In-Bestätigung
     if not opt_in_confirmed:
         if not opt_in_sent and TWILIO_WHATSAPP_CONTENT_SID:
             log.info("📱 Sending Opt-In message to %s (waiting for confirmation)", to_phone)
@@ -229,10 +244,9 @@ def _send_whatsapp_with_opt_in(to_phone: str, message: str | dict, staff_id: Opt
         else:
             log.info("📱 Opt-In already sent to %s, waiting for confirmation before sending normal message", to_phone)
             return False
-    log.info("📱 Opt-In confirmed for %s, sending template message", to_phone)
-    # Wenn message ein dict ist, verwende Template, sonst normale Nachricht
-    use_template = isinstance(message, dict)
-    return _send_whatsapp(to_phone, message, use_template=use_template)
+    
+    log.info("📱 Opt-In confirmed for %s, sending normal message", to_phone)
+    return _send_whatsapp(to_phone, message, use_template=False)
 
 def build_assignment_whatsapp_message(lang: str, staff_name: str, items: list, base_url: str) -> str:
     """Erstellt eine WhatsApp-Nachricht (für nicht-Template-Versand)"""
