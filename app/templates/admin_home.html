@@ -225,7 +225,10 @@
       visibility: visible !important; 
       opacity: 1 !important; 
       position: relative !important;
-      z-index: 10 !important;
+      z-index: 99999 !important;
+      width: 100% !important;
+      height: auto !important;
+      min-height: 100px !important;
     }
     .hide-on-mobile { display: none !important; }
     /* Lovable/iOS Fallback: Karten immer sichtbar erzwingen */
@@ -336,8 +339,7 @@
   
   @media (min-width: 769px) {
     .desktop-view { display: block; }
-    /* TEMPORÄR: Mobile-View auch auf Desktop anzeigen zum Debuggen */
-    .mobile-view { display: block !important; visibility: visible !important; opacity: 1 !important; }
+    .mobile-view { display: none; }
   }
 </style>
 </head>
