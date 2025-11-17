@@ -172,14 +172,27 @@ def _send_whatsapp(to_phone: str, message: str | dict, use_template: bool = Fals
                 content_vars = {"1": message}
             
             # Stelle sicher, dass alle Werte Strings sind (Twilio erwartet Strings)
-            content_vars_str = {str(k): str(v) if v is not None else "" for k, v in content_vars.items()}
+            # WICHTIG: Twilio erwartet, dass content_variables ein JSON-String ist
+            # und dass alle Werte Strings sind (keine Zahlen, keine null)
+            content_vars_str = {}
+            for k, v in content_vars.items():
+                if v is None:
+                    content_vars_str[str(k)] = ""
+                elif isinstance(v, (int, float)):
+                    content_vars_str[str(k)] = str(v)
+                else:
+                    # Stelle sicher, dass es ein String ist und keine Sonderzeichen Probleme verursachen
+                    content_vars_str[str(k)] = str(v)
             
             # Debug: Logge die Variablen
-            log.info("📱 Template variables: %s", json.dumps(content_vars_str))
+            log.info("📱 Template variables: %s", json.dumps(content_vars_str, ensure_ascii=False))
+            
+            # WICHTIG: content_variables muss als JSON-String gesendet werden
+            content_variables_json = json.dumps(content_vars_str, ensure_ascii=False)
             
             message_obj = client.messages.create(
                 content_sid=TWILIO_WHATSAPP_CONTENT_SID,
-                content_variables=json.dumps(content_vars_str),
+                content_variables=content_variables_json,
                 from_=TWILIO_WHATSAPP_FROM,
                 to=whatsapp_to,
                 status_callback=status_callback_url
