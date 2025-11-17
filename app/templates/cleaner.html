@@ -186,10 +186,13 @@ body { background-color: var(--background); }
   margin-right: 0 !important; 
   padding-top: 0 !important; 
   padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
 .task-card { 
   width: 100% !important; 
   margin: 0 !important;          /* keine zusätzlichen Außenabstände */
+  margin-bottom: 0 !important;    /* kein margin-bottom auf Mobile */
   padding: 0.85rem 1rem;         /* leicht reduziertes Padding für kompaktere Karten */
   border-radius: 0.75rem;
 }
@@ -233,6 +236,23 @@ body { background-color: var(--background); }
   .row.g-3 .col-4 { flex: 0 0 100% !important; max-width: 100% !important; }
   /* Form-Controls füllen Breite und verursachen kein Überlaufen */
   select.form-select, input.form-control, textarea.form-control { max-width: 100%; width: 100%; }
+  /* Mobile: Keine zusätzlichen Abstände zwischen Karten */
+  .row.g-3 {
+    row-gap: 0.75rem !important;
+    margin-bottom: 0 !important;
+  }
+  .row.g-3 > .col-12 {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+  .task-card {
+    margin-bottom: 0 !important;
+  }
+  /* Sicherstellen, dass keine leeren Bereiche zwischen Karten entstehen */
+  .tab-pane .row.g-3 {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
 }
 </style>
 </head>
