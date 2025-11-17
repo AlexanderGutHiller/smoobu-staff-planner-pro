@@ -1300,10 +1300,6 @@ function setLanguage(lang) {
 </div>
 
 <script>
-{% set tl = timelog_map.get(t.id, {}) %}
-{% set extras = extras_map.get(t.id, {}) %}
-{% set baby_beds = extras.get('baby_beds', 0) %}
-<div id="task-mobile-{{ t.id }}" class="task-card-mobile {% if not t.assigned_staff_id %}unassigned{% endif %} {% if t.assignment_status=='rejected' %}rejected{% elif t.assignment_status=='pending' %}pending{% elif t.assignment_status=='accepted' %}accepted{% endif %} {% if t.status=='done' %}done{% elif t.status=='running' %}running{% elif t.status=='paused' %}paused{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id==t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}" style="display: block !important; visibility: visible !important; opacity: 1 !important; min-height: 50px !important; margin-bottom: 1rem !important;">
   <div class="task-card-header">
     <div>
       {% if not t.assigned_staff_id %}
