@@ -242,7 +242,7 @@
       overflow: visible !important;
     }
     .hide-on-mobile { display: none !important; }
-    /* Lovable/iOS Fallback: Karten immer sichtbar erzwingen */
+    /* Mobile: Karten immer sichtbar */
     .task-card-mobile { 
       display: block !important; 
       visibility: visible !important; 
@@ -1291,46 +1291,27 @@ function setLanguage(lang) {
 </div>
 
 <script>
-  // MOBILE VIEW FALLBACK: Erzwinge Mobile-Ansicht auf mobilen Geräten (iPhone Safari Fix)
+  // Mobile-View Fallback für iOS Safari (falls CSS Media Queries nicht greifen)
   (function() {
-    function forceMobileView() {
+    function ensureMobileView() {
       const isMobile = window.innerWidth <= 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       if (isMobile) {
         const mobileView = document.getElementById('mobile-view-container');
         const desktopView = document.querySelector('.desktop-view');
-        if (mobileView) {
-          // Stelle sicher, dass Mobile-View sichtbar ist
+        if (mobileView && getComputedStyle(mobileView).display === 'none') {
           mobileView.style.display = 'block';
-          mobileView.style.visibility = 'visible';
-          mobileView.style.opacity = '1';
-          mobileView.style.position = 'relative';
-          mobileView.style.zIndex = '1';
-          mobileView.style.width = '100%';
-          mobileView.style.height = 'auto';
-          mobileView.style.overflow = 'visible';
         }
-        if (desktopView) {
+        if (desktopView && getComputedStyle(desktopView).display !== 'none') {
           desktopView.style.display = 'none';
-          desktopView.style.visibility = 'hidden';
-          desktopView.style.opacity = '0';
-          desktopView.style.height = '0';
-          desktopView.style.overflow = 'hidden';
-          desktopView.style.position = 'absolute';
-          desktopView.style.left = '-9999px';
         }
       }
     }
-    // Sofort beim Laden
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', forceMobileView);
+      document.addEventListener('DOMContentLoaded', ensureMobileView);
     } else {
-      forceMobileView();
+      ensureMobileView();
     }
-    // Auch bei Resize
-    window.addEventListener('resize', forceMobileView);
-    // Und nach kurzer Verzögerung (für iOS Safari)
-    setTimeout(forceMobileView, 100);
-    setTimeout(forceMobileView, 500);
+    window.addEventListener('resize', ensureMobileView);
   })();
 
   // Scroll-Position und Fokus nach Zuweisung erhalten (einmalig, außerhalb der Task-Schleife)
