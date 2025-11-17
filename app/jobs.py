@@ -295,17 +295,24 @@ def build_assignment_whatsapp_template_vars(item: dict) -> dict:
     {{8}} = reject URL
     """
     # Extrahiere Raum-Nummer aus Raum-Name (z.B. "Romantik (9)" -> "9")
-    room_name = item.get('apt', '') or 'Manuelle Aufgabe'
+    apt_raw = item.get('apt', '') or ''
+    room_name = ''
     room_number = ''
-    if '(' in room_name and ')' in room_name:
+    
+    # Wenn kein Apartment vorhanden (manuelle Aufgabe)
+    if not apt_raw or apt_raw == 'Manuelle Aufgabe':
+        room_name = 'Manuelle Aufgabe'
+        room_number = '-'  # Verwende "-" statt leerem String für manuelle Aufgaben
+    elif '(' in apt_raw and ')' in apt_raw:
         # Extrahiere Nummer aus Klammern
-        match = re.search(r'\(([^)]+)\)', room_name)
+        match = re.search(r'\(([^)]+)\)', apt_raw)
         if match:
             room_number = match.group(1)
         # Entferne Klammern aus Raum-Name
-        room_name = re.sub(r'\s*\([^)]+\)\s*', '', room_name).strip()
+        room_name = re.sub(r'\s*\([^)]+\)\s*', '', apt_raw).strip()
     else:
-        room_number = ''
+        room_name = apt_raw.strip()
+        room_number = '-'  # Wenn keine Nummer vorhanden, verwende "-"
     
     # Anzahl Gäste (direkt aus item oder 0)
     guest_count = item.get('guest_count', 0)
@@ -329,7 +336,8 @@ def build_assignment_whatsapp_template_vars(item: dict) -> dict:
     if not accept_url or not reject_url:
         log.warning("⚠️ URLs missing in template vars - accept: %s, reject: %s", accept_url, reject_url)
     
-    return {
+    # Erstelle Variablen-Dict - Twilio erwartet String-Keys ("1", "2", etc.)
+    template_vars = {
         "1": staff_name,  # employee name
         "2": str(room_name or ''),  # room name (ohne Nummer)
         "3": str(room_number or ''),  # room number
@@ -339,6 +347,11 @@ def build_assignment_whatsapp_template_vars(item: dict) -> dict:
         "7": accept_url,  # accept URL
         "8": reject_url,  # reject URL
     }
+    
+    # Debug: Logge die Variablen vor dem Senden
+    log.info("📱 Template vars prepared: %s", json.dumps(template_vars, ensure_ascii=False))
+    
+    return template_vars
 
 def build_assignment_email(lang: str, staff_name: str, items: list, base_url: str) -> tuple[str, str, str]:
     trans = _get_translations(lang)

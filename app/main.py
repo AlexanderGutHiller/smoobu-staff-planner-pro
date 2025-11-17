@@ -711,17 +711,24 @@ def build_assignment_whatsapp_template_vars(item: dict) -> dict:
     """
     import re
     # Extrahiere Raum-Nummer aus Raum-Name (z.B. "Romantik (9)" -> "9")
-    room_name = item.get('apt', '') or 'Manuelle Aufgabe'
+    apt_raw = item.get('apt', '') or ''
+    room_name = ''
     room_number = ''
-    if '(' in room_name and ')' in room_name:
+    
+    # Wenn kein Apartment vorhanden (manuelle Aufgabe)
+    if not apt_raw or apt_raw == 'Manuelle Aufgabe':
+        room_name = 'Manuelle Aufgabe'
+        room_number = '-'  # Verwende "-" statt leerem String für manuelle Aufgaben
+    elif '(' in apt_raw and ')' in apt_raw:
         # Extrahiere Nummer aus Klammern
-        match = re.search(r'\(([^)]+)\)', room_name)
+        match = re.search(r'\(([^)]+)\)', apt_raw)
         if match:
             room_number = match.group(1)
         # Entferne Klammern aus Raum-Name
-        room_name = re.sub(r'\s*\([^)]+\)\s*', '', room_name).strip()
+        room_name = re.sub(r'\s*\([^)]+\)\s*', '', apt_raw).strip()
     else:
-        room_number = ''
+        room_name = apt_raw.strip()
+        room_number = '-'  # Wenn keine Nummer vorhanden, verwende "-"
     
     # Anzahl Gäste (direkt aus item oder 0)
     guest_count = item.get('guest_count', 0)
