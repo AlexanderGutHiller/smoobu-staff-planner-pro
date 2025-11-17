@@ -526,6 +526,10 @@ function setLanguage(lang) {
 
 <!-- Mobile Filter Section (gleiche Parameter wie Desktop, submit per JS) -->
 <div class="mobile-view mobile-filter-section">
+  <!-- DEBUG: Filter-Sektion ist sichtbar -->
+  <div style="background: lime; color: black; padding: 15px; margin: 10px; font-size: 20px; font-weight: bold; text-align: center; border: 5px solid blue; z-index: 99999 !important;">
+    🟢 FILTER-SEKTION SICHTBAR
+  </div>
   <form id="filterFormMobile" method="get" action="/admin/{{ token }}">
   <h6 class="mb-2">{{ trans.date }}:</h6>
     {% set date_default = default_date_filter or '' %}
@@ -1076,11 +1080,11 @@ function setLanguage(lang) {
 </div>
 </div>
 
-<!-- Mobile View -->
-<div class="mobile-view" id="mobile-view-container" style="display: block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 1 !important; width: 100% !important; height: auto !important; overflow: visible !important;">
-<!-- DEBUG: Mobile-Ansicht ist sichtbar -->
+<!-- Mobile View Container (Tasks) -->
+<div class="mobile-view" id="mobile-view-container" style="display: block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 9999 !important; width: 100% !important; height: auto !important; overflow: visible !important; background: #f0f0f0 !important; padding: 20px !important; margin-top: 20px !important;">
+<!-- DEBUG: Mobile-Tasks-Container ist sichtbar -->
 <div style="background: red; color: white; padding: 20px; margin: 10px; font-size: 24px; font-weight: bold; text-align: center; border: 5px solid yellow; z-index: 99999 !important; position: relative !important;">
-  🔴 MOBILE ANSICHT SICHTBAR - Tasks: {{ tasks|length }}
+  🔴 MOBILE TASKS CONTAINER - Tasks: {{ tasks|length }}
 </div>
 {% for t in tasks %}
 {% set tl = timelog_map.get(t.id, {}) %}
