@@ -588,6 +588,225 @@ function setLanguage(lang) {
   </form>
 </div>
 
+<!-- Mobile View Container (Tasks) - WICHTIG: VOR Desktop-View, damit nicht verdeckt wird -->
+<div class="mobile-view" id="mobile-view-container" style="display: block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 99999 !important; width: 100% !important; height: auto !important; min-height: 200px !important; overflow: visible !important; background: #f0f0f0 !important; padding: 20px !important; margin-top: 20px !important; border: 10px solid red !important;">
+<!-- DEBUG: Mobile-Tasks-Container ist sichtbar -->
+<div style="background: red; color: white; padding: 20px; margin: 10px; font-size: 24px; font-weight: bold; text-align: center; border: 5px solid yellow; z-index: 99999 !important; position: relative !important;">
+  🔴 MOBILE TASKS CONTAINER - Tasks: {{ tasks|length }}
+</div>
+{% for t in tasks %}
+{% set tl = timelog_map.get(t.id, {}) %}
+{% set extras = extras_map.get(t.id, {}) %}
+{% set baby_beds = extras.get('baby_beds', 0) %}
+<div id="task-mobile-{{ t.id }}" class="task-card-mobile {% if not t.assigned_staff_id %}unassigned{% endif %} {% if t.assignment_status=='rejected' %}rejected{% elif t.assignment_status=='pending' %}pending{% elif t.assignment_status=='accepted' %}accepted{% endif %} {% if t.status=='done' %}done{% elif t.status=='running' %}running{% elif t.status=='paused' %}paused{% else %}open{% endif %}" data-date="{{ t.date }}" data-apt="{% if t.apartment_id %}{{ apt_map.get(t.apartment_id, t.apartment_id) }}{% else %}{{ trans.manuelle_aufgabe }}{% endif %}" data-staff="{% if t.assigned_staff_id %}{% for s in staff %}{% if s.id==t.assigned_staff_id %}{{ s.name }}{% endif %}{% endfor %}{% endif %}" style="display: block !important; visibility: visible !important; opacity: 1 !important; min-height: 50px !important; margin-bottom: 1rem !important;">
+  <div class="task-card-header">
+    <div>
+      {% if not t.assigned_staff_id %}
+        <span class="badge rounded-pill text-bg-secondary">Nicht zugewiesen</span>
+      {% elif t.assignment_status=='pending' %}
+        <span class="badge rounded-pill text-bg-warning text-dark">Ausstehend</span>
+      {% elif t.assignment_status=='accepted' %}
+        <span class="badge rounded-pill text-bg-success">Angenommen</span>
+      {% elif t.assignment_status=='rejected' %}
+        <span class="badge rounded-pill text-bg-danger">Abgelehnt</span>
+      {% endif %}
+    </div>
+    <div>
+      <strong style="font-size: 1.1rem;">{{ t.date | date_wd_de('short') }}</strong>
+      {% if not t.apartment_id %}
+        <!-- Manuelle Aufgabe: Beschreibung im Vordergrund -->
+        <div class="fw-bold text-primary" style="font-size: 1.2rem;">{{ t.description or trans.manuelle_aufgabe }}</div>
+        {% if t.apartment_id %}
+          <div class="text-muted small fst-italic" style="font-size: 0.9rem;">{{ apt_map.get(t.apartment_id, t.apartment_id) }}</div>
+        {% else %}
+          <div class="text-muted small fst-italic" style="font-size: 0.9rem;">{{ trans.manuelle_aufgabe }}</div>
+        {% endif %}
+      {% else %}
+        <!-- Normale Aufgabe: Apartment im Vordergrund -->
+        <div class="fw-bold text-primary" style="font-size: 1.2rem;">{{ apt_map.get(t.apartment_id, t.apartment_id) }}</div>
+      {% endif %}
+    </div>
+    <div>
+      {% if t.status == 'done' %}
+        <span class="badge bg-success"><i class="bi bi-check-circle"></i> {{ trans.erledigt }}</span>
+      {% elif t.status == 'running' %}
+        <span class="badge bg-primary"><i class="bi bi-play-circle"></i> {{ trans.läuft }}</span>
+      {% elif t.status == 'paused' %}
+        <span class="badge bg-info"><i class="bi bi-pause-circle"></i> {{ trans.pausiert }}</span>
+      {% else %}
+        <span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> {{ trans.offen }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="task-info-row">
+    <span class="task-info-label">Status:</span>
+    <span>
+      <form method="post" action="/admin/{{ token }}/task/status" class="d-inline">
+        <input type="hidden" name="task_id" value="{{ t.id }}">
+        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="open" {% if t.status=='open' %}selected{% endif %}>{{ trans.offen }}</option>
+          <option value="paused" {% if t.status=='paused' %}selected{% endif %}>{{ trans.pausiert }}</option>
+          <option value="done" {% if t.status=='done' %}selected{% endif %}>{{ trans.erledigt }}</option>
+        </select>
+      </form>
+    </span>
+  </div>
+
+  <div class="mt-2">
+    <div class="task-info-label mb-1">{{ trans.checklist }}:</div>
+    <div class="extras-container">
+      <form method="post" action="/admin/{{ token }}/task/extras" class="extras-form">
+        <input type="hidden" name="task_id" value="{{ t.id }}">
+        <input type="hidden" name="field" value="kurtaxe_registriert">
+        <input type="hidden" name="value" value="{{ 1 if extras.get('kurtaxe_registriert') else 0 }}">
+        <input type="hidden" name="redirect" value="/admin/{{ token }}">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="kurtaxe_registriert-mobile-{{ t.id }}" data-last-value="{{ 1 if extras.get('kurtaxe_registriert') else 0 }}" {% if extras.get('kurtaxe_registriert') %}checked{% endif %} onchange="handleExtraToggle(this)">
+          <label class="form-check-label" for="kurtaxe_registriert-mobile-{{ t.id }}">{{ trans.kurtaxe_registriert }}</label>
+        </div>
+      </form>
+      <form method="post" action="/admin/{{ token }}/task/extras" class="extras-form">
+        <input type="hidden" name="task_id" value="{{ t.id }}">
+        <input type="hidden" name="field" value="kurtaxe_bestaetigt">
+        <input type="hidden" name="value" value="{{ 1 if extras.get('kurtaxe_bestaetigt') else 0 }}">
+        <input type="hidden" name="redirect" value="/admin/{{ token }}">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="kurtaxe_bestaetigt-mobile-{{ t.id }}" data-last-value="{{ 1 if extras.get('kurtaxe_bestaetigt') else 0 }}" {% if extras.get('kurtaxe_bestaetigt') %}checked{% endif %} onchange="handleExtraToggle(this)">
+          <label class="form-check-label" for="kurtaxe_bestaetigt-mobile-{{ t.id }}">{{ trans.kurtaxe_bestaetigt }}</label>
+        </div>
+      </form>
+      <form method="post" action="/admin/{{ token }}/task/extras" class="extras-form">
+        <input type="hidden" name="task_id" value="{{ t.id }}">
+        <input type="hidden" name="field" value="checkin_vorbereitet">
+        <input type="hidden" name="value" value="{{ 1 if extras.get('checkin_vorbereitet') else 0 }}">
+        <input type="hidden" name="redirect" value="/admin/{{ token }}">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="checkin_vorbereitet-mobile-{{ t.id }}" data-last-value="{{ 1 if extras.get('checkin_vorbereitet') else 0 }}" {% if extras.get('checkin_vorbereitet') %}checked{% endif %} onchange="handleExtraToggle(this)">
+          <label class="form-check-label" for="checkin_vorbereitet-mobile-{{ t.id }}">{{ trans.checkin_vorbereitet }}</label>
+        </div>
+      </form>
+      <form method="post" action="/admin/{{ token }}/task/extras" class="extras-form">
+        <input type="hidden" name="task_id" value="{{ t.id }}">
+        <input type="hidden" name="field" value="kurtaxe_bezahlt">
+        <input type="hidden" name="value" value="{{ 1 if extras.get('kurtaxe_bezahlt') else 0 }}">
+        <input type="hidden" name="redirect" value="/admin/{{ token }}">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="kurtaxe_bezahlt-mobile-{{ t.id }}" data-last-value="{{ 1 if extras.get('kurtaxe_bezahlt') else 0 }}" {% if extras.get('kurtaxe_bezahlt') %}checked{% endif %} onchange="handleExtraToggle(this)">
+          <label class="form-check-label" for="kurtaxe_bezahlt-mobile-{{ t.id }}">{{ trans.kurtaxe_bezahlt }}</label>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.babybetten }}:</span>
+    <span>
+      <form method="post" action="/admin/{{ token }}/task/extras" class="extras-form">
+        <input type="hidden" name="task_id" value="{{ t.id }}">
+        <input type="hidden" name="field" value="baby_beds">
+        <input type="hidden" name="value" value="{{ baby_beds }}">
+        <input type="hidden" name="redirect" value="/admin/{{ token }}">
+        <select class="form-select form-select-sm" onchange="handleExtraSelect(this)" data-last-value="{{ baby_beds }}">
+          <option value="0" {% if baby_beds==0 %}selected{% endif %}>0</option>
+          <option value="1" {% if baby_beds==1 %}selected{% endif %}>1</option>
+          <option value="2" {% if baby_beds==2 %}selected{% endif %}>2</option>
+        </select>
+      </form>
+    </span>
+  </div>
+
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.geplant }}:</span>
+    <span class="fw-bold">{{ (t.planned_minutes or 0) // 60 }}:{{ "%02d"|format((t.planned_minutes or 0) % 60) }}</span>
+  </div>
+
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.tatsächlich }}:</span>
+    <span>
+      {% if tl.get('total_seconds', 0) > 0 %}
+        <span class="fw-bold {% if tl.get('total_seconds', 0) > (t.planned_minutes or 0) * 60 %}text-danger{% endif %}">
+          {{ (tl.get('total_seconds', 0) // 60) // 60 }}:{{ "%02d"|format(((tl.get('total_seconds', 0) // 60) % 60)) }}
+        </span>
+        {% if tl.get('total_seconds', 0) > (t.planned_minutes or 0) * 60 %}
+          <small class="text-danger d-block">+{{ ((tl.get('total_seconds', 0) - (t.planned_minutes or 0) * 60) // 60) // 60 }}:{{ "%02d"|format(((tl.get('total_seconds', 0) - (t.planned_minutes or 0) * 60) // 60) % 60) }}</small>
+        {% endif %}
+      {% else %}
+        <span class="text-muted">-</span>
+      {% endif %}
+    </span>
+  </div>
+
+  {% if t.apartment_id %}
+    {% if booking_map.get(t.apartment_id) %}
+      {% set next_booking = booking_map.get(t.apartment_id) %}
+      <div class="task-info-row">
+        <span class="task-info-label">{{ trans.nächste_anreise }}:</span>
+        <span>
+          <div class="fw-bold">{{ next_booking.arrival_date | date_wd_de('short') }}</div>
+          <div class="small">
+            <i class="bi bi-people"></i> {{ next_booking.adults }} {{ trans.erw }}
+            {% if next_booking.children > 0 %}
+              + {{ next_booking.children }} {{ trans.kinder }}
+            {% endif %}
+          </div>
+          <div class="small text-primary"><i class="bi bi-person"></i> {{ next_booking.guests }} {{ trans.gäste if trans.gäste is defined else 'Gäste' }}</div>
+        </span>
+      </div>
+    {% endif %}
+    {% if booking_map.get(t.apartment_id) %}
+      <div class="task-info-row">
+        <span class="task-info-label"><i class="bi bi-person"></i> {{ trans.gast }}:</span>
+        <span class="text-primary fw-bold">{{ booking_map.get(t.apartment_id).guests }} {{ trans.gäste if trans.gäste is defined else 'Gäste' }}</span>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  <div class="task-info-row">
+    <span class="task-info-label">{{ trans.ma }}:</span>
+    <span>
+      <form method="post" action="/admin/{{ token }}/task/assign" class="assign-form" id="assign-form-mobile-{{ t.id }}">
+        <input type="hidden" name="task_id" value="{{ t.id }}">
+        <select name="staff_id_raw" class="form-select form-select-sm" onchange="document.getElementById('assign-form-mobile-{{ t.id }}').submit()">
+          <option value="">–</option>
+          {% for s in staff %}
+            <option value="{{ s.id }}" {% if t.assigned_staff_id==s.id %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      {% if t.assigned_staff_id %}
+        {% if t.assignment_status=='pending' %}
+          <small class="text-warning d-block mt-1"><i class="bi bi-hourglass-split"></i> {{ trans.pending }}</small>
+        {% elif t.assignment_status=='accepted' %}
+          <small class="text-success d-block mt-1"><i class="bi bi-check-circle"></i> {{ trans.accepted }}</small>
+        {% elif t.assignment_status=='rejected' %}
+          <small class="text-danger d-block mt-1"><i class="bi bi-x-circle"></i> {{ trans.rejected }}</small>
+        {% endif %}
+      {% endif %}
+    </span>
+  </div>
+
+  {% if not t.apartment_id and t.description %}
+    <div class="task-info-row">
+      <span class="task-info-label"><i class="bi bi-sticky"></i> {{ trans.notiz }}:</span>
+      <span class="text-muted">{{ t.description }}</span>
+    </div>
+  {% endif %}
+
+  <div class="mt-2 text-muted text-end">
+    <small>#{{ t.id }}</small>
+  </div>
+</div>
+{% endfor %}
+{% if not tasks %}
+  <div class="text-center py-5" style="background: orange; color: black; padding: 30px; margin: 20px; border: 5px solid red; font-size: 20px; font-weight: bold;">
+    <i class="bi bi-inbox" style="font-size: 4rem; color: #dee2e6;"></i>
+    <p class="mt-3" style="font-size: 24px; font-weight: bold;">{{ trans.keine_einsätze }}</p>
+    <p style="font-size: 18px;">KEINE TASKS GEFUNDEN - Filter prüfen!</p>
+  </div>
+{% endif %}
+</div> <!-- Ende Mobile-Ansicht -->
+
 <!-- Desktop View -->
 <div class="desktop-view" style="display: none !important; visibility: hidden !important; opacity: 0 !important; height: 0 !important; overflow: hidden !important; position: absolute !important; left: -9999px !important;">
   <!-- Kompakte Gesamt-Statistik in EINER Kachel -->
@@ -1080,13 +1299,7 @@ function setLanguage(lang) {
 </div>
 </div>
 
-<!-- Mobile View Container (Tasks) -->
-<div class="mobile-view" id="mobile-view-container" style="display: block !important; visibility: visible !important; opacity: 1 !important; position: relative !important; z-index: 99999 !important; width: 100% !important; height: auto !important; min-height: 200px !important; overflow: visible !important; background: #f0f0f0 !important; padding: 20px !important; margin-top: 20px !important; border: 10px solid red !important;">
-<!-- DEBUG: Mobile-Tasks-Container ist sichtbar -->
-<div style="background: red; color: white; padding: 20px; margin: 10px; font-size: 24px; font-weight: bold; text-align: center; border: 5px solid yellow; z-index: 99999 !important; position: relative !important;">
-  🔴 MOBILE TASKS CONTAINER - Tasks: {{ tasks|length }}
-</div>
-{% for t in tasks %}
+<script>
 {% set tl = timelog_map.get(t.id, {}) %}
 {% set extras = extras_map.get(t.id, {}) %}
 {% set baby_beds = extras.get('baby_beds', 0) %}
