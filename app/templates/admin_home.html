@@ -1042,7 +1042,7 @@ function setLanguage(lang) {
 {% for t in tasks %}
 {% set extras = extras_map.get(t.id, {}) %}
 {% set baby_beds = extras.get('baby_beds', 0) %}
-<tr class="{% if t.assignment_status == 'rejected' %}table-danger{% elif t.status == 'done' %}table-secondary{% elif t.status == 'running' or t.status == 'paused' %}table-info{% elif t.assigned_staff_id %}table-success{% else %}table-warning{% endif %}" data-date="{{ t.date }}">
+<tr id="task-table-{{ t.id }}" class="{% if t.assignment_status == 'rejected' %}table-danger{% elif t.status == 'done' %}table-secondary{% elif t.status == 'running' or t.status == 'paused' %}table-info{% elif t.assigned_staff_id %}table-success{% else %}table-warning{% endif %}" data-date="{{ t.date }}">
   <td data-col="date">{{ t.date | date_wd_de('short') }}</td>
   <td data-col="apt">
     {% if not t.auto_generated and not t.apartment_id %}
@@ -1246,54 +1246,119 @@ function setLanguage(lang) {
   // Scroll-Position und Fokus nach Zuweisung erhalten (einmalig, außerhalb der Task-Schleife)
   (function() {
     document.addEventListener('DOMContentLoaded', function() {
+      // WICHTIG: Zuerst View-Mode wiederherstellen (falls gespeichert), damit die richtige Ansicht aktiv ist
+      const savedViewMode = sessionStorage.getItem('adminViewMode');
+      if (savedViewMode) {
+        const cardsView = document.getElementById('task-cards-view');
+        const tableView = document.getElementById('task-table-view');
+        const btnViewCards = document.getElementById('btnViewCards');
+        const btnViewTable = document.getElementById('btnViewTable');
+        
+        if (savedViewMode === 'table' && tableView && cardsView) {
+          cardsView.style.display = 'none';
+          tableView.style.display = '';
+          if (btnViewTable) btnViewTable.classList.add('active');
+          if (btnViewCards) btnViewCards.classList.remove('active');
+        } else if (savedViewMode === 'cards' && tableView && cardsView) {
+          cardsView.style.display = '';
+          tableView.style.display = 'none';
+          if (btnViewCards) btnViewCards.classList.add('active');
+          if (btnViewTable) btnViewTable.classList.remove('active');
+        }
+      }
+      
       try {
         const anchorId = sessionStorage.getItem('adminAnchor');
         const scrollY = sessionStorage.getItem('adminScrollY');
+        
         if (anchorId) {
-          // Versuche zuerst gespeicherten Anker, sonst Desktop/Mobile-Varianten
-          let el = document.getElementById(anchorId);
-          if (!el) {
-            const id = anchorId.replace(/^task-mobile-/, '').replace(/^task-/, '');
-            el = document.getElementById('task-' + id) || document.getElementById('task-mobile-' + id);
-          }
-          if (el) el.scrollIntoView({ behavior: 'auto', block: 'center' });
+          // Kurze Verzögerung, damit View-Mode-Wiederherstellung abgeschlossen ist
+          setTimeout(function() {
+            // Versuche zuerst gespeicherten Anker direkt zu finden
+            let el = document.getElementById(anchorId);
+            
+            // Falls nicht gefunden, versuche alle Varianten (Mobile, Kacheln, Tabelle)
+            if (!el) {
+              const taskId = anchorId.replace(/^task-(mobile-|table-)?/, '');
+              el = document.getElementById('task-mobile-' + taskId) || 
+                   document.getElementById('task-' + taskId) || 
+                   document.getElementById('task-table-' + taskId);
+            }
+            
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 150);
         } else if (scrollY) {
-          window.scrollTo(0, parseInt(scrollY, 10) || 0);
+          // Fallback: Scroll-Position wiederherstellen
+          setTimeout(function() {
+            window.scrollTo({ top: parseInt(scrollY, 10) || 0, behavior: 'auto' });
+          }, 150);
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('Error restoring scroll position:', e);
+      }
+      
       // Nach Wiederherstellung aufräumen
       try {
         sessionStorage.removeItem('adminAnchor');
         sessionStorage.removeItem('adminScrollY');
+        sessionStorage.removeItem('adminViewMode'); // Nur sessionStorage, nicht localStorage
       } catch (e) {}
+      
+      // Funktion zum Speichern der Position vor Submit
+      function saveScrollPosition(form) {
+        try {
+          const taskInput = form.querySelector('input[name="task_id"]');
+          const taskId = taskInput ? taskInput.value : '';
+          if (!taskId) return;
+          
+          // Aktuelle Scroll-Position speichern
+          sessionStorage.setItem('adminScrollY', String(window.scrollY));
+          
+          // Bestimme die aktuelle Ansicht
+          const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+          const tableView = document.getElementById('task-table-view');
+          const isTableView = tableView && tableView.style.display !== 'none';
+          
+          // Bestimme die richtige ID basierend auf der Ansicht
+          let anchorId = '';
+          if (isMobile) {
+            anchorId = 'task-mobile-' + taskId;
+          } else if (isTableView) {
+            anchorId = 'task-table-' + taskId;
+          } else {
+            anchorId = 'task-' + taskId;
+          }
+          
+          sessionStorage.setItem('adminAnchor', anchorId);
+          
+          // View-Mode speichern (für Wiederherstellung)
+          if (!isMobile) {
+            const currentView = isTableView ? 'table' : 'cards';
+            sessionStorage.setItem('adminViewMode', currentView);
+          }
+        } catch (e) {
+          console.error('Error saving scroll position:', e);
+        }
+      }
       
       // Vor Submit von Zuweisungs-Formularen Position merken
       const assignForms = document.querySelectorAll('form[action$="/task/assign"]');
       assignForms.forEach(function(form) {
         form.addEventListener('submit', function() {
-          try {
-            const taskInput = form.querySelector('input[name="task_id"]');
-            const taskId = taskInput ? taskInput.value : '';
-            sessionStorage.setItem('adminScrollY', String(window.scrollY));
-            const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-            sessionStorage.setItem('adminAnchor', taskId ? ((isMobile ? 'task-mobile-' : 'task-') + taskId) : '');
-          } catch (e) {}
+          saveScrollPosition(form);
         }, { capture: true });
       });
+      
       // Auch für Status/Extras-Formulare, damit die Ansicht nicht "verspringt"
       const otherForms = document.querySelectorAll('form[action*="/task/status"], form[action*="/task/extras"]');
       otherForms.forEach(function(form) {
         form.addEventListener('submit', function() {
-          try {
-            const taskInput = form.querySelector('input[name="task_id"]');
-            const taskId = taskInput ? taskInput.value : '';
-            sessionStorage.setItem('adminScrollY', String(window.scrollY));
-            const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-            sessionStorage.setItem('adminAnchor', taskId ? ((isMobile ? 'task-mobile-' : 'task-') + taskId) : '');
-          } catch (e) {}
+          saveScrollPosition(form);
         }, { capture: true });
-  });
-});
+      });
+    });
   })();
 </script>
 
