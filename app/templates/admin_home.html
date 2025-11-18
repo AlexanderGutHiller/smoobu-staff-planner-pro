@@ -1272,8 +1272,8 @@ function setLanguage(lang) {
         const scrollY = sessionStorage.getItem('adminScrollY');
         
         if (anchorId) {
-          // Kurze Verzögerung, damit View-Mode-Wiederherstellung abgeschlossen ist
-          setTimeout(function() {
+          // Funktion zum Scrollen, die mehrmals versucht, falls Element noch nicht geladen
+          function scrollToElement(attempts = 0) {
             // Versuche zuerst gespeicherten Anker direkt zu finden
             let el = document.getElementById(anchorId);
             
@@ -1286,14 +1286,33 @@ function setLanguage(lang) {
             }
             
             if (el) {
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              // Für Tabellen-Ansicht: Scroll zur Zeile mit Offset
+              if (anchorId.startsWith('task-table-')) {
+                const rect = el.getBoundingClientRect();
+                const absoluteElementTop = rect.top + window.pageYOffset;
+                const offset = 100; // Offset vom oberen Rand
+                window.scrollTo({ top: absoluteElementTop - offset, behavior: 'smooth' });
+              } else {
+                // Für Kacheln/Mobile: Standard scrollIntoView
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            } else if (attempts < 5) {
+              // Element noch nicht geladen, erneut versuchen
+              setTimeout(function() {
+                scrollToElement(attempts + 1);
+              }, 100);
             }
-          }, 150);
+          }
+          
+          // Starte Scroll-Versuch nach kurzer Verzögerung
+          setTimeout(function() {
+            scrollToElement(0);
+          }, 200);
         } else if (scrollY) {
           // Fallback: Scroll-Position wiederherstellen
           setTimeout(function() {
             window.scrollTo({ top: parseInt(scrollY, 10) || 0, behavior: 'auto' });
-          }, 150);
+          }, 200);
         }
       } catch (e) {
         console.error('Error restoring scroll position:', e);
