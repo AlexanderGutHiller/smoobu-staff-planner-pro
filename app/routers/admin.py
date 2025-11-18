@@ -22,6 +22,26 @@ from ..main import log
 router = APIRouter(prefix="/admin/{token}", tags=["admin"])
 
 
+def _build_admin_redirect_url(token: str, request: Request) -> str:
+    """Baut eine Redirect-URL mit allen Filter-Parametern aus dem Request"""
+    from urllib.parse import urlparse, parse_qs, urlencode
+    referer = request.headers.get("referer", "")
+    if referer:
+        try:
+            parsed = urlparse(referer)
+            params = parse_qs(parsed.query)
+            # Alle relevanten Filter-Parameter sammeln
+            filter_params = {}
+            for key in ["date_range", "apartment_id", "staff_id", "show_done", "show_open", "assignment_open"]:
+                if key in params and params[key]:
+                    filter_params[key] = params[key][0]
+            if filter_params:
+                query_string = urlencode(filter_params)
+                return f"/admin/{token}?{query_string}"
+        except Exception:
+            pass
+    return f"/admin/{token}"
+
 
 # Admin Routes
 
@@ -628,28 +648,14 @@ async def admin_task_assign(request: Request, token: str, task_id: int = Form(..
     except Exception as e:
         log.error("Immediate notify failed for task %s: %s", t.id, e)
     # Behalte Filter-Parameter bei
-    referer = request.headers.get("referer", "")
-    if referer:
-        try:
-            from urllib.parse import urlparse, parse_qs, urlencode
-            parsed = urlparse(referer)
-            params = parse_qs(parsed.query)
-            query_parts = []
-            if params.get("show_done"):
-                query_parts.append(f"show_done={params['show_done'][0]}")
-            if params.get("show_open"):
-                query_parts.append(f"show_open={params['show_open'][0]}")
-            if query_parts:
-                return RedirectResponse(url=f"/admin/{token}?{'&'.join(query_parts)}", status_code=303)
-        except Exception:
-            pass
-    return RedirectResponse(url=f"/admin/{token}", status_code=303)
+    return RedirectResponse(url=_build_admin_redirect_url(token, request), status_code=303)
 
 
 
 # POST /task/create
 @router.post("/task/create")
 async def admin_task_create(
+    request: Request,
     token: str,
     date: str = Form(...),
     apartment_id: str = Form(""),
@@ -716,13 +722,13 @@ async def admin_task_create(
         except Exception as e:
             log.error("Fehler beim Senden der Zuweisungs-Benachrichtigung für manuelle Aufgabe %s: %s", new_task.id, e)
 
-    return RedirectResponse(url=f"/admin/{token}", status_code=303)
+    return RedirectResponse(url=_build_admin_redirect_url(token, request), status_code=303)
 
 
 
 # POST /task/delete
 @router.post("/task/delete")
-async def admin_task_delete(token: str, task_id: int = Form(...), db=Depends(get_db)):
+async def admin_task_delete(request: Request, token: str, task_id: int = Form(...), db=Depends(get_db)):
     if not _is_admin_token(token, db):
         raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
@@ -734,13 +740,13 @@ async def admin_task_delete(token: str, task_id: int = Form(...), db=Depends(get
         db.delete(tl)
     db.delete(t)
     db.commit()
-    return RedirectResponse(url=f"/admin/{token}", status_code=303)
+    return RedirectResponse(url=_build_admin_redirect_url(token, request), status_code=303)
 
 
 
 # POST /task/update_manual
 @router.post("/task/update_manual")
-async def admin_task_update_manual(token: str, task_id: int = Form(...), date: str = Form(...), apartment_id: str = Form(""), planned_minutes: int = Form(90), description: str = Form(""), staff_id: str = Form(""), db=Depends(get_db)):
+async def admin_task_update_manual(request: Request, token: str, task_id: int = Form(...), date: str = Form(...), apartment_id: str = Form(""), planned_minutes: int = Form(90), description: str = Form(""), staff_id: str = Form(""), db=Depends(get_db)):
     if not _is_admin_token(token, db):
         raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
@@ -805,13 +811,13 @@ async def admin_task_update_manual(token: str, task_id: int = Form(...), date: s
             log.error("Fehler beim Senden der Zuweisungs-Benachrichtigung nach Update: %s", e)
     
     log.info("✅ Manuelle Aufgabe %s aktualisiert", t.id)
-    return RedirectResponse(url=f"/admin/{token}", status_code=303)
+    return RedirectResponse(url=_build_admin_redirect_url(token, request), status_code=303)
 
 
 
 # POST /task/status
 @router.post("/task/status")
-async def admin_task_status(token: str, task_id: int = Form(...), status: str = Form(...), db=Depends(get_db)):
+async def admin_task_status(request: Request, token: str, task_id: int = Form(...), status: str = Form(...), db=Depends(get_db)):
     if not _is_admin_token(token, db):
         raise HTTPException(status_code=403)
     allowed = {"open", "paused", "done"}
@@ -836,7 +842,7 @@ async def admin_task_status(token: str, task_id: int = Form(...), status: str = 
             pass
     t.status = status
     db.commit()
-    return RedirectResponse(url=f"/admin/{token}", status_code=303)
+    return RedirectResponse(url=_build_admin_redirect_url(token, request), status_code=303)
 
 
 
