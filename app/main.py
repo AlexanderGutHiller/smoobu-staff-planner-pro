@@ -484,15 +484,15 @@ def expand_series_job(days_ahead: int = 30):
                 db.add(t)
                 created += 1
                 new_tasks.append(t)
-    db.commit()
-        # Sofort benachrichtigen, wenn neue Zuweisungen entstanden sind
-        if created > 0:
-            try:
+        db.commit()
+    # Sofort benachrichtigen, wenn neue Zuweisungen entstanden sind
+    if created > 0:
+        try:
             send_assignment_emails_job()
-    except Exception as e:
-                log.error("send_assignment_emails_job after series expansion failed: %s", e)
-        log.info("🗓️ Series expansion created %d tasks up to %s", created, horizon.isoformat())
-        return created
+        except Exception as e:
+            log.error("send_assignment_emails_job after series expansion failed: %s", e)
+    log.info("🗓️ Series expansion created %d tasks up to %s", created, horizon.isoformat())
+    return created
 
 def minutes_to_hhmm(minutes: Optional[int]) -> str:
     """Konvertiere Minuten in hh:mm Format"""
