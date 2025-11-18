@@ -22,24 +22,33 @@ from ..main import log
 router = APIRouter(prefix="/admin/{token}", tags=["admin"])
 
 
-def _build_admin_redirect_url(token: str, request: Request) -> str:
+def _build_admin_redirect_url(token: str, request: Request, form_params: Optional[Dict[str, Optional[str]]] = None) -> str:
     """Baut eine Redirect-URL mit allen Filter-Parametern aus dem Request"""
     from urllib.parse import urlparse, parse_qs, urlencode
+    filter_params = {}
+    
+    # Zuerst Form-Parameter prüfen (höchste Priorität)
+    if form_params:
+        for key in ["date_range", "apartment_id", "staff_id", "show_done", "show_open", "assignment_open"]:
+            if key in form_params and form_params[key] is not None:
+                filter_params[key] = form_params[key]
+    
+    # Dann Referer-Header prüfen (Fallback)
     referer = request.headers.get("referer", "")
     if referer:
         try:
             parsed = urlparse(referer)
             params = parse_qs(parsed.query)
-            # Alle relevanten Filter-Parameter sammeln
-            filter_params = {}
+            # Nur Parameter hinzufügen, die nicht bereits aus Form-Parametern kommen
             for key in ["date_range", "apartment_id", "staff_id", "show_done", "show_open", "assignment_open"]:
-                if key in params and params[key]:
+                if key not in filter_params and key in params and params[key]:
                     filter_params[key] = params[key][0]
-            if filter_params:
-                query_string = urlencode(filter_params)
-                return f"/admin/{token}?{query_string}"
         except Exception:
             pass
+    
+    if filter_params:
+        query_string = urlencode(filter_params)
+        return f"/admin/{token}?{query_string}"
     return f"/admin/{token}"
 
 
@@ -71,7 +80,13 @@ async def admin_home(
     # Unterscheide: kein date_range-Parameter (Standard: nächste 7 Tage)
     # vs. explizit "Alle" gewählt (date_range="" in Query -> keine Beschränkung)
     has_date_range_param = "date_range" in request.query_params
-    default_date_filter = date_range or ""
+    # Wenn date_range explizit als leerer String übergeben wurde, ist das "Alle"
+    if has_date_range_param and date_range == "":
+        default_date_filter = ""
+    elif date_range:
+        default_date_filter = date_range
+    else:
+        default_date_filter = ""
     today = dt.date.today()
     if date_range and not (date_from or date_to):
         if date_range == "today":
@@ -625,7 +640,19 @@ async def admin_staff_delete(token: str, staff_id: int = Form(...), db=Depends(g
 
 # POST /task/assign
 @router.post("/task/assign")
-async def admin_task_assign(request: Request, token: str, task_id: int = Form(...), staff_id_raw: str = Form(""), db=Depends(get_db)):
+async def admin_task_assign(
+    request: Request, 
+    token: str, 
+    task_id: int = Form(...), 
+    staff_id_raw: str = Form(""),
+    date_range: Optional[str] = Form(None),
+    apartment_id: Optional[str] = Form(None),
+    staff_id: Optional[str] = Form(None),
+    show_done: Optional[str] = Form(None),
+    show_open: Optional[str] = Form(None),
+    assignment_open: Optional[str] = Form(None),
+    db=Depends(get_db)
+):
     if not _is_admin_token(token, db): raise HTTPException(status_code=403)
     t = db.get(Task, task_id)
     if not t:
@@ -647,8 +674,16 @@ async def admin_task_assign(request: Request, token: str, task_id: int = Form(..
             send_assignment_emails_job()
     except Exception as e:
         log.error("Immediate notify failed for task %s: %s", t.id, e)
-    # Behalte Filter-Parameter bei
-    return RedirectResponse(url=_build_admin_redirect_url(token, request), status_code=303)
+    # Behalte Filter-Parameter bei (aus Form oder Referer)
+    redirect_url = _build_admin_redirect_url(token, request, {
+        "date_range": date_range,
+        "apartment_id": apartment_id,
+        "staff_id": staff_id,
+        "show_done": show_done,
+        "show_open": show_open,
+        "assignment_open": assignment_open,
+    })
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 

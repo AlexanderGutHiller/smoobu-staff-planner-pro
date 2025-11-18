@@ -1343,9 +1343,25 @@ function setLanguage(lang) {
         }
       }
       
-      // Vor Submit von Zuweisungs-Formularen Position merken
+      // Vor Submit von Zuweisungs-Formularen Position merken und Filter-Parameter hinzufügen
       const assignForms = document.querySelectorAll('form[action$="/task/assign"]');
       assignForms.forEach(function(form) {
+        // Filter-Parameter aus URL extrahieren und als Hidden-Felder hinzufügen
+        const urlParams = new URLSearchParams(window.location.search);
+        const filterParams = ['date_range', 'apartment_id', 'staff_id', 'show_done', 'show_open', 'assignment_open'];
+        filterParams.forEach(function(param) {
+          const value = urlParams.get(param);
+          if (value !== null) {
+            // Prüfe ob bereits vorhanden
+            if (!form.querySelector(`input[name="${param}"]`)) {
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = param;
+              input.value = value;
+              form.appendChild(input);
+            }
+          }
+        });
         form.addEventListener('submit', function() {
           saveScrollPosition(form);
         }, { capture: true });
