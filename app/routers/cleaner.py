@@ -50,7 +50,7 @@ def _build_cleaner_redirect_url(token: str, request: Request, task_id: Optional[
 
 # GET /cleaner/{token} -> 
 @router.get("")
-async def cleaner_home(request: Request, token: str, show_done: int = 1, show_open: int = 1, db=Depends(get_db)):
+async def cleaner_home(request: Request, token: str, show_done: int = 0, show_open: int = 1, db=Depends(get_db)):
     s = db.query(Staff).filter(Staff.magic_token==token, Staff.active==True).first()
     if not s: raise HTTPException(status_code=403)
     q = db.query(Task).filter(Task.assigned_staff_id==s.id)
