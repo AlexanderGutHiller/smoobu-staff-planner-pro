@@ -31,6 +31,7 @@ def _build_admin_redirect_url(token: str, request: Request, form_params: Optiona
     if form_params:
         for key in ["date_range", "apartment_id", "staff_id", "show_done", "show_open", "assignment_open"]:
             if key in form_params and form_params[key] is not None:
+                # Auch leere Strings übertragen (z.B. date_range="" für "Alle")
                 filter_params[key] = form_params[key]
     
     # Dann Referer-Header prüfen (Fallback)
