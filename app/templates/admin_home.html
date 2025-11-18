@@ -1307,19 +1307,38 @@ function setLanguage(lang) {
                   }
                 }, 50);
               } else {
-                // Für Kacheln/Mobile: Standard scrollIntoView
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Für Kacheln/Mobile: Verbesserte Scroll-Logik
+                setTimeout(function() {
+                  const rect = el.getBoundingClientRect();
+                  const absoluteElementTop = rect.top + window.pageYOffset;
+                  const offset = 100; // Offset vom oberen Rand
+                  const targetScroll = absoluteElementTop - offset;
+                  
+                  // Prüfe ob das Element bereits sichtbar ist
+                  const viewportTop = window.pageYOffset;
+                  const viewportBottom = viewportTop + window.innerHeight;
+                  const elementTop = absoluteElementTop;
+                  const elementBottom = elementTop + rect.height;
+                  
+                  // Nur scrollen, wenn das Element nicht vollständig sichtbar ist
+                  if (elementTop < viewportTop + offset || elementBottom > viewportBottom - 50) {
+                    window.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+                  }
+                }, 50);
               }
             } else if (attempts < 10) {
-              // Element noch nicht geladen, erneut versuchen (mehr Versuche für Tabellen)
+              // Element noch nicht geladen, erneut versuchen (mehr Versuche für Tabellen und Kacheln)
+              const retryDelay = anchorId.startsWith('task-table-') ? 150 : 120;
               setTimeout(function() {
                 scrollToElement(attempts + 1);
-              }, 150);
+              }, retryDelay);
             }
           }
           
-          // Starte Scroll-Versuch nach Verzögerung (länger für Tabellen-Ansicht)
-          const delay = anchorId.startsWith('task-table-') ? 400 : 200;
+          // Starte Scroll-Versuch nach Verzögerung (länger für Tabellen-Ansicht, auch für Kacheln)
+          const isTable = anchorId.startsWith('task-table-');
+          const isMobile = anchorId.startsWith('task-mobile-');
+          const delay = isTable ? 400 : (isMobile ? 300 : 350); // Kacheln brauchen auch etwas Zeit zum Rendern
           setTimeout(function() {
             scrollToElement(0);
           }, delay);
