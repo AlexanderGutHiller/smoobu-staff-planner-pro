@@ -1288,31 +1288,49 @@ function setLanguage(lang) {
             if (el) {
               // Für Tabellen-Ansicht: Scroll zur Zeile mit Offset
               if (anchorId.startsWith('task-table-')) {
-                const rect = el.getBoundingClientRect();
-                const absoluteElementTop = rect.top + window.pageYOffset;
-                const offset = 100; // Offset vom oberen Rand
-                window.scrollTo({ top: absoluteElementTop - offset, behavior: 'smooth' });
+                // Warte kurz, damit die Tabelle vollständig gerendert ist
+                setTimeout(function() {
+                  const rect = el.getBoundingClientRect();
+                  const absoluteElementTop = rect.top + window.pageYOffset;
+                  const offset = 150; // Größerer Offset vom oberen Rand für bessere Sichtbarkeit
+                  const targetScroll = absoluteElementTop - offset;
+                  
+                  // Prüfe ob die Zeile bereits sichtbar ist
+                  const viewportTop = window.pageYOffset;
+                  const viewportBottom = viewportTop + window.innerHeight;
+                  const elementTop = absoluteElementTop;
+                  const elementBottom = elementTop + rect.height;
+                  
+                  // Nur scrollen, wenn die Zeile nicht vollständig sichtbar ist
+                  if (elementTop < viewportTop + offset || elementBottom > viewportBottom - 50) {
+                    window.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+                  }
+                }, 50);
               } else {
                 // Für Kacheln/Mobile: Standard scrollIntoView
                 el.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }
-            } else if (attempts < 5) {
-              // Element noch nicht geladen, erneut versuchen
+            } else if (attempts < 10) {
+              // Element noch nicht geladen, erneut versuchen (mehr Versuche für Tabellen)
               setTimeout(function() {
                 scrollToElement(attempts + 1);
-              }, 100);
+              }, 150);
             }
           }
           
-          // Starte Scroll-Versuch nach kurzer Verzögerung
+          // Starte Scroll-Versuch nach Verzögerung (länger für Tabellen-Ansicht)
+          const delay = anchorId.startsWith('task-table-') ? 400 : 200;
           setTimeout(function() {
             scrollToElement(0);
-          }, 200);
+          }, delay);
         } else if (scrollY) {
-          // Fallback: Scroll-Position wiederherstellen
+          // Fallback: Scroll-Position wiederherstellen (länger warten für Tabellen)
+          const tableView = document.getElementById('task-table-view');
+          const isTableView = tableView && tableView.style.display !== 'none';
+          const delay = isTableView ? 400 : 200;
           setTimeout(function() {
             window.scrollTo({ top: parseInt(scrollY, 10) || 0, behavior: 'auto' });
-          }, 200);
+          }, delay);
         }
       } catch (e) {
         console.error('Error restoring scroll position:', e);
