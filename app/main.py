@@ -905,8 +905,8 @@ def send_assignment_emails_job():
                 'count': len(items),
                 'items': items,
             })
-    db.commit()
-        return report
+        db.commit()
+    return report
 
 def send_whatsapp_for_existing_assignments():
     """Sende nur WhatsApp-Benachrichtigungen für bestehende Zuweisungen (auch wenn bereits per Email benachrichtigt)"""
