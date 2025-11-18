@@ -659,10 +659,11 @@ async def admin_task_assign(
     if not t:
         raise HTTPException(status_code=404, detail="Task nicht gefunden")
     prev_staff_id = t.assigned_staff_id
-    staff_id: Optional[int] = int(staff_id_raw) if staff_id_raw.strip() else None
-    t.assigned_staff_id = staff_id
+    # WICHTIG: assigned_staff_id ist die Zuweisung, staff_id ist der Filter-Parameter!
+    assigned_staff_id: Optional[int] = int(staff_id_raw) if staff_id_raw.strip() else None
+    t.assigned_staff_id = assigned_staff_id
     # Setze assignment_status auf "pending" wenn ein MA zugewiesen wird, sonst None
-    if staff_id:
+    if assigned_staff_id:
         t.assignment_status = "pending"
         # Markiere für Benachrichtigung
         t.assign_notified_at = None
@@ -671,15 +672,16 @@ async def admin_task_assign(
     db.commit()
     # Sofortige Mail bei neuer/ändernder Zuweisung
     try:
-        if staff_id and staff_id != prev_staff_id:
+        if assigned_staff_id and assigned_staff_id != prev_staff_id:
             send_assignment_emails_job()
     except Exception as e:
         log.error("Immediate notify failed for task %s: %s", t.id, e)
     # Behalte Filter-Parameter bei (aus Form oder Referer)
+    # WICHTIG: staff_id ist der Filter-Parameter, nicht die Zuweisung!
     redirect_url = _build_admin_redirect_url(token, request, {
         "date_range": date_range,
         "apartment_id": apartment_id,
-        "staff_id": staff_id,
+        "staff_id": staff_id,  # Filter-Parameter, nicht die Zuweisung
         "show_done": show_done,
         "show_open": show_open,
         "assignment_open": assignment_open,
