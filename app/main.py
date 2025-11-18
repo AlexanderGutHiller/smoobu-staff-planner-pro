@@ -555,7 +555,7 @@ def _send_whatsapp(to_phone: str, message: str | dict, use_template: bool = Fals
             # Wenn keine Ländervorwahl, füge +49 für Deutschland hinzu (oder konfigurierbar)
             if phone.startswith("0"):
                 phone = "+49" + phone[1:]  # 0171... -> +49171...
-    else:
+            else:
                 phone = "+49" + phone  # 171... -> +49171...
         whatsapp_to = f"whatsapp:{phone}"
         
