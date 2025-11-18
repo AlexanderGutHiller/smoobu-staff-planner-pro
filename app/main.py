@@ -1001,5 +1001,5 @@ def send_whatsapp_for_existing_assignments():
                 'count': len(items),
                 'items': items,
             })
-    db.commit()
-        return report
+        db.commit()
+    return report
