@@ -347,7 +347,7 @@ async def refresh_bookings_job():
 def _parse_date(s: str) -> _date | None:
     try:
         return _dt.strptime(s, "%Y-%m-%d").date()
-    except Exception:
+        except Exception:
         return None
 
 def _add_months(d: _date, months: int) -> _date:
@@ -428,7 +428,7 @@ def _expand_series_occurrences(series: TaskSeries, start_from: _date, until: _da
                 day = min(md, last_day)
                 d = _date(cur.year, cur.month, day)
                 if d < s0 or d < start_from or d > hard_until:
-                    continue
+                continue
                 out.append(d)
                 gen += 1
                 if series.count and gen >= series.count:
@@ -484,12 +484,12 @@ def expand_series_job(days_ahead: int = 30):
                 db.add(t)
                 created += 1
                 new_tasks.append(t)
-        db.commit()
+    db.commit()
         # Sofort benachrichtigen, wenn neue Zuweisungen entstanden sind
         if created > 0:
             try:
-                send_assignment_emails_job()
-            except Exception as e:
+            send_assignment_emails_job()
+    except Exception as e:
                 log.error("send_assignment_emails_job after series expansion failed: %s", e)
         log.info("🗓️ Series expansion created %d tasks up to %s", created, horizon.isoformat())
         return created
@@ -555,7 +555,7 @@ def _send_whatsapp(to_phone: str, message: str | dict, use_template: bool = Fals
             # Wenn keine Ländervorwahl, füge +49 für Deutschland hinzu (oder konfigurierbar)
             if phone.startswith("0"):
                 phone = "+49" + phone[1:]  # 0171... -> +49171...
-            else:
+    else:
                 phone = "+49" + phone  # 171... -> +49171...
         whatsapp_to = f"whatsapp:{phone}"
         
@@ -672,7 +672,7 @@ def _send_whatsapp_with_opt_in(to_phone: str, message: str | dict, staff_id: Opt
                 staff = db.get(Staff, staff_id)
                 if staff:
                     staff.whatsapp_opt_in_sent = True
-                    db.commit()
+    db.commit()
                     log.info("✅ Opt-In message sent to staff %d (waiting for confirmation)", staff_id)
             # KEINE normale Nachricht senden, da Opt-In noch nicht bestätigt wurde
             return opt_in_result  # True wenn Opt-In-Vorlage erfolgreich gesendet wurde
@@ -838,7 +838,7 @@ def send_assignment_emails_job():
                         gname = (b.guest_name or "").strip()
                         if gname:
                             guest_str = f"{gname}"
-                        else:
+            else:
                             # Adults/children fallback
                             ac = []
                             if b.adults:
@@ -884,11 +884,11 @@ def send_assignment_emails_job():
                         result = _send_whatsapp_with_opt_in(phone, template_vars, staff_id=sid, db=db)
                         if result:
                             log.info("✅ WhatsApp template sent to %s for task %s", phone, item.get('date', ''))
-                        else:
+            else:
                             log.warning("❌ WhatsApp template failed to %s for task %s", phone, item.get('date', ''))
                 else:
                     log.debug("No phone number for staff %s, skipping WhatsApp", staff.name)
-            except Exception as e:
+        except Exception as e:
                 log.error("WhatsApp notification error for staff %s: %s", staff.name, e, exc_info=True)
             
             now = now_iso()
@@ -905,7 +905,7 @@ def send_assignment_emails_job():
                 'count': len(items),
                 'items': items,
             })
-        db.commit()
+    db.commit()
         return report
 
 def send_whatsapp_for_existing_assignments():
@@ -1001,5 +1001,5 @@ def send_whatsapp_for_existing_assignments():
                 'count': len(items),
                 'items': items,
             })
-        db.commit()
+    db.commit()
         return report
