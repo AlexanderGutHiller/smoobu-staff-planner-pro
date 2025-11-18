@@ -838,7 +838,7 @@ def send_assignment_emails_job():
                         gname = (b.guest_name or "").strip()
                         if gname:
                             guest_str = f"{gname}"
-            else:
+                        else:
                             # Adults/children fallback
                             ac = []
                             if b.adults:
