@@ -884,11 +884,11 @@ def send_assignment_emails_job():
                         result = _send_whatsapp_with_opt_in(phone, template_vars, staff_id=sid, db=db)
                         if result:
                             log.info("✅ WhatsApp template sent to %s for task %s", phone, item.get('date', ''))
-            else:
+                        else:
                             log.warning("❌ WhatsApp template failed to %s for task %s", phone, item.get('date', ''))
                 else:
                     log.debug("No phone number for staff %s, skipping WhatsApp", staff.name)
-        except Exception as e:
+            except Exception as e:
                 log.error("WhatsApp notification error for staff %s: %s", staff.name, e, exc_info=True)
             
             now = now_iso()
