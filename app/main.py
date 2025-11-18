@@ -672,7 +672,7 @@ def _send_whatsapp_with_opt_in(to_phone: str, message: str | dict, staff_id: Opt
                 staff = db.get(Staff, staff_id)
                 if staff:
                     staff.whatsapp_opt_in_sent = True
-    db.commit()
+                    db.commit()
                     log.info("✅ Opt-In message sent to staff %d (waiting for confirmation)", staff_id)
             # KEINE normale Nachricht senden, da Opt-In noch nicht bestätigt wurde
             return opt_in_result  # True wenn Opt-In-Vorlage erfolgreich gesendet wurde
