@@ -428,7 +428,7 @@ def _expand_series_occurrences(series: TaskSeries, start_from: _date, until: _da
                 day = min(md, last_day)
                 d = _date(cur.year, cur.month, day)
                 if d < s0 or d < start_from or d > hard_until:
-                continue
+                    continue
                 out.append(d)
                 gen += 1
                 if series.count and gen >= series.count:
