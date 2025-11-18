@@ -347,7 +347,7 @@ async def refresh_bookings_job():
 def _parse_date(s: str) -> _date | None:
     try:
         return _dt.strptime(s, "%Y-%m-%d").date()
-        except Exception:
+    except Exception:
         return None
 
 def _add_months(d: _date, months: int) -> _date:
