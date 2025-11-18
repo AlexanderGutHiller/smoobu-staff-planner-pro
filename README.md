@@ -1,4 +1,4 @@
-# Smoobu Staff Render v6.3
+# Smoobu Staff Planner v6.3
 
 Ein vollautomatisiertes System zur Verwaltung von Reinigungsvorgängen für Apartments basierend auf Smoobu-Buchungsdaten.
 
@@ -12,7 +12,7 @@ Verwaltung von Reinigungsvorgängen pro Apartment mit Planung, Echtzeitstatus un
 - **Backend**: FastAPI (Python)
 - **Frontend**: Jinja2 Templates + AJAX / JavaScript
 - **Datenbank**: SQLite mit SQLAlchemy ORM
-- **Hosting**: Render Cloud
+- **Hosting**: Fly.io
 - **Scheduler**: APScheduler für automatisierte Synchronisation
 
 ### Datenmodelle
@@ -174,7 +174,7 @@ REFRESH_INTERVAL_MINUTES=60
 TIMEZONE=Europe/Berlin
 
 # Base URL für Magic Links
-BASE_URL=https://your-app.onrender.com
+BASE_URL=https://your-app.fly.dev
 ```
 
 ### Installation
@@ -236,13 +236,18 @@ Export (CSV/Excel)
 
 ---
 
-## 🚀 Deployment (Render)
+## 🚀 Deployment (Fly.io)
 
-1. Git Repository verbinden
-2. Environment Variables setzen
-3. Build Command: `pip install -r requirements.txt`
-4. Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+Siehe `DEPLOY_FLY.md` für detaillierte Anleitung.
+
+Kurzfassung:
+1. Fly CLI installieren und einloggen: `fly auth login`
+2. Secrets setzen: `fly secrets set ADMIN_TOKEN=... SMOOBU_API_KEY=... BASE_URL=... -a <app-name>`
+3. Volume anlegen: `fly volumes create <volume-name> -a <app-name> --region fra --size 3`
+4. Deploy: `fly deploy -a <app-name>`
 5. Health Check: `/health`
+
+Für Details siehe `DEPLOY_FLY.md`.
 
 ---
 
