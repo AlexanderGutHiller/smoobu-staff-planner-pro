@@ -169,10 +169,11 @@ async def cleaner_start(request: Request, token: str, task_id: int = Form(...), 
     # Prüfe ob bereits ein TimeLog für diesen Task existiert (pausierte Aufgabe)
     existing_tl = db.query(TimeLog).filter(TimeLog.task_id==task_id, TimeLog.staff_id==s.id, TimeLog.ended_at==None).order_by(TimeLog.id.desc()).first()
     if existing_tl:
-        # Setze started_at auf jetzt, damit die Zeit weiterläuft
+        # Setze started_at auf jetzt, damit die Zeit weiterläuft (Fortsetzung nach Pause)
+        # Die bisherige Zeit wurde bereits in cleaner_stop zu actual_minutes addiert
         existing_tl.started_at = now_iso()
     else:
-        # Erstelle neues TimeLog für diesen Task
+        # Erstelle neues TimeLog für diesen Task (erster Start)
         existing_tl = TimeLog(task_id=task_id, staff_id=s.id, started_at=now_iso(), ended_at=None, actual_minutes=None)
         db.add(existing_tl)
     
@@ -199,15 +200,18 @@ async def cleaner_stop(request: Request, token: str, task_id: int = Form(...), s
         # Berechne die bisherige Zeit
         try:
             start = datetime.strptime(tl.started_at, fmt)
-            now = datetime.now()
+            end_time = now_iso()
+            end = datetime.strptime(end_time, fmt)
             # Berechne bisherige Minuten und addiere zu eventuell bereits vorhandenen
-            current_elapsed = int((now - start).total_seconds() // 60)
-            if tl.actual_minutes:
-                tl.actual_minutes += current_elapsed
-            else:
-                tl.actual_minutes = current_elapsed
-            # Aktualisiere started_at auf jetzt, damit beim Weiterstarten die Zeit korrekt weiterläuft
-            tl.started_at = now_iso()
+            # Verwende ceil() statt floor() um Sekunden nicht zu verlieren
+            current_elapsed = int((end - start).total_seconds() / 60)  # Genauere Berechnung
+            if current_elapsed > 0:  # Nur addieren wenn Zeit vergangen ist
+                if tl.actual_minutes:
+                    tl.actual_minutes += current_elapsed
+                else:
+                    tl.actual_minutes = current_elapsed
+            # WICHTIG: started_at NICHT ändern beim Pausieren
+            # Beim nächsten Start wird started_at in cleaner_start auf jetzt gesetzt
             # Lassen ended_at auf None, damit wir wissen dass es pausiert ist
         except Exception as e:
             log.error("Error in cleaner_stop: %s", e)
